@@ -941,39 +941,39 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                       System {system.systemIndex + 1}
                     </div>
 
-                    {/* Main Alignment Block */}
-                    <div className="flex items-start">
-                      {/* Bracing & Voice Labels block */}
-                      <div className="w-20 flex-shrink-0 relative mr-6" style={{ height: `${systemHeight}px` }}>
-                        {/* Visual braces */}
-                        {score.voicePairingGroups.map((group, gIdx) =>
-                          renderBrackets(system, group, gIdx)
-                        )}
-
-                        {/* Voice labels stacked vertically */}
-                        <div className="flex flex-col h-full justify-around pr-2 text-right">
-                          {score.voices.map((voice) => {
-                            const isMuted = !!mutedVoices[voice.id];
-                            return (
-                              <div
-                                key={`label-${system.systemIndex}-${voice.id}`}
-                                className="font-serif italic font-bold transition-opacity duration-200 text-black/80"
-                                style={{
-                                  fontSize: `${fontSize * 0.85}px`,
-                                  height: `${rowHeight}px`,
-                                  lineHeight: `${rowHeight}px`,
-                                  opacity: isMuted ? 0.25 : 1.0
-                                }}
-                              >
-                                {voice.name}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Measures Block */}
+                    {/* Main Alignment Block with Autoscale wrapping both labels and measures */}
+                    <div className="flex items-start w-full">
                       <AutoscalingMeasures systemHeight={systemHeight}>
+                        {/* Bracing & Voice Labels block */}
+                        <div className="w-20 flex-shrink-0 relative mr-6" style={{ height: `${systemHeight}px` }}>
+                          {/* Visual braces */}
+                          {score.voicePairingGroups.map((group, gIdx) =>
+                            renderBrackets(system, group, gIdx)
+                          )}
+
+                          {/* Voice labels stacked vertically */}
+                          <div className="flex flex-col h-full justify-around pr-2 text-right">
+                            {score.voices.map((voice) => {
+                              const isMuted = !!mutedVoices[voice.id];
+                              return (
+                                <div
+                                  key={`label-${system.systemIndex}-${voice.id}`}
+                                  className="font-serif italic font-bold transition-opacity duration-200 text-black/80"
+                                  style={{
+                                    fontSize: `${fontSize * 0.85}px`,
+                                    height: `${rowHeight}px`,
+                                    lineHeight: `${rowHeight}px`,
+                                    opacity: isMuted ? 0.25 : 1.0
+                                  }}
+                                >
+                                  {voice.name}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Measures Block */}
                         {Array.from({ length: systemMeasuresCount }).map((_, mIndex) => {
                           const isPlaying =
                             activeMeasure &&

@@ -13,7 +13,7 @@ import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
 import { serializeScoreToAbc } from './engine/abc_serializer';
-import { Play, Pause, Square, Music, Sliders, SlidersHorizontal, Download, Volume2 } from 'lucide-react';
+import { Play, Pause, Square, Music, Sliders, SlidersHorizontal, Download, Volume2, FileDown } from 'lucide-react';
 
 export default function App() {
   // 1. App States
@@ -140,6 +140,24 @@ export default function App() {
   const handleExportMidi = () => {
     if (!score) return;
     MidiWriter.downloadMidiFile(score, bpm, transpose);
+  };
+
+  const handleExportAbc = () => {
+    if (!abcText) return;
+    const blob = new Blob([abcText], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    const fileName = score?.title 
+      ? `${score.title.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.abc` 
+      : 'score.abc';
+      
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Convert transpose values into helpful human-readable key steps
@@ -278,9 +296,20 @@ export default function App() {
           <button
             onClick={handleExportMidi}
             className="px-4 py-2.5 bg-[#1C1E24] hover:bg-[#252830] border border-white/5 text-white rounded-xl active:scale-95 transition-all text-xs font-sans font-black uppercase tracking-wider flex items-center gap-2 shadow-md cursor-pointer"
+            title="Download MIDI File"
           >
             <Download size={14} />
             Export MIDI
+          </button>
+
+          {/* Download ABC button */}
+          <button
+            onClick={handleExportAbc}
+            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 border border-indigo-500 text-white rounded-xl active:scale-95 transition-all text-xs font-sans font-black uppercase tracking-wider flex items-center gap-2 shadow-md cursor-pointer"
+            title="Download ABC notation text file"
+          >
+            <FileDown size={14} />
+            Download ABC
           </button>
         </div>
       </section>
