@@ -1,0 +1,6 @@
+{
+  "name": "SolfaTunes",
+  "description": "Convert ABC notation to Movable-Do Tonic Sol-fa notation with custom score rendering, MIDI playback, and MIDI export.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
