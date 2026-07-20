@@ -49,6 +49,13 @@ export interface ParseWarning {
   reason: string;
 }
 
+export interface SelectedNoteLocation {
+  systemIndex: number;
+  voiceId: string;
+  measureIndex: number;
+  noteIndex: number;
+}
+
 export interface ParsedScore {
   title: string;
   composer: string;

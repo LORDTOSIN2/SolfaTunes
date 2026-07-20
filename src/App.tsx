@@ -9,9 +9,10 @@ import { ScoreRenderer } from './components/ScoreRenderer';
 import { AbcParser } from './engine/abc_parser';
 import { SolfaTransformer } from './engine/solfa_transformer';
 import { ExampleSong, EXAMPLES } from './utils/examples';
-import { ParsedScore, ParseWarning } from './types';
+import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
+import { serializeScoreToAbc } from './engine/abc_serializer';
 import { Play, Pause, Square, Music, Sliders, SlidersHorizontal, Download, Volume2 } from 'lucide-react';
 
 export default function App() {
@@ -30,6 +31,10 @@ export default function App() {
   // Sheet display states
   const [fontSize, setFontSize] = useState<number>(18);
   const [scale, setScale] = useState<number>(1.0);
+
+  // Selected note state for visual editing
+  const [selectedNote, setSelectedNote] = useState<SelectedNoteLocation | null>(null);
+  const [isEditorMode, setIsEditorMode] = useState<boolean>(true);
 
   // 2. Playback Engine reference
   const playerRef = useRef<MidiPlayer | null>(null);
@@ -124,6 +129,12 @@ export default function App() {
 
   const handleLoadExample = (song: ExampleSong) => {
     setAbcText(song.abcText);
+    setSelectedNote(null);
+  };
+
+  const handleUpdateScore = (newScore: ParsedScore) => {
+    const newAbc = serializeScoreToAbc(newScore);
+    setAbcText(newAbc);
   };
 
   const handleExportMidi = () => {
@@ -295,6 +306,11 @@ export default function App() {
             setScale={setScale}
             mutedVoices={mutedVoices}
             toggleMute={toggleMute}
+            selectedNote={selectedNote}
+            onSelectNote={setSelectedNote}
+            onUpdateScore={handleUpdateScore}
+            isEditorMode={isEditorMode}
+            setIsEditorMode={setIsEditorMode}
           />
         </div>
       </main>
