@@ -118,6 +118,7 @@ export class MidiPlayer {
   private pausedEighth = 0;
   private startCtxTime = 0;
   private totalEighths = 0;
+  private nextScheduleWindowStartEighth = 0;
 
   // Active playing voices
   private scheduledVoices: SynthVoice[] = [];
@@ -228,42 +229,59 @@ export class MidiPlayer {
     this.startCtxTime = ctx.currentTime;
     this.isPlaying = true;
 
-    // Schedule all notes from pausedEighth onwards
-    this.score.voices.forEach(voice => {
-      // Skip if voice is muted
-      if (this.activeVoices[voice.id] === false) return;
+    // Track the scheduling window boundary dynamically
+    this.nextScheduleWindowStartEighth = this.pausedEighth;
 
-      this.score!.systems.forEach(system => {
-        const line = system.voices[voice.id];
-        if (!line) return;
+    const scheduleNextNotes = () => {
+      const current = this.getCurrentEighth();
+      const lookAheadEnd = current + 4.0; // 4 eighth notes in advance (about 1 second at 120bpm)
 
-        line.measures.forEach(measure => {
-          measure.notes.forEach(note => {
-            if (note.isRest) return;
-            if (note.timestamp < this.pausedEighth) return;
+      if (this.nextScheduleWindowStartEighth < lookAheadEnd) {
+        const startWindow = this.nextScheduleWindowStartEighth;
+        this.score!.voices.forEach(voice => {
+          // Skip if voice is muted
+          if (this.activeVoices[voice.id] === false) return;
 
-            // Compute relative scheduling times
-            const delayEighths = note.timestamp - this.pausedEighth;
-            const startSec = delayEighths * secondsPerEighth;
-            const durSec = note.durationInEighths * secondsPerEighth;
+          this.score!.systems.forEach(system => {
+            const line = system.voices[voice.id];
+            if (!line) return;
 
-            const startTime = this.startCtxTime + startSec;
+            line.measures.forEach(measure => {
+              measure.notes.forEach(note => {
+                if (note.isRest) return;
+                
+                // Only schedule notes that start in the current lookahead window [startWindow, lookAheadEnd)
+                if (note.timestamp >= startWindow && note.timestamp < lookAheadEnd) {
+                  // Compute relative scheduling times
+                  const delayEighths = note.timestamp - this.pausedEighth;
+                  const startSec = delayEighths * secondsPerEighth;
+                  const durSec = note.durationInEighths * secondsPerEighth;
 
-            // Instantiate custom synth voice
-            const voiceNode = new SynthVoice(
-              ctx,
-              this.masterGain!,
-              note.midiPitch + this.transposeOffset, // Appending transposition offset
-              startTime,
-              durSec
-            );
-            this.scheduledVoices.push(voiceNode);
+                  const startTime = this.startCtxTime + startSec;
+
+                  // Instantiate custom synth voice
+                  const voiceNode = new SynthVoice(
+                    ctx,
+                    this.masterGain!,
+                    note.midiPitch + this.transposeOffset, // Appending transposition offset
+                    startTime,
+                    durSec
+                  );
+                  this.scheduledVoices.push(voiceNode);
+                }
+              });
+            });
           });
         });
-      });
-    });
 
-    // Start timer polling for progress updates
+        this.nextScheduleWindowStartEighth = lookAheadEnd;
+      }
+    };
+
+    // Run first schedule pass immediately!
+    scheduleNextNotes();
+
+    // Start timer polling for progress updates and dynamic scheduling
     if (this.pollingTimer) clearInterval(this.pollingTimer);
     this.pollingTimer = window.setInterval(() => {
       const current = this.getCurrentEighth();
@@ -272,9 +290,10 @@ export class MidiPlayer {
         this.stop();
         onProgress(0);
       } else {
+        scheduleNextNotes();
         onProgress(current);
       }
-    }, 50);
+    }, 25); // Faster 25ms poll for tightly scheduled lookahead checks
   }
 
   /**

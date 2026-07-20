@@ -282,21 +282,60 @@ export class SolfaTransformer {
       });
     });
 
-    // 4. Compute Playback Timestamps per voice line (cumulative timeline)
-    score.voices.forEach(voice => {
-      let cumulativeTime = 0;
+    // 4. Compute Playback Timestamps using a synchronized timeline across all voices!
+    // This aligns the start of each measure for all voices, preventing drift or lag.
+    let currentMeasureStart = 0;
 
-      score.systems.forEach(system => {
+    score.systems.forEach(system => {
+      // Find the maximum number of measures among all voices in this system
+      let systemMeasuresCount = 0;
+      score.voices.forEach(voice => {
         const voiceLine = system.voices[voice.id];
-        if (!voiceLine) return;
-
-        voiceLine.measures.forEach(measure => {
-          measure.notes.forEach(note => {
-            note.timestamp = cumulativeTime;
-            cumulativeTime += note.durationInEighths;
-          });
-        });
+        if (voiceLine && voiceLine.measures.length > systemMeasuresCount) {
+          systemMeasuresCount = voiceLine.measures.length;
+        }
       });
+
+      for (let mIndex = 0; mIndex < systemMeasuresCount; mIndex++) {
+        // Calculate the duration of this measure.
+        // We'll use the maximum duration from any voice's measure as the reference.
+        let measureDuration = 0;
+        
+        score.voices.forEach(voice => {
+          const voiceLine = system.voices[voice.id];
+          if (voiceLine && voiceLine.measures[mIndex]) {
+            const measure = voiceLine.measures[mIndex];
+            let voiceMeasureLen = 0;
+            measure.notes.forEach(note => {
+              voiceMeasureLen += note.durationInEighths;
+            });
+            if (voiceMeasureLen > measureDuration) {
+              measureDuration = voiceMeasureLen;
+            }
+          }
+        });
+
+        // Fallback if measure is completely empty
+        if (measureDuration === 0) {
+          measureDuration = 8;
+        }
+
+        // Assign note timestamps relative to the measure start
+        score.voices.forEach(voice => {
+          const voiceLine = system.voices[voice.id];
+          if (voiceLine && voiceLine.measures[mIndex]) {
+            const measure = voiceLine.measures[mIndex];
+            let noteOffset = 0;
+            measure.notes.forEach(note => {
+              note.timestamp = currentMeasureStart + noteOffset;
+              noteOffset += note.durationInEighths;
+            });
+          }
+        });
+
+        // Advance the start of the next measure
+        currentMeasureStart += measureDuration;
+      }
     });
 
     return score;
