@@ -34,7 +34,7 @@ export default function App() {
 
   // Selected note state for visual editing
   const [selectedNote, setSelectedNote] = useState<SelectedNoteLocation | null>(null);
-  const [studioMode, setStudioMode] = useState<'read' | 'interactive' | 'source'>('interactive');
+  const [studioMode, setStudioMode] = useState<'read' | 'lyrics' | 'interactive' | 'source'>('interactive');
 
   // 2. Playback Engine reference
   const playerRef = useRef<MidiPlayer | null>(null);

@@ -135,6 +135,40 @@ export class AbcParser {
 
     const lines = abcText.split(/\r?\n/);
     
+    let hymnMeter: string | undefined = undefined;
+    let tuneName: string | undefined = undefined;
+    let hymnName: string | undefined = undefined;
+    let verses: number | undefined = undefined;
+    let hasDescant: boolean | undefined = undefined;
+    const lyrics: string[] = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('%')) {
+        const hmMatch = line.match(/^%\s*hymn_meter\s*=\s*(.*)$/i);
+        if (hmMatch) hymnMeter = hmMatch[1].trim();
+        
+        const tnMatch = line.match(/^%\s*tune_name\s*=\s*(.*)$/i);
+        if (tnMatch) tuneName = tnMatch[1].trim();
+
+        const hnMatch = line.match(/^%\s*hymn_name\s*=\s*(.*)$/i);
+        if (hnMatch) hymnName = hnMatch[1].trim();
+
+        const vsMatch = line.match(/^%\s*verses\s*=\s*(\d+)/i);
+        if (vsMatch) verses = parseInt(vsMatch[1], 10);
+
+        const hdMatch = line.match(/^%\s*has_descant\s*=\s*(true|false)/i);
+        if (hdMatch) hasDescant = hdMatch[1].toLowerCase() === 'true';
+      } else if (line.startsWith('W:')) {
+        const lyrMatch = line.match(/^W:\s*(.*)$/i);
+        if (lyrMatch) {
+          lyrics.push(lyrMatch[1]);
+        } else {
+          lyrics.push('');
+        }
+      }
+    }
+    
     // Pass 1: Parse Headers and Voice Declarations
     let bodyStartIndex = 0;
     for (let i = 0; i < lines.length; i++) {
@@ -199,6 +233,7 @@ export class AbcParser {
     for (let i = bodyStartIndex; i < lines.length; i++) {
       const line = lines[i];
       if (line.trim().startsWith('%')) continue;
+      if (line.trim().startsWith('W:')) continue;
       
       const tokens = tokenizeMusicLine(line);
       for (const token of tokens) {
@@ -230,8 +265,31 @@ export class AbcParser {
       });
     }
 
-    // If no %%staves parsed but we have S, A, T, B voices, group S-A and T-B
-    if (this.voicePairingGroups.length === 0 && this.voices.length > 1) {
+    // If hasDescant is true, set the grouping default
+    if (hasDescant && this.voicePairingGroups.length === 0) {
+      const v5 = this.voices.find(v => v.id === '5');
+      const v1 = this.voices.find(v => v.id === '1');
+      const v2 = this.voices.find(v => v.id === '2');
+      const v3 = this.voices.find(v => v.id === '3');
+      const v4 = this.voices.find(v => v.id === '4');
+
+      const groups: string[][] = [];
+      if (v5) groups.push([v5.id]);
+      
+      const treble: string[] = [];
+      if (v1) treble.push(v1.id);
+      if (v2) treble.push(v2.id);
+      if (treble.length > 0) groups.push(treble);
+
+      const bass: string[] = [];
+      if (v3) bass.push(v3.id);
+      if (v4) bass.push(v4.id);
+      if (bass.length > 0) groups.push(bass);
+
+      if (groups.length > 0) {
+        this.voicePairingGroups = groups;
+      }
+    } else if (this.voicePairingGroups.length === 0 && this.voices.length > 1) {
       const sVoice = this.voices.find(v => ['S', 'SOPRANO', '1'].includes(v.id.toUpperCase()));
       const aVoice = this.voices.find(v => ['A', 'ALTO', '2'].includes(v.id.toUpperCase()));
       const tVoice = this.voices.find(v => ['T', 'TENOR', '3'].includes(v.id.toUpperCase()));
@@ -262,6 +320,7 @@ export class AbcParser {
     for (let i = bodyStartIndex; i < lines.length; i++) {
       const line = lines[i].trim();
       if (line === '') continue;
+      if (line.startsWith('W:')) continue;
 
       // Check for System break command in comments
       const isSystemComment = line.startsWith('%') && /System/i.test(line);
@@ -372,9 +431,25 @@ export class AbcParser {
       meter: this.meter,
       defaultLength: this.defaultLength,
       index: this.index,
-      voices: this.voices.sort((a, b) => a.order - b.order),
+      voices: this.voices.sort((a, b) => {
+        if (this.voicePairingGroups.length > 0) {
+          const flatGroup = this.voicePairingGroups.flat();
+          const idxA = flatGroup.indexOf(a.id);
+          const idxB = flatGroup.indexOf(b.id);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
+        }
+        return a.order - b.order;
+      }),
       voicePairingGroups: this.voicePairingGroups,
-      systems
+      systems,
+      hymnMeter,
+      tuneName,
+      hymnName,
+      verses,
+      hasDescant,
+      lyrics
     };
 
     return { score, warnings: this.warnings };

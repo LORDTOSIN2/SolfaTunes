@@ -66,4 +66,12 @@ export interface ParsedScore {
   voices: VoiceDeclaration[];
   voicePairingGroups: string[][]; // Groups of voices bracketed together, e.g. [['S', 'A'], ['T', 'B']]
   systems: System[];
+  
+  // Extra metadata
+  hymnMeter?: string;
+  tuneName?: string;
+  hymnName?: string;
+  verses?: number;
+  hasDescant?: boolean;
+  lyrics?: string[];
 }

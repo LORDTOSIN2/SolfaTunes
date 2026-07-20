@@ -110,5 +110,54 @@ K:C
 V:S name="Melody" clef=treble
 C ^C D ^D | E F ^F G | ^G A ^A B | c4 |]
 `
+  },
+  {
+    id: 'bishopthorpe',
+    title: 'Bishopthorpe (with Descant)',
+    composer: 'J. Clarke (c.1659–1707)',
+    abcText: `% Beautiful Bishopthorpe Hymn Setting
+% Demonstrating has_descant, staves formatting, and lyrics
+X:4
+T:Bishopthorpe
+C:J. Clarke (c.1659–1707)
+M:3/4
+L:1/4
+K:G
+% hymn_meter=8.6.8.6
+% tune_name=Bishopthorpe
+% hymn_name=Immortal Love, For Ever Full
+% verses=7
+% has_descant=true
+%%staves [(5) (1 2) (3 4)]
+V:5 name="Descant" clef=treble
+V:1 name="Soprano" clef=treble
+V:2 name="Alto" clef=treble
+V:3 name="Tenor" clef=treble
+V:4 name="Bass" clef=bass
+
+% --- System 1 ---
+[V:5] B2 c | d2 e | d2 c | B3 |
+[V:1] G2 A | B2 c | B2 A | G3 |
+[V:2] D2 D | D2 E | D2 C | B,3 |
+[V:3] B,2 F, | G,2 G, | G,2 F, | G,3 |
+[V:4] G,,2 D, | G,2 C, | G,,2 D, | G,,3 |
+
+% --- System 2 ---
+[V:5] d2 d | e2 d | c2 B | A3 |
+[V:1] B2 B | c2 B | A2 G | F3 |
+[V:2] D2 D | E2 D | C2 B, | A,3 |
+[V:3] G,2 G, | G,2 G, | E,2 G, | D,3 |
+[V:4] G,,2 B,, | C,2 G,, | A,,2 B,, | D,3 |
+
+W: 1. Immortal Love for ever full,
+W:    for ever flowing free,
+W:    for ever shared, for ever whole,
+W:    a never-ebbing sea.
+W:
+W: 2. Our outward lips confess the name,
+W:    all other names above;
+W:    love only knoweth whence it came,
+W:    and comprehendeth love.
+`
   }
 ];

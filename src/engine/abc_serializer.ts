@@ -108,6 +108,13 @@ export function serializeScoreToAbc(score: ParsedScore): string {
   if (score.defaultLength) lines.push(`L:${score.defaultLength}`);
   if (score.key) lines.push(`K:${score.key}`);
 
+  // Extra metadata comments
+  if (score.hymnMeter) lines.push(`% hymn_meter=${score.hymnMeter}`);
+  if (score.tuneName) lines.push(`% tune_name=${score.tuneName}`);
+  if (score.hymnName) lines.push(`% hymn_name=${score.hymnName}`);
+  if (score.verses !== undefined) lines.push(`% verses=${score.verses}`);
+  if (score.hasDescant !== undefined) lines.push(`% has_descant=${score.hasDescant}`);
+
   // 2. Voice pairings / %%staves if present
   if (score.voicePairingGroups && score.voicePairingGroups.length > 0) {
     const stavesStr = score.voicePairingGroups
@@ -151,6 +158,17 @@ export function serializeScoreToAbc(score: ParsedScore): string {
 
     lines.push(''); // Blank line between systems
   });
+
+  // Append lyrics if present
+  if (score.lyrics && score.lyrics.length > 0) {
+    score.lyrics.forEach(line => {
+      if (line.trim() === '') {
+        lines.push('W:');
+      } else {
+        lines.push(`W: ${line}`);
+      }
+    });
+  }
 
   return lines.join('\n');
 }

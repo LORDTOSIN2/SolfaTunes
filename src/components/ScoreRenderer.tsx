@@ -6,7 +6,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ParsedScore, System, VoiceLine, Measure, SolfaNote, SelectedNoteLocation, ParseWarning } from '../types';
 import { SolfaTransformer } from '../engine/solfa_transformer';
-import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle } from 'lucide-react';
+import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle, FileText } from 'lucide-react';
 
 interface ScoreRendererProps {
   score: ParsedScore | null;
@@ -23,8 +23,8 @@ interface ScoreRendererProps {
   selectedNote: SelectedNoteLocation | null;
   onSelectNote: (location: SelectedNoteLocation | null) => void;
   onUpdateScore: (score: ParsedScore) => void;
-  studioMode: 'read' | 'interactive' | 'source';
-  setStudioMode: (val: 'read' | 'interactive' | 'source') => void;
+  studioMode: 'read' | 'lyrics' | 'interactive' | 'source';
+  setStudioMode: (val: 'read' | 'lyrics' | 'interactive' | 'source') => void;
 }
 
 /**
@@ -709,6 +709,43 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
 }) => {
   const [showHelp, setShowHelp] = useState<boolean>(false);
 
+  const layoutRows = useMemo<({ type: 'voice'; voice: any } | { type: 'divider' })[]>(() => {
+    if (!score) return [];
+    
+    const rows: ({ type: 'voice'; voice: any } | { type: 'divider' })[] = [];
+    const groupedVoiceIds = new Set<string>();
+    
+    // Process groups
+    score.voicePairingGroups.forEach((group, gIdx) => {
+      let groupHasVoices = false;
+      group.forEach(voiceId => {
+        const voice = score.voices.find(v => v.id === voiceId);
+        if (voice) {
+          rows.push({ type: 'voice', voice });
+          groupedVoiceIds.add(voiceId);
+          groupHasVoices = true;
+        }
+      });
+      
+      if (groupHasVoices && gIdx < score.voicePairingGroups.length - 1) {
+        rows.push({ type: 'divider' });
+      }
+    });
+    
+    // Add remaining ungrouped voices
+    const ungrouped = score.voices.filter(v => !groupedVoiceIds.has(v.id));
+    if (ungrouped.length > 0) {
+      if (rows.length > 0) {
+        rows.push({ type: 'divider' });
+      }
+      ungrouped.forEach(voice => {
+        rows.push({ type: 'voice', voice });
+      });
+    }
+    
+    return rows;
+  }, [score]);
+
   // Synchronized scrolling for our high-fidelity IDE
   const editorTextareaRef = useRef<HTMLTextAreaElement>(null);
   const editorHighlightRef = useRef<HTMLPreElement>(null);
@@ -923,19 +960,34 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 setStudioMode('read');
                 onSelectNote(null);
               }}
-              className={`px-3.5 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
                 studioMode === 'read'
-                  ? 'bg-[#1C1E24] text-white shadow border border-white/10'
+                  ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
                   : 'text-stone-400 hover:text-white'
               }`}
-              title="Switch to View/Read Mode"
+              title="Switch to Solfa sheet music mode"
             >
               <Eye size={12} />
-              Read Only
+              Solfa
+            </button>
+            <button
+              onClick={() => {
+                setStudioMode('lyrics');
+                onSelectNote(null);
+              }}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
+                studioMode === 'lyrics'
+                  ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
+                  : 'text-stone-400 hover:text-white'
+              }`}
+              title="Switch to Hymn Lyrics View"
+            >
+              <FileText size={12} />
+              Hymn Lyrics
             </button>
             <button
               onClick={() => setStudioMode('interactive')}
-              className={`px-3.5 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
                 studioMode === 'interactive'
                   ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
                   : 'text-stone-400 hover:text-indigo-400'
@@ -950,7 +1002,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 setStudioMode('source');
                 onSelectNote(null);
               }}
-              className={`px-3.5 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
                 studioMode === 'source'
                   ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
                   : 'text-stone-400 hover:text-indigo-400'
@@ -1151,6 +1203,101 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             </div>
           )}
         </div>
+      ) : studioMode === 'lyrics' ? (
+        /* Hymn Lyrics View */
+        <div className="flex-1 overflow-auto p-8 relative bg-[#0A0A0B]">
+          <div
+            className="mx-auto max-w-2xl bg-[#FDFCF8] text-black border border-black/5 shadow-2xl rounded-2xl p-10 font-sans relative transition-all overflow-hidden"
+            style={{
+              transform: `scale(${scale})`,
+              transformOrigin: 'top center',
+              marginBottom: `${(scale - 1) * 100}%`
+            }}
+          >
+            {/* Subtle Watermark */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.02] select-none z-0">
+              <h1 className="text-[12rem] font-black tracking-tighter font-serif">LYRICS</h1>
+            </div>
+
+            <div className="relative z-10">
+              {/* Hymn Headers */}
+              {score && (
+                <div className="mb-8 border-b-2 border-black/10 pb-4 text-center">
+                  <h1 className="font-serif italic font-black text-3xl tracking-tight text-stone-900">
+                    {score.hymnName || score.title}
+                  </h1>
+                  {score.tuneName && (
+                    <p className="font-serif italic text-black/60 text-sm mt-1">
+                      Tune: <span className="font-bold">{score.tuneName}</span>
+                    </p>
+                  )}
+                  <div className="flex justify-center gap-4 mt-2 text-stone-500 uppercase tracking-widest font-bold text-[10px]">
+                    {score.hymnMeter && <span>Meter: {score.hymnMeter}</span>}
+                    {score.verses !== undefined && <span>Verses: {score.verses}</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Render the lyrics verses nicely */}
+              {score && score.lyrics && score.lyrics.length > 0 ? (
+                <div className="space-y-6 max-w-md mx-auto text-center font-serif text-base leading-relaxed text-stone-800">
+                  {(() => {
+                    // Group lyrics into verses separated by blank lines
+                    const versesList: string[][] = [];
+                    let currentVerse: string[] = [];
+                    
+                    score.lyrics.forEach(line => {
+                      if (line.trim() === '') {
+                        if (currentVerse.length > 0) {
+                          versesList.push(currentVerse);
+                          currentVerse = [];
+                        }
+                      } else {
+                        currentVerse.push(line);
+                      }
+                    });
+                    
+                    if (currentVerse.length > 0) {
+                      versesList.push(currentVerse);
+                    }
+
+                    if (versesList.length === 0) {
+                      return <p className="italic text-stone-400">No lyrics available.</p>;
+                    }
+
+                    return versesList.map((verse, vIdx) => (
+                      <div key={`verse-${vIdx}`} className="p-4 bg-stone-50/50 rounded-xl border border-stone-100">
+                        {verse.map((line, lIdx) => {
+                          const numMatch = line.match(/^(\d+\.?\s*)(.*)$/);
+                          if (numMatch) {
+                            return (
+                              <p key={`line-${vIdx}-${lIdx}`} className="my-1">
+                                <span className="font-bold text-stone-400 mr-1">{numMatch[1]}</span>
+                                {numMatch[2]}
+                              </p>
+                            );
+                          }
+                          return (
+                            <p key={`line-${vIdx}-${lIdx}`} className="my-1">
+                              {line}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    ));
+                  })()}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-stone-400 italic">
+                  <p>No lyrics (W: lines) found in this ABC score.</p>
+                  <p className="text-[11px] font-sans mt-2">
+                    Add lyrics lines at the end of the ABC file with the <code className="bg-stone-100 px-1 py-0.5 rounded text-indigo-600">W:</code> prefix.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       ) : (
         /* Sheet Music Visual Area */
         <div className="flex-1 overflow-auto p-8 relative bg-[#0A0A0B]">
@@ -1345,7 +1492,10 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
 
                   // Compute the exact height of the voice rows in this system for barline alignment
                   const rowHeight = fontSize * 2.2;
-                  const systemHeight = score.voices.length * rowHeight;
+                  const dividerHeight = 12;
+                  const voiceCount = layoutRows.filter(r => r.type === 'voice').length;
+                  const dividerCount = layoutRows.filter(r => r.type === 'divider').length;
+                  const systemHeight = (voiceCount * rowHeight) + (dividerCount * dividerHeight);
 
                   return (
                     <div
@@ -1368,8 +1518,17 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                             )}
 
                             {/* Voice labels stacked vertically */}
-                            <div className="flex flex-col h-full justify-around pr-2 text-right">
-                              {score.voices.map((voice) => {
+                            <div className="flex flex-col h-full justify-start pr-2 text-right">
+                              {layoutRows.map((row, rIdx) => {
+                                if (row.type === 'divider') {
+                                  return (
+                                    <div 
+                                      key={`label-div-${system.systemIndex}-${rIdx}`} 
+                                      style={{ height: `${dividerHeight}px` }}
+                                    />
+                                  );
+                                }
+                                const voice = row.voice;
                                 const isMuted = !!mutedVoices[voice.id];
                                 return (
                                   <div
@@ -1408,8 +1567,20 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                                 }`}
                               >
                                 {/* Measure Content (Beat cells vertical stack) */}
-                                <div className="flex flex-col justify-around px-2" style={{ height: `${systemHeight}px` }}>
-                                  {score.voices.map((voice) => {
+                                <div className="flex flex-col justify-start px-2" style={{ height: `${systemHeight}px` }}>
+                                  {layoutRows.map((row, rIdx) => {
+                                    if (row.type === 'divider') {
+                                      return (
+                                        <div 
+                                          key={`notes-div-${system.systemIndex}-${mIndex}-${rIdx}`}
+                                          className="flex items-center w-full px-4" 
+                                          style={{ height: `${dividerHeight}px` }}
+                                        >
+                                          <div className="w-full border-t border-black/15" />
+                                        </div>
+                                      );
+                                    }
+                                    const voice = row.voice;
                                     const voiceLine = system.voices[voice.id];
                                     const measure = voiceLine?.measures[mIndex];
                                     const isMuted = !!mutedVoices[voice.id];
