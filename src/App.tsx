@@ -34,7 +34,7 @@ export default function App() {
 
   // Selected note state for visual editing
   const [selectedNote, setSelectedNote] = useState<SelectedNoteLocation | null>(null);
-  const [isEditorMode, setIsEditorMode] = useState<boolean>(true);
+  const [studioMode, setStudioMode] = useState<'read' | 'interactive' | 'source'>('interactive');
 
   // 2. Playback Engine reference
   const playerRef = useRef<MidiPlayer | null>(null);
@@ -328,6 +328,9 @@ export default function App() {
         <div className="flex-1 min-w-0 h-full">
           <ScoreRenderer
             score={score}
+            abcText={abcText}
+            setAbcText={setAbcText}
+            warnings={warnings}
             currentEighth={currentEighth}
             fontSize={fontSize}
             setFontSize={setFontSize}
@@ -338,8 +341,8 @@ export default function App() {
             selectedNote={selectedNote}
             onSelectNote={setSelectedNote}
             onUpdateScore={handleUpdateScore}
-            isEditorMode={isEditorMode}
-            setIsEditorMode={setIsEditorMode}
+            studioMode={studioMode}
+            setStudioMode={setStudioMode}
           />
         </div>
       </main>

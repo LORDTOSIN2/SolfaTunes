@@ -4,6 +4,72 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SolfaTunes — ABC to Tonic Sol-fa notation Studio</title>
+    <script>
+      // Safeguard against browser and chrome extension polyfill errors in iframes
+      (function() {
+        try {
+          var mockGetManifest = function() {
+            return { version: "1.0.0", name: "SafeMock", manifest_version: 3 };
+          };
+          
+          var patchRuntime = function(obj) {
+            if (!obj) return;
+            try {
+              if (!obj.runtime) {
+                Object.defineProperty(obj, 'runtime', {
+                  value: {},
+                  writable: true,
+                  configurable: true
+                });
+              }
+              if (obj.runtime && typeof obj.runtime.getManifest !== 'function') {
+                Object.defineProperty(obj.runtime, 'getManifest', {
+                  value: mockGetManifest,
+                  writable: true,
+                  configurable: true
+                });
+              }
+            } catch (err) {
+              if (obj.runtime && !obj.runtime.getManifest) {
+                try {
+                  obj.runtime.getManifest = mockGetManifest;
+                } catch (e) {}
+              }
+            }
+          };
+
+          if (typeof window !== 'undefined') {
+            if (!window.browser) {
+              try {
+                Object.defineProperty(window, 'browser', {
+                  value: {},
+                  writable: true,
+                  configurable: true
+                });
+              } catch (e) {
+                window.browser = {};
+              }
+            }
+            patchRuntime(window.browser);
+
+            if (!window.chrome) {
+              try {
+                Object.defineProperty(window, 'chrome', {
+                  value: {},
+                  writable: true,
+                  configurable: true
+                });
+              } catch (e) {
+                window.chrome = {};
+              }
+            }
+            patchRuntime(window.chrome);
+          }
+        } catch (e) {
+          console.warn("Could not patch chrome/browser runtime mocks:", e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

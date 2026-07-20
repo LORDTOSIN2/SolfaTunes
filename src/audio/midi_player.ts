@@ -113,6 +113,9 @@ export class MidiPlayer {
   private transposeOffset = 0; // Transposition in semitones
   private activeVoices: { [voiceId: string]: boolean } = {};
   
+  // Per-voice sub-mixing gain nodes
+  private voiceGains: { [voiceId: string]: GainNode } = {};
+  
   // State
   private isPlaying = false;
   private pausedEighth = 0;
@@ -145,6 +148,25 @@ export class MidiPlayer {
   }
 
   /**
+   * Dynamically gets or creates the GainNode for a specific voice.
+   */
+  private getVoiceGain(voiceId: string): GainNode {
+    this.initAudio();
+    const ctx = this.ctx!;
+    
+    if (!this.voiceGains[voiceId]) {
+      const gainNode = ctx.createGain();
+      // activeVoices: true means MUTED, false/undefined means ACTIVE
+      const isMuted = !!this.activeVoices[voiceId];
+      gainNode.gain.setValueAtTime(isMuted ? 0.0 : 1.0, ctx.currentTime);
+      gainNode.connect(this.masterGain!);
+      this.voiceGains[voiceId] = gainNode;
+    }
+    
+    return this.voiceGains[voiceId];
+  }
+
+  /**
    * Loads a score and computes its total eighth-note length.
    */
   public loadScore(score: ParsedScore, bpm: number, activeVoices: { [voiceId: string]: boolean }) {
@@ -153,6 +175,16 @@ export class MidiPlayer {
     this.bpm = bpm;
     this.activeVoices = activeVoices;
     this.pausedEighth = 0;
+
+    // Disconnect and clear old voice gain nodes
+    if (this.ctx) {
+      Object.keys(this.voiceGains).forEach(vId => {
+        try {
+          this.voiceGains[vId].disconnect();
+        } catch (e) {}
+      });
+    }
+    this.voiceGains = {};
 
     // Calculate total duration
     let maxEighth = 0;
@@ -179,12 +211,21 @@ export class MidiPlayer {
    */
   public updateActiveVoices(activeVoices: { [voiceId: string]: boolean }) {
     this.activeVoices = activeVoices;
-    if (this.isPlaying && this.score) {
-      // Re-schedule remaining notes to apply active voice toggles instantly!
-      const currentPos = this.getCurrentEighth();
-      this.pause();
-      this.pausedEighth = currentPos;
-      this.play(this.onProgressCallback!);
+    
+    // Smoothly adjust the sub-mixing gain of each voice in real time!
+    if (this.ctx) {
+      const now = this.ctx.currentTime;
+      // Update all voices present in current score (or in activeVoices)
+      const voicesToUpdate = this.score ? this.score.voices.map(v => v.id) : Object.keys(activeVoices);
+      
+      voicesToUpdate.forEach(voiceId => {
+        const isMuted = !!activeVoices[voiceId];
+        const gainNode = this.getVoiceGain(voiceId);
+        
+        gainNode.gain.cancelScheduledValues(now);
+        gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+        gainNode.gain.linearRampToValueAtTime(isMuted ? 0.0 : 1.0, now + 0.015); // Smooth 15ms click-free transition
+      });
     }
   }
 
@@ -239,8 +280,8 @@ export class MidiPlayer {
       if (this.nextScheduleWindowStartEighth < lookAheadEnd) {
         const startWindow = this.nextScheduleWindowStartEighth;
         this.score!.voices.forEach(voice => {
-          // Skip if voice is muted
-          if (this.activeVoices[voice.id] === false) return;
+          // Note: We schedule all voices, and control their volume via per-voice sub-mix gain nodes.
+          // This allows users to mute/unmute voices instantly and seamlessly without restarting playback or cutting off active notes!
 
           this.score!.systems.forEach(system => {
             const line = system.voices[voice.id];
@@ -259,10 +300,10 @@ export class MidiPlayer {
 
                   const startTime = this.startCtxTime + startSec;
 
-                  // Instantiate custom synth voice
+                  // Instantiate custom synth voice and connect to its dedicated voice sub-mix gain node
                   const voiceNode = new SynthVoice(
                     ctx,
-                    this.masterGain!,
+                    this.getVoiceGain(voice.id),
                     note.midiPitch + this.transposeOffset, // Appending transposition offset
                     startTime,
                     durSec
@@ -353,6 +394,12 @@ export class MidiPlayer {
   public dispose() {
     this.stop();
     if (this.ctx) {
+      Object.keys(this.voiceGains).forEach(vId => {
+        try {
+          this.voiceGains[vId].disconnect();
+        } catch (e) {}
+      });
+      this.voiceGains = {};
       this.ctx.close();
       this.ctx = null;
     }
