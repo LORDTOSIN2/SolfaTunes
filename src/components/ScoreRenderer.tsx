@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ParsedScore, System, VoiceLine, Measure, SolfaNote } from '../types';
 import { SolfaTransformer } from '../engine/solfa_transformer';
 import { ZoomIn, ZoomOut, Type } from 'lucide-react';
@@ -85,6 +85,74 @@ const BarlineGraphic: React.FC<{ type: string; height: number }> = ({ type, heig
         </div>
       );
   }
+};
+
+/**
+ * Container that enforces single-row display and automatically scales
+ * measures down if they overflow the available width.
+ */
+interface AutoscalingMeasuresProps {
+  systemHeight: number;
+  children: React.ReactNode;
+}
+
+const AutoscalingMeasures: React.FC<AutoscalingMeasuresProps> = ({ systemHeight, children }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
+
+    const updateScale = () => {
+      const containerWidth = container.getBoundingClientRect().width;
+      
+      const prevTransform = content.style.transform;
+      content.style.transform = 'none';
+      const contentWidth = content.scrollWidth || content.getBoundingClientRect().width;
+      content.style.transform = prevTransform;
+
+      if (contentWidth > containerWidth && containerWidth > 0) {
+        const newScale = containerWidth / contentWidth;
+        setScale(newScale);
+        content.style.transform = `scale(${newScale})`;
+      } else {
+        setScale(1);
+        content.style.transform = 'none';
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateScale();
+    });
+
+    resizeObserver.observe(container);
+    resizeObserver.observe(content);
+
+    updateScale();
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [children]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="flex-1 overflow-hidden relative"
+      style={{ height: `${systemHeight * scale}px`, transition: 'height 150ms ease-out' }}
+    >
+      <div
+        ref={contentRef}
+        className="flex flex-row flex-nowrap justify-between w-max min-w-full origin-top-left transition-transform duration-150 ease-out"
+        style={{ height: `${systemHeight}px` }}
+      >
+        {children}
+      </div>
+    </div>
+  );
 };
 
 export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
@@ -362,7 +430,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                       </div>
 
                       {/* Measures Block */}
-                      <div className="flex-1 flex flex-wrap items-center gap-y-4">
+                      <AutoscalingMeasures systemHeight={systemHeight}>
                         {Array.from({ length: systemMeasuresCount }).map((_, mIndex) => {
                           const isPlaying =
                             activeMeasure &&
@@ -421,7 +489,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                             </div>
                           );
                         })}
-                      </div>
+                      </AutoscalingMeasures>
                     </div>
                   </div>
                 );
