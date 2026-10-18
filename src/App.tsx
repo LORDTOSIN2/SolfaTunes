@@ -24,7 +24,7 @@ export default function App() {
   // Player control states
   const [bpm, setBpm] = useState<number>(100);
   const [transpose, setTranspose] = useState<number>(0);
-  const [currentEighth, setCurrentEighth] = useState<number>(0);
+  const [currentTick, setCurrentTick] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [mutedVoices, setMutedVoices] = useState<{ [voiceId: string]: boolean }>({});
 
@@ -61,7 +61,7 @@ export default function App() {
 
       // Reset playhead and stop current playbacks when score changes
       setIsPlaying(false);
-      setCurrentEighth(0);
+      setCurrentTick(0);
       playerRef.current?.stop();
       
       // Load into the player
@@ -102,7 +102,7 @@ export default function App() {
     
     setIsPlaying(true);
     playerRef.current?.play((tick) => {
-      setCurrentEighth(tick);
+      setCurrentTick(tick);
       if (tick === 0) {
         setIsPlaying(false);
       }
@@ -117,7 +117,7 @@ export default function App() {
   const handleStop = () => {
     setIsPlaying(false);
     playerRef.current?.stop();
-    setCurrentEighth(0);
+    setCurrentTick(0);
   };
 
   const toggleMute = (voiceId: string) => {
@@ -213,7 +213,7 @@ export default function App() {
             <div className="flex items-center gap-1.5 border-l border-white/10 pl-4">
               <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
               <span className="text-stone-500">Tick:</span>
-              <span className="font-mono text-indigo-400">{Math.round(currentEighth)}</span>
+              <span className="font-mono text-indigo-400">{Math.round(currentTick)}</span>
             </div>
           )}
         </div>
@@ -331,7 +331,8 @@ export default function App() {
             abcText={abcText}
             setAbcText={setAbcText}
             warnings={warnings}
-            currentEighth={currentEighth}
+            currentTick={currentTick}
+            currentEighth={currentTick}
             fontSize={fontSize}
             setFontSize={setFontSize}
             scale={scale}

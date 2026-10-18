@@ -22,8 +22,8 @@ function parseDefaultLength(lengthStr: string): number {
 export function serializeNoteToAbc(note: SolfaNote, defaultLengthVal: number): string {
   if (note.isRest) {
     const restChar = note.rawLetter || 'z';
-    // Calculate multiplier relative to default length: durationInEighths / (L_val * 8)
-    const mult = note.durationInEighths / (defaultLengthVal * 8);
+    // Calculate multiplier relative to default length: durationTicks / (L_val * 16)
+    const mult = note.durationTicks / (defaultLengthVal * 16);
     const durStr = serializeDuration(mult);
     return `${restChar}${durStr}`;
   }
@@ -53,7 +53,7 @@ export function serializeNoteToAbc(note: SolfaNote, defaultLengthVal: number): s
   }
 
   // 3. Duration
-  const mult = note.durationInEighths / (defaultLengthVal * 8);
+  const mult = note.durationTicks / (defaultLengthVal * 16);
   const durStr = serializeDuration(mult);
 
   return `${acc}${abcLetter}${octaveMarks}${durStr}`;

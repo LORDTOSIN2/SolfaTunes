@@ -176,10 +176,10 @@ export class SolfaTransformer {
           const activeOverrides: { [letter: string]: number } = {};
 
           measure.notes.forEach(note => {
-            // Scale duration by the default note length: durationInEighths = mult * L_val * 8
-            const durationMult = note.durationInEighths;
-            note.durationInEighths = Math.round(durationMult * defaultLengthVal * 8);
-            if (note.durationInEighths <= 0) note.durationInEighths = 1; // Safeguard
+            // Scale duration by the default note length: durationTicks = mult * L_val * 16
+            const durationMult = note.durationTicks;
+            note.durationTicks = Math.round(durationMult * defaultLengthVal * 16);
+            if (note.durationTicks <= 0) note.durationTicks = 1; // Safeguard
 
             if (note.isRest) {
               note.syllable = '·';
@@ -214,6 +214,9 @@ export class SolfaTransformer {
             // MIDI pitch
             const oct = note.octaveNum !== undefined ? note.octaveNum : 4;
             note.midiPitch = 12 * (oct + 1) + pc;
+
+            // Solfa octave relative to tonic
+            note.solfaOctave = Math.floor((note.midiPitch - keyInfo.tonic) / 12);
           });
         });
       });
@@ -231,8 +234,8 @@ export class SolfaTransformer {
 
         voiceLine.measures.forEach(measure => {
           measure.notes.forEach(note => {
-            if (!note.isRest && note.octaveNum !== undefined) {
-              octaves.push(note.octaveNum);
+            if (!note.isRest && note.solfaOctave !== undefined) {
+              octaves.push(note.solfaOctave);
             }
           });
         });
@@ -242,7 +245,7 @@ export class SolfaTransformer {
       if (octaves.length > 0) {
         const frequency: { [val: number]: number } = {};
         let maxFreq = 0;
-        let mode = 4; // fallback
+        let mode = 5; // fallback
 
         octaves.forEach(oct => {
           frequency[oct] = (frequency[oct] || 0) + 1;
@@ -254,8 +257,10 @@ export class SolfaTransformer {
         voiceHomeRegisters[voice.id] = mode;
       } else {
         // Fallbacks if voice is silent or has only rests
-        if (['B', 'BASS', 'T', 'TENOR'].includes(voice.id.toUpperCase())) {
+        if (['B', 'BASS', '4'].includes(voice.id.toUpperCase())) {
           voiceHomeRegisters[voice.id] = 3;
+        } else if (['T', 'TENOR', '3'].includes(voice.id.toUpperCase())) {
+          voiceHomeRegisters[voice.id] = 4;
         } else {
           voiceHomeRegisters[voice.id] = 5;
         }
@@ -272,8 +277,8 @@ export class SolfaTransformer {
 
         voiceLine.measures.forEach(measure => {
           measure.notes.forEach(note => {
-            if (!note.isRest && note.octaveNum !== undefined) {
-              note.octaveRelativeToVoice = note.octaveNum - homeRegister;
+            if (!note.isRest && note.solfaOctave !== undefined) {
+              note.octaveRelativeToVoice = note.solfaOctave - homeRegister;
             } else {
               note.octaveRelativeToVoice = 0;
             }
@@ -307,7 +312,7 @@ export class SolfaTransformer {
             const measure = voiceLine.measures[mIndex];
             let voiceMeasureLen = 0;
             measure.notes.forEach(note => {
-              voiceMeasureLen += note.durationInEighths;
+              voiceMeasureLen += note.durationTicks;
             });
             if (voiceMeasureLen > measureDuration) {
               measureDuration = voiceMeasureLen;
@@ -317,7 +322,7 @@ export class SolfaTransformer {
 
         // Fallback if measure is completely empty
         if (measureDuration === 0) {
-          measureDuration = 8;
+          measureDuration = 16;
         }
 
         // Assign note timestamps relative to the measure start
@@ -328,7 +333,7 @@ export class SolfaTransformer {
             let noteOffset = 0;
             measure.notes.forEach(note => {
               note.timestamp = currentMeasureStart + noteOffset;
-              noteOffset += note.durationInEighths;
+              noteOffset += note.durationTicks;
             });
           }
         });
@@ -343,84 +348,195 @@ export class SolfaTransformer {
 
   /**
    * Formats a Measure's rhythm into beat-divided columns (e.g. m : - : m : r).
-   * 
-   * 1. Compute beat unit in eighth-note ticks: beatEighths = Math.round(8 / meterDenominator).
-   * 2. Walk the eighth-tick timeline, chunking it into beatEighths-sized cells.
-   * 3. Within each cell:
-   *    - If a note is sustained into this position from earlier, place a dash '-'.
-   *    - If a note starts, place its syllable.
-   *    - If multiple notes start in the same cell, join them with a dot, e.g. 'd.r'.
-   *    - If it is a rest starting, place '·'.
+   * Uses analyzeMeasureCells to share logic with InteractiveRhythmLine.
    */
-  public static formatMeasureRhythm(measure: Measure, meterDenominator: number): string {
-    const notes = measure.notes;
-    if (notes.length === 0) return '';
+  public static formatMeasureRhythm(measure: Measure, meterOrDen?: string | number): string {
+    let meterStr = '4/4';
+    if (typeof meterOrDen === 'number') {
+      meterStr = `4/${meterOrDen}`;
+    } else if (typeof meterOrDen === 'string') {
+      meterStr = meterOrDen;
+    }
+    const cells = analyzeMeasureCells(measure, meterStr);
+    return cells
+      .map(cell => cell.parts.map(p => p.items.map(it => it.text).join(',')).join('.'))
+      .join(' : ');
+  }
+}
 
-    const beatEighths = Math.max(1, Math.round(8 / meterDenominator));
+/**
+ * Formats a Solfa syllable with combining diacritic dots for octave relative to voice.
+ */
+export function formatSolfaSyllable(syllable: string, octaveRelativeToVoice: number): string {
+  let text = syllable;
+  if (octaveRelativeToVoice > 0) {
+    // Octave above: U+0307 (combining dot above). Limit to 2.
+    const dots = '\u0307'.repeat(Math.min(octaveRelativeToVoice, 2));
+    text = text.charAt(0) + dots + text.substring(1);
+  } else if (octaveRelativeToVoice < 0) {
+    // Octave below: U+0323 (combining dot below). Limit to 2.
+    const dots = '\u0323'.repeat(Math.min(Math.abs(octaveRelativeToVoice), 2));
+    text = text.charAt(0) + dots + text.substring(1);
+  }
+  return text;
+}
 
-    // Map each note to its relative start/end in the measure
-    let currentOffset = 0;
-    const timeline = notes.map(note => {
-      const start = currentOffset;
-      currentOffset += note.durationInEighths;
-      return {
-        note,
-        start,
-        end: currentOffset
+/**
+ * Calculates pulse ticks in sixteenth notes:
+ * simple = 16/den; 6/8, 9/8, 12/8 = 6.
+ */
+export function pulseTicks(meter: string | undefined): number {
+  if (!meter) return 4;
+  const clean = meter.trim();
+  if (clean === '6/8' || clean === '9/8' || clean === '12/8') {
+    return 6;
+  }
+  const parts = clean.split('/');
+  const den = parseInt(parts[1], 10) || 4;
+  return Math.max(1, Math.round(16 / den));
+}
+
+export interface FormattedCellItem {
+  type: 'note' | 'sustained' | 'rest';
+  text: string;
+  note?: SolfaNote;
+  noteIndex?: number;
+}
+
+export interface FormattedCellPart {
+  items: FormattedCellItem[];
+}
+
+export interface FormattedCell {
+  parts: FormattedCellPart[];
+}
+
+/**
+ * Shared helper: analyzes a measure's notes into pulse-divided cells.
+ * - Pulse size is determined by pulseTicks(meter).
+ * - Join notes inside one half-pulse with ",", across halves with ".".
+ * - When a note is sustained into a cell AND other notes start inside it,
+ *   render "-" then "." then those notes.
+ */
+export function analyzeMeasureCells(measure: Measure, meter: string | undefined): FormattedCell[] {
+  const notes = measure.notes;
+  if (notes.length === 0) return [];
+
+  const pulse = pulseTicks(meter);
+  const halfPulse = pulse / 2;
+
+  // Map each note to its relative start/end in the measure
+  let currentOffset = 0;
+  const timeline = notes.map((note, index) => {
+    const start = currentOffset;
+    currentOffset += note.durationTicks;
+    return {
+      note,
+      index,
+      start,
+      end: currentOffset
+    };
+  });
+
+  const totalTicks = currentOffset;
+  const cells: FormattedCell[] = [];
+
+  const makeItem = (t: { note: SolfaNote; index: number }): FormattedCellItem => {
+    if (t.note.isRest) {
+      return { type: 'rest', text: '·', note: t.note, noteIndex: t.index };
+    }
+    const text = formatSolfaSyllable(t.note.syllable, t.note.octaveRelativeToVoice);
+    return { type: 'note', text, note: t.note, noteIndex: t.index };
+  };
+
+  // Walk the timeline in chunks of pulse ticks
+  for (let cellStart = 0; cellStart < totalTicks; cellStart += pulse) {
+    const cellEnd = cellStart + pulse;
+    const cellMid = cellStart + halfPulse;
+
+    // Check if a note starts BEFORE cellStart and continues INTO cellStart
+    const sustainedNote = timeline.find(t => t.start < cellStart && t.end > cellStart);
+
+    // Find notes that start within this pulse cell
+    const startingInCell = timeline.filter(t => t.start >= cellStart && t.start < cellEnd);
+
+    if (sustainedNote && !sustainedNote.note.isRest) {
+      const sustainedItem: FormattedCellItem = {
+        type: 'sustained',
+        text: '-',
+        note: sustainedNote.note,
+        noteIndex: sustainedNote.index
       };
-    });
 
-    const totalEighths = currentOffset;
-    const cells: string[] = [];
-
-    // Walk the timeline in chunks of beatEighths
-    for (let cellStart = 0; cellStart < totalEighths; cellStart += beatEighths) {
-      const cellEnd = cellStart + beatEighths;
-
-      // Check if a note starts BEFORE cellStart and continues INTO cellStart
-      const sustainedNote = timeline.find(t => t.start < cellStart && t.end > cellStart);
-
-      if (sustainedNote && !sustainedNote.note.isRest) {
-        // Sustained note spanning across the beat cell start boundary
-        cells.push('-');
+      if (startingInCell.length === 0) {
+        // Pure sustained note covering the whole cell
+        cells.push({
+          parts: [{ items: [sustainedItem] }]
+        });
       } else {
-        // Find notes that start within this beat cell
-        const startingInCell = timeline.filter(t => t.start >= cellStart && t.start < cellEnd);
+        // Sustained note + late starter: render "-" then "." then those notes
+        const firstHalf = startingInCell.filter(t => t.start < cellMid);
+        const secondHalf = startingInCell.filter(t => t.start >= cellMid);
 
-        if (startingInCell.length === 0) {
-          // No note starts, but maybe a rest is sustained, or it's a gap
-          if (sustainedNote && sustainedNote.note.isRest) {
-            cells.push('·');
-          } else {
-            cells.push('-');
-          }
-        } else {
-          // Format the starting notes
-          const parts = startingInCell.map(t => {
-            if (t.note.isRest) return '·';
-            
-            // Format syllable with combining diacritics for octave display
-            let text = t.note.syllable;
-            const diff = t.note.octaveRelativeToVoice;
-            
-            if (diff > 0) {
-              // Octave above: U+0307 (combining dot above). Limit to 2.
-              const dots = '\u0307'.repeat(Math.min(diff, 2));
-              text = text.charAt(0) + dots + text.substring(1);
-            } else if (diff < 0) {
-              // Octave below: U+0323 (combining dot below). Limit to 2.
-              const dots = '\u0323'.repeat(Math.min(Math.abs(diff), 2));
-              text = text.charAt(0) + dots + text.substring(1);
-            }
-            return text;
-          });
-
-          // Join multiple notes in the same beat cell with a dot
-          cells.push(parts.join('.'));
+        const parts: FormattedCellPart[] = [{ items: [sustainedItem] }];
+        if (firstHalf.length > 0) {
+          parts.push({ items: firstHalf.map(makeItem) });
         }
+        if (secondHalf.length > 0) {
+          parts.push({ items: secondHalf.map(makeItem) });
+        }
+        cells.push({ parts });
+      }
+    } else {
+      if (startingInCell.length === 0) {
+        if (sustainedNote && sustainedNote.note.isRest) {
+          cells.push({
+            parts: [{
+              items: [{
+                type: 'rest',
+                text: '·',
+                note: sustainedNote.note,
+                noteIndex: sustainedNote.index
+              }]
+            }]
+          });
+        } else {
+          cells.push({
+            parts: [{
+              items: [{
+                type: 'sustained',
+                text: '-'
+              }]
+            }]
+          });
+        }
+      } else {
+        // Notes start within this cell. Group into half-pulses.
+        // Join notes inside one half-pulse with ",", across halves with ".".
+        const firstHalf = startingInCell.filter(t => t.start < cellMid);
+        const secondHalf = startingInCell.filter(t => t.start >= cellMid);
+
+        const parts: FormattedCellPart[] = [];
+        if (firstHalf.length > 0) {
+          parts.push({ items: firstHalf.map(makeItem) });
+        }
+        if (secondHalf.length > 0) {
+          if (firstHalf.length === 0 && sustainedNote && sustainedNote.note.isRest) {
+            parts.push({
+              items: [{
+                type: 'rest',
+                text: '·',
+                note: sustainedNote.note,
+                noteIndex: sustainedNote.index
+              }]
+            });
+          }
+          parts.push({ items: secondHalf.map(makeItem) });
+        }
+        cells.push({ parts });
       }
     }
-
-    return cells.join(' : ');
   }
+
+  return cells;
 }

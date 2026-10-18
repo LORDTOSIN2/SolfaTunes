@@ -118,17 +118,17 @@ export class MidiPlayer {
   
   // State
   private isPlaying = false;
-  private pausedEighth = 0;
+  private pausedTick = 0;
   private startCtxTime = 0;
-  private totalEighths = 0;
-  private nextScheduleWindowStartEighth = 0;
+  private totalTicks = 0;
+  private nextScheduleWindowStartTick = 0;
 
   // Active playing voices
   private scheduledVoices: SynthVoice[] = [];
   
   // Interval for playhead polling
   private pollingTimer: number | null = null;
-  private onProgressCallback: ((currentEighth: number) => void) | null = null;
+  private onProgressCallback: ((currentTick: number) => void) | null = null;
 
   constructor() {}
 
@@ -167,14 +167,14 @@ export class MidiPlayer {
   }
 
   /**
-   * Loads a score and computes its total eighth-note length.
+   * Loads a score and computes its total tick length (in sixteenths).
    */
   public loadScore(score: ParsedScore, bpm: number, activeVoices: { [voiceId: string]: boolean }) {
     this.stop();
     this.score = score;
     this.bpm = bpm;
     this.activeVoices = activeVoices;
-    this.pausedEighth = 0;
+    this.pausedTick = 0;
 
     // Disconnect and clear old voice gain nodes
     if (this.ctx) {
@@ -187,23 +187,23 @@ export class MidiPlayer {
     this.voiceGains = {};
 
     // Calculate total duration
-    let maxEighth = 0;
+    let maxTick = 0;
     score.voices.forEach(v => {
       score.systems.forEach(sys => {
         const line = sys.voices[v.id];
         if (line) {
           line.measures.forEach(measure => {
             measure.notes.forEach(note => {
-              const end = note.timestamp + note.durationInEighths;
-              if (end > maxEighth) {
-                maxEighth = end;
+              const end = note.timestamp + note.durationTicks;
+              if (end > maxTick) {
+                maxTick = end;
               }
             });
           });
         }
       });
     });
-    this.totalEighths = maxEighth;
+    this.totalTicks = maxTick;
   }
 
   /**
@@ -235,9 +235,9 @@ export class MidiPlayer {
   public setBpm(newBpm: number) {
     this.bpm = newBpm;
     if (this.isPlaying && this.score) {
-      const currentPos = this.getCurrentEighth();
+      const currentPos = this.getCurrentTick();
       this.pause();
-      this.pausedEighth = currentPos;
+      this.pausedTick = currentPos;
       this.play(this.onProgressCallback!);
     }
   }
@@ -248,9 +248,9 @@ export class MidiPlayer {
   public setTransposeOffset(offset: number) {
     this.transposeOffset = offset;
     if (this.isPlaying && this.score) {
-      const currentPos = this.getCurrentEighth();
+      const currentPos = this.getCurrentTick();
       this.pause();
-      this.pausedEighth = currentPos;
+      this.pausedTick = currentPos;
       this.play(this.onProgressCallback!);
     }
   }
@@ -258,7 +258,7 @@ export class MidiPlayer {
   /**
    * Play or Resume.
    */
-  public play(onProgress: (currentEighth: number) => void) {
+  public play(onProgress: (currentTick: number) => void) {
     if (this.isPlaying) return;
     if (!this.score) return;
 
@@ -266,19 +266,19 @@ export class MidiPlayer {
     this.onProgressCallback = onProgress;
     const ctx = this.ctx!;
 
-    const secondsPerEighth = 30 / this.bpm;
+    const secondsPerTick = 15 / this.bpm; // 1 sixteenth note = 15 / bpm seconds
     this.startCtxTime = ctx.currentTime;
     this.isPlaying = true;
 
     // Track the scheduling window boundary dynamically
-    this.nextScheduleWindowStartEighth = this.pausedEighth;
+    this.nextScheduleWindowStartTick = this.pausedTick;
 
     const scheduleNextNotes = () => {
-      const current = this.getCurrentEighth();
-      const lookAheadEnd = current + 4.0; // 4 eighth notes in advance (about 1 second at 120bpm)
+      const current = this.getCurrentTick();
+      const lookAheadEnd = current + 8.0; // 8 sixteenth notes in advance (about 1 second at 120bpm)
 
-      if (this.nextScheduleWindowStartEighth < lookAheadEnd) {
-        const startWindow = this.nextScheduleWindowStartEighth;
+      if (this.nextScheduleWindowStartTick < lookAheadEnd) {
+        const startWindow = this.nextScheduleWindowStartTick;
         this.score!.voices.forEach(voice => {
           // Note: We schedule all voices, and control their volume via per-voice sub-mix gain nodes.
           // This allows users to mute/unmute voices instantly and seamlessly without restarting playback or cutting off active notes!
@@ -294,9 +294,9 @@ export class MidiPlayer {
                 // Only schedule notes that start in the current lookahead window [startWindow, lookAheadEnd)
                 if (note.timestamp >= startWindow && note.timestamp < lookAheadEnd) {
                   // Compute relative scheduling times
-                  const delayEighths = note.timestamp - this.pausedEighth;
-                  const startSec = delayEighths * secondsPerEighth;
-                  const durSec = note.durationInEighths * secondsPerEighth;
+                  const delayTicks = note.timestamp - this.pausedTick;
+                  const startSec = delayTicks * secondsPerTick;
+                  const durSec = note.durationTicks * secondsPerTick;
 
                   const startTime = this.startCtxTime + startSec;
 
@@ -315,7 +315,7 @@ export class MidiPlayer {
           });
         });
 
-        this.nextScheduleWindowStartEighth = lookAheadEnd;
+        this.nextScheduleWindowStartTick = lookAheadEnd;
       }
     };
 
@@ -325,9 +325,9 @@ export class MidiPlayer {
     // Start timer polling for progress updates and dynamic scheduling
     if (this.pollingTimer) clearInterval(this.pollingTimer);
     this.pollingTimer = window.setInterval(() => {
-      const current = this.getCurrentEighth();
+      const current = this.getCurrentTick();
       
-      if (current >= this.totalEighths) {
+      if (current >= this.totalTicks) {
         this.stop();
         onProgress(0);
       } else {
@@ -344,7 +344,7 @@ export class MidiPlayer {
     if (!this.isPlaying) return;
 
     // Capture paused spot
-    this.pausedEighth = this.getCurrentEighth();
+    this.pausedTick = this.getCurrentTick();
     this.isPlaying = false;
 
     // Clear polling timer
@@ -363,7 +363,7 @@ export class MidiPlayer {
    */
   public stop() {
     this.isPlaying = false;
-    this.pausedEighth = 0;
+    this.pausedTick = 0;
 
     if (this.pollingTimer) {
       clearInterval(this.pollingTimer);
@@ -375,17 +375,24 @@ export class MidiPlayer {
   }
 
   /**
-   * Computes the current playhead position in eighth-note units.
+   * Computes the current playhead position in sixteenth-note units.
    */
-  public getCurrentEighth(): number {
-    if (!this.isPlaying) return this.pausedEighth;
+  public getCurrentTick(): number {
+    if (!this.isPlaying) return this.pausedTick;
     if (!this.ctx) return 0;
 
     const elapsedSecs = this.ctx.currentTime - this.startCtxTime;
-    const secondsPerEighth = 30 / this.bpm;
-    const elapsedEighths = elapsedSecs / secondsPerEighth;
+    const secondsPerTick = 15 / this.bpm;
+    const elapsedTicks = elapsedSecs / secondsPerTick;
     
-    return Math.min(this.pausedEighth + elapsedEighths, this.totalEighths);
+    return Math.min(this.pausedTick + elapsedTicks, this.totalTicks);
+  }
+
+  /**
+   * Backwards-compatible alias for getCurrentTick.
+   */
+  public getCurrentEighth(): number {
+    return this.getCurrentTick();
   }
 
   /**

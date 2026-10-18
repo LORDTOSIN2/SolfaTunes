@@ -60,8 +60,8 @@ export class MidiWriter {
    * Generates a complete Standard MIDI File (Type 1) as a Uint8Array.
    */
   public static generateMidiBytes(score: ParsedScore, bpm: number, transposeOffset: number = 0): Uint8Array {
-    const ticksPerQuarter = 120; // 1 quarter note = 120 ticks, 1 eighth note = 60 ticks
-    const ticksPerEighth = 60;
+    const ticksPerQuarter = 120; // 1 quarter note = 120 ticks, 1 sixteenth note = 30 ticks
+    const ticksPerSixteenth = 30;
 
     // Track 0: Tempo and Time Signature
     const track0Bytes: number[] = [];
@@ -141,8 +141,8 @@ export class MidiWriter {
           measure.notes.forEach(note => {
             if (note.isRest) return;
 
-            const startTick = note.timestamp * ticksPerEighth;
-            const endTick = (note.timestamp + note.durationInEighths) * ticksPerEighth;
+            const startTick = note.timestamp * ticksPerSixteenth;
+            const endTick = (note.timestamp + note.durationTicks) * ticksPerSixteenth;
 
             events.push({
               tick: startTick,

@@ -5,7 +5,7 @@
 
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ParsedScore, System, VoiceLine, Measure, SolfaNote, SelectedNoteLocation, ParseWarning } from '../types';
-import { SolfaTransformer } from '../engine/solfa_transformer';
+import { SolfaTransformer, analyzeMeasureCells } from '../engine/solfa_transformer';
 import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle, FileText } from 'lucide-react';
 
 interface ScoreRendererProps {
@@ -13,7 +13,8 @@ interface ScoreRendererProps {
   abcText: string;
   setAbcText: (text: string) => void;
   warnings?: ParseWarning[];
-  currentEighth: number;
+  currentTick?: number;
+  currentEighth?: number;
   fontSize: number;
   setFontSize: (size: number) => void;
   scale: number;
@@ -322,7 +323,8 @@ function parseDefaultLength(lengthStr: string): number {
 
 interface InteractiveRhythmLineProps {
   measure: Measure;
-  meterDenominator: number;
+  meter?: string;
+  meterDenominator?: number;
   systemIndex: number;
   voiceId: string;
   measureIndex: number;
@@ -335,6 +337,7 @@ interface InteractiveRhythmLineProps {
 
 const InteractiveRhythmLine: React.FC<InteractiveRhythmLineProps> = ({
   measure,
+  meter,
   meterDenominator,
   systemIndex,
   voiceId,
@@ -345,97 +348,38 @@ const InteractiveRhythmLine: React.FC<InteractiveRhythmLineProps> = ({
   isMuted,
   isEditorMode
 }) => {
-  const notes = measure.notes;
-  if (notes.length === 0) return <>{"\u00A0"}</>;
+  const meterStr = meter || (meterDenominator ? `4/${meterDenominator}` : '4/4');
+  const cellsData = analyzeMeasureCells(measure, meterStr);
+  if (cellsData.length === 0) return <>{"\u00A0"}</>;
 
-  const beatEighths = Math.max(1, Math.round(8 / meterDenominator));
+  const renderedElements: React.ReactNode[] = [];
 
-  // Map each note to its relative start/end in the measure
-  let currentOffset = 0;
-  const timeline = notes.map((note, index) => {
-    const start = currentOffset;
-    currentOffset += note.durationInEighths;
-    return {
-      note,
-      index,
-      start,
-      end: currentOffset
-    };
-  });
+  cellsData.forEach((cell, cellIdx) => {
+    const partElements: React.ReactNode[] = [];
 
-  const totalEighths = currentOffset;
-  const cells: React.ReactNode[] = [];
+    cell.parts.forEach((part, partIdx) => {
+      const itemElements: React.ReactNode[] = [];
 
-  // Walk the timeline in chunks of beatEighths
-  let cellIdx = 0;
-  for (let cellStart = 0; cellStart < totalEighths; cellStart += beatEighths) {
-    const cellEnd = cellStart + beatEighths;
+      part.items.forEach((item, itemIdx) => {
+        const isSelected =
+          selectedNote &&
+          selectedNote.systemIndex === systemIndex &&
+          selectedNote.voiceId === voiceId &&
+          selectedNote.measureIndex === measureIndex &&
+          item.noteIndex !== undefined &&
+          selectedNote.noteIndex === item.noteIndex;
 
-    // Check if a note starts BEFORE cellStart and continues INTO cellStart
-    const sustainedNote = timeline.find(t => t.start < cellStart && t.end > cellStart);
-
-    if (sustainedNote && !sustainedNote.note.isRest) {
-      // Sustained note spanning across the beat cell start boundary
-      const isSelected =
-        selectedNote &&
-        selectedNote.systemIndex === systemIndex &&
-        selectedNote.voiceId === voiceId &&
-        selectedNote.measureIndex === measureIndex &&
-        selectedNote.noteIndex === sustainedNote.index;
-
-      cells.push(
-        <button
-          key={`cell-${cellIdx}`}
-          onClick={isEditorMode ? (e) => {
-            e.stopPropagation();
-            onSelectNote({
-              systemIndex,
-              voiceId,
-              measureIndex,
-              noteIndex: sustainedNote.index
-            });
-          } : undefined}
-          disabled={!isEditorMode}
-          className={`inline-block px-1 rounded font-serif font-black transition-all duration-150 text-center ${
-            isMuted ? 'pointer-events-none' : ''
-          } ${
-            isEditorMode && !isMuted ? 'cursor-pointer hover:bg-indigo-100' : ''
-          } ${
-            isSelected
-              ? 'bg-[#6366F1] text-white ring-2 ring-[#818CF8]/80 scale-[1.12] shadow-md font-extrabold z-10'
-              : isPlaying
-              ? 'text-[#6366F1]'
-              : 'text-black'
-          }`}
-          style={{ minWidth: '1.25rem' }}
-          title={isEditorMode ? "Sustained note. Click to edit." : "Sustained note"}
-        >
-          -
-        </button>
-      );
-    } else {
-      // Find notes that start within this beat cell
-      const startingInCell = timeline.filter(t => t.start >= cellStart && t.start < cellEnd);
-
-      if (startingInCell.length === 0) {
-        if (sustainedNote && sustainedNote.note.isRest) {
-          const isSelected =
-            selectedNote &&
-            selectedNote.systemIndex === systemIndex &&
-            selectedNote.voiceId === voiceId &&
-            selectedNote.measureIndex === measureIndex &&
-            selectedNote.noteIndex === sustainedNote.index;
-
-          cells.push(
+        if (item.noteIndex !== undefined) {
+          itemElements.push(
             <button
-              key={`cell-${cellIdx}`}
+              key={`item-${cellIdx}-${partIdx}-${itemIdx}`}
               onClick={isEditorMode ? (e) => {
                 e.stopPropagation();
                 onSelectNote({
                   systemIndex,
                   voiceId,
                   measureIndex,
-                  noteIndex: sustainedNote.index
+                  noteIndex: item.noteIndex!
                 });
               } : undefined}
               disabled={!isEditorMode}
@@ -450,100 +394,73 @@ const InteractiveRhythmLine: React.FC<InteractiveRhythmLineProps> = ({
                   ? 'text-[#6366F1]'
                   : 'text-black'
               }`}
-              style={{ minWidth: '1.25rem' }}
-              title={isEditorMode ? "Rest. Click to edit." : "Rest"}
+              style={{ minWidth: item.type === 'note' ? undefined : '1.25rem' }}
+              title={
+                isEditorMode
+                  ? `${item.type === 'note' ? `Note: ${item.text}` : item.type === 'rest' ? 'Rest' : 'Sustained note'}. Click to edit.`
+                  : item.type === 'note'
+                  ? `Note: ${item.text}`
+                  : item.type === 'rest'
+                  ? 'Rest'
+                  : 'Sustained note'
+              }
             >
-              ·
+              {item.text}
             </button>
           );
         } else {
-          cells.push(
-            <span key={`cell-${cellIdx}`} className="text-black/20 font-light select-none px-1">
-              -
+          itemElements.push(
+            <span
+              key={`item-${cellIdx}-${partIdx}-${itemIdx}`}
+              className="text-black/20 font-light select-none px-1"
+            >
+              {item.text}
             </span>
           );
         }
-      } else {
-        // Format the starting notes
-        const noteSpans: React.ReactNode[] = [];
 
-        startingInCell.forEach((t, partIdx) => {
-          const isSelected =
-            selectedNote &&
-            selectedNote.systemIndex === systemIndex &&
-            selectedNote.voiceId === voiceId &&
-            selectedNote.measureIndex === measureIndex &&
-            selectedNote.noteIndex === t.index;
-
-          // Format syllable with combining diacritics for octave display
-          let text = t.note.syllable;
-          const diff = t.note.octaveRelativeToVoice;
-
-          if (diff > 0) {
-            const dots = '\u0307'.repeat(Math.min(diff, 2));
-            text = text.charAt(0) + dots + text.substring(1);
-          } else if (diff < 0) {
-            const dots = '\u0323'.repeat(Math.min(Math.abs(diff), 2));
-            text = text.charAt(0) + dots + text.substring(1);
-          }
-
-          noteSpans.push(
-            <button
-              key={`note-part-${t.index}`}
-              onClick={isEditorMode ? (e) => {
-                e.stopPropagation();
-                onSelectNote({
-                  systemIndex,
-                  voiceId,
-                  measureIndex,
-                  noteIndex: t.index
-                });
-              } : undefined}
-              disabled={!isEditorMode}
-              className={`inline-block px-1.5 py-0.5 rounded font-serif font-black transition-all duration-150 text-center ${
-                isMuted ? 'pointer-events-none' : ''
-              } ${
-                isEditorMode && !isMuted ? 'cursor-pointer hover:bg-indigo-100' : ''
-              } ${
-                isSelected
-                  ? 'bg-[#6366F1] text-white ring-2 ring-[#818CF8]/80 scale-[1.12] shadow-md font-extrabold z-10'
-                  : isPlaying
-                  ? 'text-[#6366F1]'
-                  : 'text-black'
-              }`}
-              title={isEditorMode ? `Note: ${text}. Click to edit.` : `Note: ${text}`}
+        // Sub-beat separator within half-pulse: comma ','
+        if (itemIdx < part.items.length - 1) {
+          itemElements.push(
+            <span
+              key={`comma-${cellIdx}-${partIdx}-${itemIdx}`}
+              className="text-black/30 font-light select-none px-0.5"
             >
-              {text}
-            </button>
+              ,
+            </span>
           );
+        }
+      });
 
-          if (partIdx < startingInCell.length - 1) {
-            noteSpans.push(
-              <span key={`dot-${t.index}`} className="text-black/30 font-light select-none px-0.5">
-                .
-              </span>
-            );
-          }
-        });
+      partElements.push(
+        <span key={`part-${cellIdx}-${partIdx}`} className="inline-flex items-center">
+          {itemElements}
+        </span>
+      );
 
-        cells.push(
-          <span key={`cell-${cellIdx}`} className="inline-flex items-center">
-            {noteSpans}
+      // Half-pulse boundary separator across halves: period '.'
+      if (partIdx < cell.parts.length - 1) {
+        partElements.push(
+          <span
+            key={`dot-${cellIdx}-${partIdx}`}
+            className="text-black/30 font-light select-none px-0.5"
+          >
+            .
           </span>
         );
       }
-    }
+    });
 
-    cellIdx++;
-  }
+    renderedElements.push(
+      <span key={`cell-${cellIdx}`} className="inline-flex items-center">
+        {partElements}
+      </span>
+    );
 
-  // Separator rendering
-  const renderedElements: React.ReactNode[] = [];
-  cells.forEach((cell, idx) => {
-    renderedElements.push(cell);
-    if (idx < cells.length - 1) {
+    // Pulse separator: colon ':'
+    if (cellIdx < cellsData.length - 1) {
       renderedElements.push(
-        <span key={`sep-${idx}`} className="mx-2 text-black/30 font-light select-none">
+        <span key={`sep-${cellIdx}`} className="mx-2 text-black/30 font-light select-none">
           :
         </span>
       );
@@ -694,6 +611,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   abcText,
   setAbcText,
   warnings,
+  currentTick,
   currentEighth,
   fontSize,
   setFontSize,
@@ -790,10 +708,10 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
       if (!line) return;
 
       line.measures.forEach((measure, mIndex) => {
-        // Calculate length of this measure in eighths
+        // Calculate length of this measure in ticks
         let measureLen = 0;
         measure.notes.forEach((note) => {
-          measureLen += note.durationInEighths;
+          measureLen += note.durationTicks;
         });
 
         ranges.push({
@@ -812,10 +730,11 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
 
   // Find currently active measure
   const activeMeasure = useMemo(() => {
+    const playhead = currentTick !== undefined ? currentTick : (currentEighth || 0);
     return measureRanges.find(
-      (r) => currentEighth >= r.start && currentEighth < r.end
+      (r) => playhead >= r.start && playhead < r.end
     );
-  }, [measureRanges, currentEighth]);
+  }, [measureRanges, currentTick, currentEighth]);
 
   const selectedNoteObj = useMemo(() => {
     if (!score || !selectedNote) return null;
@@ -887,8 +806,8 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
       .notes[selectedNote.noteIndex];
       
     const defaultLengthVal = parseDefaultLength(score.defaultLength);
-    note.durationInEighths = Math.round(mult * defaultLengthVal * 8);
-    if (note.durationInEighths <= 0) note.durationInEighths = 1;
+    note.durationTicks = Math.round(mult * defaultLengthVal * 16);
+    if (note.durationTicks <= 0) note.durationTicks = 1;
     
     onUpdateScore(newScore);
   };
@@ -1398,7 +1317,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                       Note Duration (Beats)
                     </label>
                     <select
-                      value={selectedNoteObj ? (selectedNoteObj.durationInEighths / (parseDefaultLength(score.defaultLength) * 8)) : 1.0}
+                      value={selectedNoteObj ? (selectedNoteObj.durationTicks / (parseDefaultLength(score.defaultLength) * 16)) : 1.0}
                       onChange={(e) => handleUpdateNoteDuration(parseFloat(e.target.value))}
                       className="w-full max-w-[200px] bg-black/40 border border-white/10 text-stone-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer font-sans"
                     >
@@ -1599,6 +1518,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                                         {measure ? (
                                           <InteractiveRhythmLine
                                             measure={measure}
+                                            meter={score.meter}
                                             meterDenominator={meterDen}
                                             systemIndex={system.systemIndex}
                                             voiceId={voice.id}

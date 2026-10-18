@@ -532,7 +532,7 @@ export class AbcParser {
           scaleDegree: 0,
           midiPitch: 0,
           octaveRelativeToVoice: 0,
-          durationInEighths: durationMultiplier, // Temp placeholder, scaled by L: later
+          durationTicks: durationMultiplier, // Temp placeholder, scaled by L: * 16 later
           isRest,
           timestamp: 0, // Computed in playback/timing layout
           rawLetter: letter,

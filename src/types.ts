@@ -8,14 +8,15 @@ export interface SolfaNote {
   scaleDegree: number;        // 0-11 scale degree
   midiPitch: number;          // MIDI note number (e.g., 60 for C4)
   octaveRelativeToVoice: number; // Signed int (relative to the voice's home register)
-  durationInEighths: number;  // Duration normalized in eighth-note ticks
+  durationTicks: number;      // Duration normalized in sixteenth-note ticks
   isRest: boolean;            // True if this is a rest
-  timestamp: number;          // Playback offset in eighths from start of piece
+  timestamp: number;          // Playback offset in ticks from start of piece
   
   // Raw fields populated by parser for transformer
   rawLetter?: string;         // e.g., 'C', 'g', 'z'
   rawAccidental?: string;     // e.g., '^', '_', '=', or undefined
   octaveNum?: number;         // Absolute octave number (e.g. 4, 5, 3)
+  solfaOctave?: number;       // Solfa octave: Math.floor((midiPitch - keyInfo.tonic)/12)
 }
 
 export interface Measure {
