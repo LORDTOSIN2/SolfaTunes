@@ -159,5 +159,84 @@ W:    all other names above;
 W:    love only knoweth whence it came,
 W:    and comprehendeth love.
 `
+  },
+  {
+    id: 'hursley',
+    title: 'Hursley (Katholisches Gesangbuch)',
+    composer: 'c. 1775, SATB + Descant',
+    abcText: `% Hursley Hymn Setting in F Major
+X:5
+T:Hursley
+C:Katholisches Gesangbuch, c. 1775
+M:3/4
+L:1/4
+K:F
+% tune_name=Hursley
+% has_descant=true
+%%staves [(5) (1 2) (3 4)]
+V:5 name="Descant" clef=treble
+V:1 name="Soprano" clef=treble
+V:2 name="Alto" clef=treble
+V:3 name="Tenor" clef=treble
+V:4 name="Bass" clef=bass
+
+% --- System 1 ---
+[V:5] f e/2 d/2 c/2 B/2 | A G F | c2 B | A3 || c d e | f2 c | f e d | e3 ||
+[V:1] F F F | F E F | G A G | F3 || A A A | A G A | c B A | G3 ||
+[V:2] C C C | C2 C | E2 E | F3 || F F F | F E F | F E F | E3 ||
+[V:3] A, A, A, | A, G, A, | B, C B, | A,3 || C C C | C2 C | C2 C | C3 ||
+[V:4] F, F, F, | F,2 F, | C,2 C, | F,3 || F, F, F, | F,2 F, | A, G, F, | C,3 ||
+
+% --- System 2 ---
+[V:5] e d/2 e/2 ^f | g2 e | f c d | e3 | f f f || f e f | g f e | f3 |]
+[V:1] G G A | B2 G | A2 B | c3 | d d d || c2 A | B A G | F3 |]
+[V:2] E G ^F | G D E | F2 F | E3 | D F F || F E F | F2 E | F3 |]
+[V:3] C D C | B,2 C | C2 F, | G,2 A, | B, B, B, || G,2 F, | D C B, | A,3 |]
+[V:4] C B, A, | G,2 C, | F,2 D, | C,3 | B,, B,, B,, || C,2 D, | B,, C, C, | F,3 |]
+`
+  },
+  {
+    id: 'warrington',
+    title: 'Warrington (Harrison)',
+    composer: 'R. Harrison, 1748–1810',
+    abcText: `% Warrington in Bb Major
+X:6
+T:Warrington
+C:R. Harrison, 1748-1810
+M:3/4
+L:1/4
+K:Bb
+% tune_name=Warrington
+% hymn_name=Rector potens, verax Deus
+% has_descant=false
+%%staves [(1 2) (3 4)]
+V:1 name="Soprano" clef=treble
+V:2 name="Alto" clef=treble
+V:3 name="Tenor" clef=treble
+V:4 name="Bass" clef=bass
+
+% --- System 1 ---
+[V:1] F F E | D F B | B3/2 c/2 A | B2 || d | c2 c | d2 c/2 B/2 |
+[V:2] D D C | D C D | E2 C | D2 || F | F2 F | F =E F/2 G/2 |
+[V:3] B, B, A, | B, C B, | G,2 F, | F,2 || B, | B, A, A, | B,2 C/2 D/2 |
+[V:4] B,, D, F, | B, A, G, | E, C, F, | B,,2 || B,, | F,2 F, | B,, G,, A,,/2 B,,/2 |
+
+% --- System 2 ---
+[V:1] A2 G | F3 || B B F | G2 B | e3/2 d/2 c/2 B/2 |
+[V:2] F2 =E | F3 || D F D | E2 F | E3/2 F/2 G |
+[V:3] C2 C/2 B,/2 | A,3 || B, B, B, | B,2 B, | C G, C |
+[V:4] C,2 C, | F,3 || B,, D, B,, | E,2 D, | C,3/2 D,/2 E, |
+
+% --- System 3 ---
+[V:1] B A || G | F2 E | D F B | B3/2 c/2 A | B3 |]
+[V:2] F2 || E | D2 C | D2 D/2 E/2 | F G F | F3 |]
+[V:3] D C || B,/2 C/2 | D B, A, | B,2 B,/2 C/2 | D E C | D3 |]
+[V:4] F,2 || G,/2 A,/2 | B, D, F, | B,, D, G, | F, E, F, | B,,3 |]
+
+W: O GOD of truth, O Lord of might,
+W: Who orderest time and change aright,
+W: Arraying morn with joyful gleams,
+W: And kindling noonday's fiery beams;
+`
   }
 ];

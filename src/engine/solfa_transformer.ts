@@ -53,8 +53,8 @@ const KEYS: { [key: string]: KeyInfo } = {
 /**
  * Normalizes a key signature string into a dictionary-compliant format.
  */
-function normalizeKey(keyStr: string): string {
-  let clean = keyStr.trim();
+function normalizeKey(keyStr: string | undefined): string {
+  let clean = (keyStr || 'C').trim();
   let isMinor = false;
   
   // Regex to check minor key endings: e.g., Am, G#m, Ebmin, Fminor
@@ -475,17 +475,12 @@ export function analyzeMeasureCells(measure: Measure, meter: string | undefined)
         });
       } else {
         // Sustained note + late starter: render "-" then "." then those notes
-        const firstHalf = startingInCell.filter(t => t.start < cellMid);
-        const secondHalf = startingInCell.filter(t => t.start >= cellMid);
-
-        const parts: FormattedCellPart[] = [{ items: [sustainedItem] }];
-        if (firstHalf.length > 0) {
-          parts.push({ items: firstHalf.map(makeItem) });
-        }
-        if (secondHalf.length > 0) {
-          parts.push({ items: secondHalf.map(makeItem) });
-        }
-        cells.push({ parts });
+        cells.push({
+          parts: [
+            { items: [sustainedItem] },
+            { items: startingInCell.map(makeItem) }
+          ]
+        });
       }
     } else {
       if (startingInCell.length === 0) {
