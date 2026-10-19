@@ -126,7 +126,7 @@ SolfaTunes plays ABC notes exactly as written (no clef transposition). Its own e
 3. **Tenor and Bass:** one octave **lower** than the same printed sol-fa in the S/A table (sol-fa prints the T and B parts an octave above where they sound). To lower one octave: a lowercase letter becomes uppercase, an uppercase letter gains one comma, a letter with `'` loses one `'`. Equivalently, read the Tenor/Bass note from the S/A table **one column to the left** (T/B central = S/A `₁` column).
 4. Each subscript lowers by one more octave (add `,`). Each superscript raises by one (add `'`).
 
-**Sanity check on ranges** (the voices must never cross): Descant above Soprano; roughly Soprano C4 to A5, Alto G3 to D5, Tenor C3 to G4, Bass E2 to D4. If the Tenor sits above the Alto anywhere, the Tenor/Bass octave shift was forgotten.
+**Sanity check on ranges** (voices should rarely cross and should stay in characteristic registers): Descant above Soprano; roughly Soprano C4–A5, Alto G3–D5, Tenor C3–G4, Bass E2–D4. Persistent Tenor notes above the Alto almost always mean the Tenor/Bass octave shift was forgotten.
 
 ---
 
