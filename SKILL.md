@@ -1,11 +1,11 @@
 ---
 name: create-abc-notation-from-image-solfa
-description: Use when asked to convert a Curwen Tonic Sol-fa hymn score image (photo, scan, screenshot) into real, standard ABC notation for the SolfaTunes app. Triggers on "solfa to ABC", "convert this tonic sol-fa", "transcribe this hymn for SolfaTunes", or any image of d r m f s l t notation, with or without a descant. The output must be genuine ABC (note letters A-G, not sol-fa syllables) and must pass a pitch/rhythm round-trip check before it is returned.
+description: Use when asked to convert a Curwen Tonic Sol-fa hymn score image (photo, scan, screenshot) into real, standard ABC notation for the SolfaTunes app. Triggers on "solfa to ABC", "convert this tonic sol-fa", "transcribe this hymn for SolfaTunes", or any image of d r m f s l t notation, with or without a descant. The output must be genuine ABC (note letters A-G, not sol-fa syllables) and must pass a rigorous pitch/rhythm round-trip check (converting ABC back to sol-fa to compare with the original) before it is returned.
 ---
 
 # SKILL: Convert Curwen Tonic Sol-fa Image to ABC for SolfaTunes
 
-Convert an image of a Curwen Tonic Sol-fa hymn into ABC notation that the SolfaTunes app (https://github.com/PYTHAGON2/SolfaTunes/) can parse, display and play. SolfaTunes has its **own** ABC parser (no abcjs), so it reads only the subset of ABC described in this file. The rules below were checked against that parser's source.
+Convert an image of a Curwen Tonic Sol-fa hymn into ABC notation that the SolfaTunes app (https://github.com/PYTHAGON2/SolfaTunes/) can parse, display and play. SolfaTunes has its **own** ABC parser and tonic sol-fa reconstruction engine (no abcjs), so it reads only the subset of ABC described in this file. The rules below reflect the exact parser and timing engine source.
 
 ---
 
@@ -23,7 +23,7 @@ Inside an ABC music line (everything after `[V:n]`), only these characters are l
 | `,` `'` | one octave down / up (`C,` is below `C`; `c'` is above `c`) |
 | `^` `_` `=` | sharp / flat / natural, placed before the note letter |
 | `z` | rest |
-| digits and `/` | duration multiplier (`2`, `3`, `3/2`, `/2`) |
+| digits and `/` | duration multiplier (`2`, `3`, `3/2`, `/2`, `/4`, `3/4`) |
 | `\|` `\|\|` `\|]` | barlines |
 | space | separator |
 
@@ -32,7 +32,7 @@ Inside an ABC music line (everything after `[V:n]`), only these characters are l
 - subscript or superscript digits;
 - the colon `:` (outside `[V:n]`) and the period `.` (in ABC it means staccato);
 - a lone `-` used as "hold the note";
-- ties, chords `[...]`, tuplets and grace notes (SolfaTunes ignores or mangles them; merge held notes into one longer note instead, for example `d4`).
+- ties, chords `[...]`, tuplets and grace notes (merge held notes into one longer note instead, for example `d4` or `B3/2`).
 
 **Quick lint:** after the `[V:n]` prefix, any lowercase letter outside `a`-`g` and `z`, and any `:` or `.`, means sol-fa leaked in.
 
@@ -55,7 +55,7 @@ Bass    |d  :d   :d   |d :-  :d |
 
 ### A. Key and tonic
 
-- Read the printed `KEY [Letter]` and use it: `KEY Bb` becomes `K:Bb`, `KEY F` becomes `K:F`. `d` is that note.
+- Read the printed `KEY [Letter]` and use it: `KEY Bb` becomes `K:Bb`, `KEY F` becomes `K:F`, `KEY G` becomes `K:G`. `d` is that note.
 - Do not infer the key from the melody when a `KEY` is printed.
 
 ### B. Syllables
@@ -81,28 +81,37 @@ Bass    |d  :d   :d   |d :-  :d |
 | `:` | separates **pulses** (beats) inside a bar |
 | `-` | the previous note continues through this pulse (or half-pulse) |
 | `.` | splits a pulse into **two halves** |
-| `,` | splits a half-pulse into two quarters (see 2.E: not representable) |
+| `,` | splits a half-pulse into **two quarter-pulses** (sixteenth notes) |
 | empty pulse | silence, so a rest `z` |
 
-Pulse arithmetic (one pulse = 1 beat):
+**Pulse arithmetic (under `L:1/4`, one pulse = 1 beat):**
 
-| Printed | Durations |
-|---|---|
-| `d` | d = 1 |
-| `d :-` | d = 2 |
-| `d :- :-` | d = 3 |
-| `t.l` | t = 1/2, l = 1/2 |
-| `d :-.r` | d = 1 + 1/2 = 3/2, r = 1/2 |
+| Printed Sol-fa | Duration Meaning | ABC (`L:1/4`) | SolfaTunes Output Display |
+|---|---|---|---|
+| `d` | 1 pulse | `C` | `d` |
+| `d :-` | 2 pulses | `C2` | `d : -` |
+| `d :- :-` | 3 pulses | `C3` | `d : - : -` |
+| `t.l` | Two half-pulses (1/2 + 1/2) | `B/2 A/2` | `t.l` |
+| `d :-.r` | 1 + 1/2 pulses, then 1/2 pulse | `B3/2 c/2` | `d : -.r` |
+| `d,r.m` | Two 1/4-pulses, then 1/2 pulse | `C/4 D/4 E/2` | `d,r.m` |
+| `d.r,m` | 1/2-pulse, then two 1/4-pulses | `C/2 D/4 E/4` | `d.r,m` |
+| `d,r,m,f` | Four 1/4-pulses (sixteenths) | `C/4 D/4 E/4 F/4` | `d,r,m,f` |
+| `d :-` in 6/8 | 2 compound beats (dotted half) | `C3` | `d : -` |
+| `d : r` in 6/8 | 2 compound beats (each dotted quarter) | `C3/2 D3/2` | `d : r` |
 
-### E. Phrase-end bar split across `||`
+### E. Phrase-end bar split across `||` & Anacrusis (Pickups)
 
-Some scores print the last bar of a line short, with the missing pulse printed as a one-pulse "pickup" right after the `||`:
+1. **Phrase-end split across `||`:**
+   Some scores print the last bar of a line short, with the missing pulse printed as a one-pulse "pickup" right after the `||`:
+   ```text
+    |d :-  ||m |r :- :r |
+   ```
+   `d :-` (2 pulses) plus the lone `m` (1 pulse) make one full 3-pulse bar. Transcribe exactly what is printed: `B2 || d |` (in K:Bb, soprano). Do **not** pad the pickup into a full bar, do **not** invent a rest, and do not add a pickup at the start of the tune unless the first bar is printed short. When checking bar lengths, add the two halves together.
 
-```text
- |d :-  ||m |r :- :r |
-```
-
-`d :-` (2 pulses) plus the lone `m` (1 pulse) make one full 3-pulse bar. Transcribe exactly what is printed: `B2 || d |` (in K:Bb, soprano). Do **not** pad the pickup into a full bar, do **not** invent a rest, and do not add a pickup at the start of the tune unless the first bar is printed short. When checking bar lengths, add the two halves together. Many scores (for example Hursley) have no such split: every bar is full.
+2. **Anacrusis / Pickup Bar at Tune Start:**
+   If the hymn begins on an upbeat (for example a single pulse before the first barline), write only the note(s) in that opening bar: e.g. `[V:1] D |`.
+   - **Do NOT** pad the opening bar with rests.
+   - **Do NOT** change the `M:` meter header to accommodate the pickup. SolfaTunes natively handles anacrusis bars.
 
 ---
 
@@ -117,20 +126,70 @@ SolfaTunes plays ABC notes exactly as written (no clef transposition). Its own e
 3. **Tenor and Bass:** one octave **lower** than the same printed sol-fa in the S/A table (sol-fa prints the T and B parts an octave above where they sound). To lower one octave: a lowercase letter becomes uppercase, an uppercase letter gains one comma, a letter with `'` loses one `'`. Equivalently, read the Tenor/Bass note from the S/A table **one column to the left** (T/B central = S/A `₁` column).
 4. Each subscript lowers by one more octave (add `,`). Each superscript raises by one (add `'`).
 
-**Soprano / Alto / Descant table for `K:Bb`** (`d` = B♭):
+**Sanity check on ranges** (the voices must never cross): Descant above Soprano; roughly Soprano C4 to A5, Alto G3 to D5, Tenor C3 to G4, Bass E2 to D4. If the Tenor sits above the Alto anywhere, the Tenor/Bass octave shift was forgotten.
 
+---
+
+### B. Complete Hymn Key Pitch Reference Tables (Soprano / Alto / Descant)
+
+Below are the complete lookup tables for every major key commonly found in Curwen Tonic Sol-fa hymnody. For **Tenor** and **Bass**, read one column to the left (e.g. Tenor central octave = the `₁` column).
+
+#### Key of C (`K:C`, tonic C)
 | Sol-fa | `₂` | `₁` | central | `¹` |
 |---|---|---|---|---|
-| d | `B,,` | `B,` | `B` | `b` |
-| r | `C,` | `C` | `c` | `c'` |
-| m | `D,` | `D` | `d` | `d'` |
-| f | `E,` | `E` | `e` | `e'` |
-| s | `F,` | `F` | `f` | `f'` |
-| l | `G,` | `G` | `g` | `g'` |
-| t | `A,` | `A` | `a` | `a'` |
+| d | `C,,` | `C,` | `C` | `c` |
+| r | `D,,` | `D,` | `D` | `d` |
+| m | `E,,` | `E,` | `E` | `e` |
+| f | `F,,` | `F,` | `F` | `f` |
+| s | `G,,` | `G,` | `G` | `g` |
+| l | `A,,` | `A,` | `A` | `a` |
+| t | `B,,` | `B,` | `B` | `b` |
 
-**Soprano / Alto / Descant table for `K:F`** (`d` = F):
+#### Key of G (`K:G`, tonic G, 1 sharp F#)
+| Sol-fa | `₂` | `₁` | central | `¹` |
+|---|---|---|---|---|
+| d | `G,,` | `G,` | `G` | `g` |
+| r | `A,,` | `A,` | `A` | `a` |
+| m | `B,,` | `B,` | `B` | `b` |
+| f | `C,` | `C` | `c` | `c'` |
+| s | `D,` | `D` | `d` | `d'` |
+| l | `E,` | `E` | `e` | `e'` |
+| t | `F,` | `F` | `f` | `f'` |
 
+#### Key of D (`K:D`, tonic D, 2 sharps F# C#)
+| Sol-fa | `₂` | `₁` | central | `¹` |
+|---|---|---|---|---|
+| d | `D,,` | `D,` | `D` | `d` |
+| r | `E,,` | `E,` | `E` | `e` |
+| m | `F,,` | `F,` | `F` | `f` |
+| f | `G,,` | `G,` | `G` | `g` |
+| s | `A,,` | `A,` | `A` | `a` |
+| l | `B,,` | `B,` | `B` | `b` |
+| t | `C,` | `C` | `c` | `c'` |
+
+#### Key of A (`K:A`, tonic A, 3 sharps F# C# G#)
+| Sol-fa | `₂` | `₁` | central | `¹` |
+|---|---|---|---|---|
+| d | `A,,` | `A,` | `A` | `a` |
+| r | `B,,` | `B,` | `B` | `b` |
+| m | `C,` | `C` | `c` | `c'` |
+| f | `D,` | `D` | `d` | `d'` |
+| s | `E,` | `E` | `e` | `e'` |
+| l | `F,` | `F` | `f` | `f'` |
+| t | `G,` | `G` | `g` | `g'` |
+
+#### Key of E (`K:E`, tonic E, 4 sharps F# C# G# D#)
+| Sol-fa | `₂` | `₁` | central | `¹` |
+|---|---|---|---|---|
+| d | `E,,` | `E,` | `E` | `e` |
+| r | `F,,` | `F,` | `F` | `f` |
+| m | `G,,` | `G,` | `G` | `g` |
+| f | `A,,` | `A,` | `A` | `a` |
+| s | `B,,` | `B,` | `B` | `b` |
+| l | `C,` | `C` | `c` | `c'` |
+| t | `D,` | `D` | `d` | `d'` |
+
+#### Key of F (`K:F`, tonic F, 1 flat Bb)
 | Sol-fa | `₂` | `₁` | central | `¹` |
 |---|---|---|---|---|
 | d | `F,,` | `F,` | `F` | `f` |
@@ -141,35 +200,81 @@ SolfaTunes plays ABC notes exactly as written (no clef transposition). Its own e
 | l | `D,` | `D` | `d` | `d'` |
 | t | `E,` | `E` | `e` | `e'` |
 
-For another key, build the same table: the tonic letter in uppercase for `d`, then climb through the letter names (`K:G`: `d r m f s l t` = `G A B c d e f`, the key adds F♯).
+#### Key of Bb (`K:Bb`, tonic Bb, 2 flats Bb Eb)
+| Sol-fa | `₂` | `₁` | central | `¹` |
+|---|---|---|---|---|
+| d | `B,,` | `B,` | `B` | `b` |
+| r | `C,` | `C` | `c` | `c'` |
+| m | `D,` | `D` | `d` | `d'` |
+| f | `E,` | `E` | `e` | `e'` |
+| s | `F,` | `F` | `f` | `f'` |
+| l | `G,` | `G` | `g` | `g'` |
+| t | `A,` | `A` | `a` | `a'` |
 
-**Sanity check on ranges** (the voices must never cross): Descant above Soprano; roughly Soprano C4 to A5, Alto G3 to D5, Tenor C3 to G4, Bass E2 to D4. If the Tenor sits above the Alto anywhere, the Tenor/Bass octave shift was forgotten.
+#### Key of Eb (`K:Eb`, tonic Eb, 3 flats Bb Eb Ab)
+| Sol-fa | `₂` | `₁` | central | `¹` |
+|---|---|---|---|---|
+| d | `E,,` | `E,` | `E` | `e` |
+| r | `F,,` | `F,` | `F` | `f` |
+| m | `G,,` | `G,` | `G` | `g` |
+| f | `A,,` | `A,` | `A` | `a` |
+| s | `B,,` | `B,` | `B` | `b` |
+| l | `C,` | `C` | `c` | `c'` |
+| t | `D,` | `D` | `d` | `d'` |
 
-### B. Time signature and note length
+#### Key of Ab (`K:Ab`, tonic Ab, 4 flats Bb Eb Ab Db)
+| Sol-fa | `₂` | `₁` | central | `¹` |
+|---|---|---|---|---|
+| d | `A,,` | `A,` | `A` | `a` |
+| r | `B,,` | `B,` | `B` | `b` |
+| m | `C,` | `C` | `c` | `c'` |
+| f | `D,` | `D` | `d` | `d'` |
+| s | `E,` | `E` | `e` | `e'` |
+| l | `F,` | `F` | `f` | `f'` |
+| t | `G,` | `G` | `g` | `g'` |
 
-- Use `L:1/4`. One sol-fa pulse = one quarter note.
-- If `M:` is printed, use it. If no time signature is printed, infer it from the pulses per full bar: 2 becomes `2/4`, 3 becomes `3/4`, 4 becomes `4/4`. Warrington and Hursley print none and have 3 pulses per bar, so `M:3/4`.
-
-### C. Chromatic syllables
-
-Find the diatonic pitch of the plain degree, move it one semitone (raised `e`/`i` endings up, lowered `a` endings down), and write an explicit accidental that gives that pitch.
-
-`K:Bb`, central octave S/A: `di`/`de` = `=B`, `ri`/`re` = `^c`, `fi`/`fe` = `=e`, `si`/`se` = `^f`, `li`/`le` = `^g`, `ma` = `_d`, `la` = `_g`, `ta` = `_a`.
-`K:F`, central octave S/A: `de` = `^F`, `re` = `^G`, `fe` = `=B`, `se` = `^c`, `le` = `^d`, `ma` = `_A`, `la` = `_d`, `ta` = `_e`.
-
-An accidental lasts until the barline for that letter and octave. If the plain note of the same letter and octave returns later in the same bar, restate it (for example `=E ... _E`). Apply the octave rules of 2.A to chromatic notes too (Tenor `de` in K:F is `^F,`).
-
-### D. Holds
-
-A sol-fa `-` extends duration. Encode it as a longer note (`d2`, `d3`, `d3/2`). Never use an ABC tie.
-
-### E. What the renderer can and cannot represent
-
-SolfaTunes measures time in eighth notes. Pulses and half-pulses are fine. Quarter-pulse subdivisions (`d.r,m`) and compound-meter pulses (`6/8`, pulse = `3/2`) cannot be shown faithfully. Transcribe such passages exactly as printed anyway and do not simplify them silently.
+#### Key of Db (`K:Db`, tonic Db, 5 flats Bb Eb Ab Db Gb)
+| Sol-fa | `₂` | `₁` | central | `¹` |
+|---|---|---|---|---|
+| d | `D,,` | `D,` | `D` | `d` |
+| r | `E,,` | `E,` | `E` | `e` |
+| m | `F,,` | `F,` | `F` | `f` |
+| f | `G,,` | `G,` | `G` | `g` |
+| s | `A,,` | `A,` | `A` | `a` |
+| l | `B,,` | `B,` | `B` | `b` |
+| t | `C,` | `C` | `c` | `c'` |
 
 ---
 
-## 3. What the SolfaTunes Parser Accepts (format rules)
+### C. Time Signature and Note Length
+
+- Always declare `L:1/4` in the ABC header.
+- **Simple meters (`2/4`, `3/4`, `4/4`):** One sol-fa pulse = one quarter note (`1`). Half-pulse = `/2`. Quarter-pulse = `/4`.
+- **Compound meters (`6/8`, `9/8`, `12/8`):** One sol-fa pulse is a dotted quarter note. Under `L:1/4`, a full compound pulse is written as `3/2` (e.g. `C3/2 D3/2` gives two pulses `d : r`), and a 2-pulse held note is `3` (e.g. `E3` gives `m : -`).
+- If no meter is printed, infer it from the pulses per bar: 2 pulses = `M:2/4`, 3 pulses = `M:3/4`, 4 pulses = `M:4/4`.
+
+### D. Chromatic Syllables
+
+Find the diatonic pitch of the plain degree, move it one semitone (raised `e`/`i` endings up with `^` or `=`, lowered `a` endings down with `_` or `=`), and write an explicit accidental.
+
+- `K:Bb`, central S/A: `di`/`de` = `=B`, `ri`/`re` = `^c`, `fi`/`fe` = `=e`, `si`/`se` = `^f`, `li`/`le` = `^g`, `ma` = `_d`, `la` = `_g`, `ta` = `_a`.
+- `K:F`, central S/A: `de` = `^F`, `re` = `^G`, `fe` = `=B`, `se` = `^c`, `le` = `^d`, `ma` = `_A`, `la` = `_d`, `ta` = `_e`.
+- `K:G`, central S/A: `fe` = `=c` (or `^c`), `se` = `^d`, `ta` = `=f` (or `_f`).
+- An accidental lasts until the barline for that letter and octave. If the plain note returns later in the same bar, restate it explicitly. Apply the Tenor/Bass octave shift to chromatic notes too (e.g. Tenor `de` in K:F is `^F,`).
+
+### E. What the SolfaTunes Renderer Supports
+
+SolfaTunes calculates rhythm using **sixteenth-note resolution** (`durationTicks = mult * L_val * 16`):
+- Simple meters (`2/4`, `3/4`, `4/4`) have 4 sixteenth ticks per pulse.
+- Half-pulses are split by periods `.` (e.g. `t.l`).
+- Sub-pulses within a half-pulse are split by commas `,` (e.g. `d,r.m` or `d,r,m,f`).
+- Notes sustained into a pulse followed by a late starter are rendered as `-` then `.` then the note (e.g. `d :-.r`).
+- Compound meters (`6/8`, `9/8`, `12/8`) have 6 sixteenth ticks per pulse.
+- **Home Register Octaves:** SolfaTunes computes sol-fa octaves relative to the tonic pitch class (`solfaOctave = Math.floor((midiPitch - tonic) / 12)`). Notes within the home register `d r m f s l t` display without octave dots.
+
+---
+
+## 3. What the SolfaTunes Parser Accepts (Format Rules)
 
 Header order: `X`, `T`, `C`, `M`, `L`, `K`, metadata comments, `%%staves`, voice declarations, then music, then lyrics.
 
@@ -201,78 +306,96 @@ W: [verse line 1]
 W: [verse line 2]
 ```
 
-### A. Parser behaviour you must respect
-
+### Parser Behaviour Rules:
 - **Voice ids:** use `V:1` to `V:4` (Soprano, Alto, Tenor, Bass) and `V:5` for a Descant. Each music line starts with `[V:n] `.
-- **Music lines:** one line per voice per visual system. All voices in a system have the same bars and the same barlines in the same places. A voice id that repeats inside one system silently starts a new system.
-- **System comments:** the line `% --- System N ---` starts a new system. The parser treats **any comment line containing the word "System"** as a break, so never use that word in any other comment.
+- **Music lines:** one line per voice per visual system. All voices in a system have the same bars and the same barlines in the same places.
+- **System comments:** the line `% --- System N ---` starts a new visual system. The parser treats **any comment line containing the word "System"** as a break, so never use that word in any other comment.
 - **Barlines:** `|`, `||`, `|]` (final bar) are all accepted. Do not write a leading barline before the first bar.
 - **Lyrics:** one `W:` line per poetic line, blank `W:` between stanzas. Never use lowercase `w:` (it would be read as music).
-- **Metadata:** `% tune_name=`, `% hymn_name=`, `% hymn_meter=`, `% verses=`, `% has_descant=` are read exactly in that `key=value` form. Include one only if the information is visible on the page; omit the whole line otherwise. Never guess a meter, verse count or hymn name. Ignore headings such as "SECOND TUNE" and notes such as "(Sext)".
+- **Metadata:** `% tune_name=`, `% hymn_name=`, `% hymn_meter=`, `% verses=`, `% has_descant=` are read in `key=value` form. Include only what is visible on the page; omit otherwise.
 - **`%%staves`:** groups in parentheses make braced staves. SATB: `%%staves [(1 2) (3 4)]`. SA only: `%%staves [(1 2)]`. TB only: `%%staves [(3 4)]`. **With a descant:** `%%staves [(5) (1 2) (3 4)]`, declare `V:5 name="Descant" clef=treble` first, set `% has_descant=true`, and write the Descant line first in every system.
-- **Never drop a printed voice and never add an absent one.** Keep `clef=treble` for Tenor (clef is only a label here; pitch comes from the letters).
-
-### B. Lyrics
-
-Copy the printed words exactly. Drop printing marks that are not words (for example the small tick `'` printed before some words). Do not invent verses.
 
 ---
 
-## 4. Mandatory 5-Step Workflow
+## 4. Mandatory 5-Step Workflow with Round-Trip Validation
 
-Run steps 1 to 4 internally. Output only step 5.
+To ensure 100% accuracy, execute steps 1 to 4 internally before outputting the ABC.
 
-1. **Raw extraction.** Zoom into every system. For each voice (Descant first when present), write the exact printed tokens bar by bar: syllables, octave marks, `:` `.` `-`, barlines, `||` positions. Mark uncertain subscripts and re-inspect them. This is the ground truth.
-2. **Pulse expansion.** Turn each bar into `(note, duration)` pairs using 1.D. Confirm that every bar has the same pulse count (split bars in 1.E must sum to it).
-3. **ABC compilation.** Convert each pair using the tables in 2.A to 2.C, applying the Tenor/Bass octave shift. **Only ABC characters (section 0) may appear.**
-4. **Round-trip check.** Convert your ABC back into sol-fa for every bar and compare it with step 1. Check:
-   - pitch drift, octave slips, missing accidentals, and the range check in 2.A;
-   - note lengths (`d3/2 r/2` must come back as `d :-.r`);
-   - bar sums, with halves around `||` combined;
-   - identical bar and barline layout across all voices;
-   - the section 0 lint (no sol-fa leakage).
-   Fix errors and repeat until the round-trip equals the extraction.
-5. **Final output.** Return only the final ABC code block.
+### Step 1: Raw Extraction (Internal Ground Truth)
+Zoom into every system. For each voice (Descant first when present), write the exact printed tokens bar by bar: syllables, octave marks, `:` `.` `,` `-`, barlines, `||` positions. Mark uncertain subscripts and re-inspect them.
 
-Note for debugging: SolfaTunes draws octave dots relative to each voice's most common octave, so its on-screen dots are not a reliable check of absolute octaves. Judge octaves with the tables and range check above.
+### Step 2: Pulse & Rhythm Expansion (Internal)
+Turn each bar into `(note, duration)` pairs:
+- Simple meters: 1 pulse = 1, half = `1/2`, quarter = `1/4`.
+- Compound meters: 1 pulse = `3/2`, half = `3/4`.
+- Confirm that every bar has the same pulse count across all voices.
+
+### Step 3: ABC Compilation (Internal)
+Convert each pitch using the key tables in Section 2.B:
+- Soprano, Alto, Descant: literal column from table.
+- Tenor, Bass: shift one column to the left (1 octave lower).
+- Add durations (`2`, `3`, `3/2`, `/2`, `/4`). **Only ABC characters (Section 0) may appear.**
+
+### Step 4: Mandatory Round-Trip Test & Verification (CRITICAL)
+**Convert your generated ABC back into Sol-fa notes internally and compare token-by-token against Step 1:**
+1. **Pitch syllable verification:** Does each ABC pitch map to the exact printed sol-fa syllable? (e.g. In K:Bb, `B` -> `d`, `c` -> `r`, `d` -> `m`, `A` -> `t`).
+2. **Octave register verification:**
+   - Soprano/Alto/Descant central syllables must match the table central octave (no extraneous commas or apostrophes).
+   - Tenor/Bass must sound one octave below Soprano (check that Tenor never sits above Alto).
+3. **Rhythm & Hold verification:**
+   - `B3/2 c/2` converts back to `d :-.r`.
+   - `C/4 D/4 E/2` converts back to `d,r.m`.
+   - Held notes (`-`) must match extended durations, not ABC ties or chords.
+4. **Measure summation check:**
+   - In 3/4 time, every full bar must add up to 3 beats (12 sixteenth ticks).
+   - In 4/4 time, every full bar must add up to 4 beats (16 sixteenth ticks).
+   - In 6/8 time, every full bar must add up to 2 compound beats (12 sixteenth ticks).
+   - Split bars around `||` must sum together to exactly one full bar.
+   - Any discrepancy must be corrected in the ABC before continuing!
+
+### Step 5: Final Output
+Return **ONLY** the clean, verified ABC code block.
 
 ---
 
 ## 5. Validation Checklist
 
-- [ ] No sol-fa characters in music lines (lint passes); no ties, chords or tuplets.
-- [ ] Header order is `X T C M L K`, metadata comments, `%%staves`, `V:` lines.
-- [ ] `K:` equals the printed `KEY`; `M:` is printed or correctly inferred.
-- [ ] Soprano, Alto and Descant follow the 2.A table; Tenor and Bass are one octave lower; ranges do not cross.
-- [ ] Chromatic syllables carry explicit accidentals (`fe` in B♭ is `=e`/`=E`; `de` in F is `^F`).
-- [ ] Every bar adds up to `M:` (halves around `||` combined); no padded or invented pickups.
-- [ ] Holds are note lengths, not ties.
-- [ ] Descant (if printed) is `V:5`, first in each system, with `has_descant=true` and `%%staves [(5) (1 2) (3 4)]`.
-- [ ] The word "System" appears only in `% --- System N ---` lines.
-- [ ] Lyrics copied exactly into `W:` lines; no invented metadata.
+Before presenting the output, verify every item:
+- [ ] **No sol-fa characters in music lines:** only A-G, a-g, `,`, `'`, `^`, `_`, `=`, `z`, digits, `/`, `|`, and spaces.
+- [ ] **Header order:** `X`, `T`, `C`, `M`, `L`, `K`, metadata comments, `%%staves`, `V:` lines.
+- [ ] **`K:` matches the printed key:** correct tonic from the printed score.
+- [ ] **`L:1/4` is present:** all note multipliers calculated relative to quarter notes.
+- [ ] **Pitch tables respected:** S/A/D from central table; T/B shifted one column left.
+- [ ] **Voice ranges do not cross:** Descant > Soprano > Alto > Tenor > Bass.
+- [ ] **Explicit accidentals for chromatic notes:** e.g. `fe` in B♭ is `=e`/`=E`; `de` in F is `^F`.
+- [ ] **Every bar adds up to the meter:** pickup bars not padded; split bars sum across `||`.
+- [ ] **Descant correctly placed:** `V:5` top of staves, `% has_descant=true`, `%%staves [(5) (1 2) (3 4)]`.
+- [ ] **System lines strictly formatted:** `% --- System N ---` only; word "System" appears nowhere else.
+- [ ] **Lyrics placed in `W:` lines:** exact words, no invented text or lower-case `w:`.
+- [ ] **Round-trip test passed:** ABC converted back to sol-fa perfectly equals the printed score.
 
 ---
 
 ## 6. Prompt Template for Gemini
 
 ```markdown
-You are an expert musicologist and ABC notation transcription engine specializing in Curwen Tonic Sol-fa hymnody.
+You are an expert musicologist and ABC notation transcription engine specializing in Curwen Tonic Sol-fa hymnody for the SolfaTunes app (https://github.com/PYTHAGON2/SolfaTunes/).
 
-Convert the provided Sol-fa score image into standard ABC notation for the SolfaTunes app (https://github.com/PYTHAGON2/SolfaTunes/).
+Convert the provided Sol-fa score image into standard ABC notation following the exact rules from the create-abc-notation-from-image-solfa skill.
 
-Work internally in five steps: (1) read the exact printed sol-fa tokens bar by bar, voice by voice (a descant is the extra top row), (2) expand pulses into note durations, (3) compile to ABC, (4) convert your ABC back to sol-fa and compare with step 1, fixing any difference, (5) output.
-
-The ABC body must use real note letters (A-G, a-g) with octave marks, accidentals and durations. Soprano, alto and descant use the literal octave table from the skill; tenor and bass are written one octave lower. Never put sol-fa syllables, colons, subscripts, periods, ties or chords in the music lines. Use the exact header order and voice layout from the skill. Copy lyrics into W: lines. Omit metadata that is not visible on the page.
-
-Return ONLY the final ABC code block.
+Execution Steps:
+1. RAW EXTRACTION: Read the exact printed sol-fa tokens bar by bar, voice by voice (Descant is the top row when present).
+2. PULSE EXPANSION: Convert pulses and punctuation to durations (L:1/4; simple pulses = 1, compound 6/8 pulses = 3/2, half-pulses = /2, quarter-pulses = /4).
+3. ABC COMPILATION: Translate syllables to sounding pitches using the key reference table (Soprano/Alto/Descant literal; Tenor/Bass shifted one octave lower). Never put sol-fa syllables, colons, periods, ties, or chords in the ABC music lines.
+4. ROUND-TRIP VALIDATION: Convert your ABC back to sol-fa notes internally and verify token-by-token against the original score: confirm pitch degrees, octave marks, durations, and that every bar sums exactly to the meter. Fix any discrepancy.
+5. FINAL OUTPUT: Return ONLY the final ABC code block.
 ```
 
 ---
 
-## 7. Worked Example 1: Warrington (key Bb, 3 pulses per bar, SATB)
+## 7. Worked Example 1: Warrington (Key Bb, 3/4 Time, SATB)
 
-### Step 1 (internal, for illustration only): raw extraction, system 1
-
+### Step 1 (Internal Raw Extraction, System 1):
 ```text
 S: s₁ :s₁ :f₁ | m₁ :s₁ :d | d :-.r :t₁ | d :- || m | r :- :r | m :- :r.d |
 A: m₁ :m₁ :r₁ | m₁ :r₁ :m₁ | f₁ :- :r₁ | m₁ :- || s₁ | s₁ :- :s₁ | s₁ :fe₁ :s₁.l₁ |
@@ -280,16 +403,13 @@ T: d :d :t₁ | d :r :d | l₁ :- :s₁ | s₁ :- || d | d :t₁ :t₁ | d :- :r
 B: d₁ :m₁ :s₁ | d :t₁ :l₁ | f₁ :r₁ :s₁ | d₁ :- || d₁ | s₁ :- :s₁ | d₁ :l₂ :t₂.d₁ |
 ```
 
-### Steps 2 to 4 (internal): spot checks
+### Steps 2 to 4 (Internal Round-Trip Checks):
+- `d :-.r` (Soprano) = d held 3/2, then r for 1/2 -> `B3/2 c/2`. Round-trip: `B3/2 c/2` -> `d :-.r` (Pass).
+- `fe₁` (Alto) = raised f one octave down; in K:Bb, f = E♭, so `fe₁` = E♮ = `=E`. Round-trip: `=E` -> `fe₁` (Pass).
+- Tenor `d` is B♭3 = `B,`; Bass `d₁` is B♭2 = `B,,` (one octave below S/A table). (Pass).
+- Soprano `d :-` plus the pickup `m` across `||` = 2 + 1 = 3 pulses -> `B2 || d |`. (Pass).
 
-- `d :-.r` (Soprano) = d held 3/2, then r for 1/2, so `B3/2 c/2`.
-- `fe₁` (Alto) is a raised f one octave down; in K:Bb, f = E♭, so `fe₁` = E♮ = `=E`.
-- Tenor `d` is B♭3 = `B,`; Bass `d₁` is B♭2 = `B,,`. Both are one octave below the S/A table.
-- Bass `d₁ :l₂ :t₂.d₁` = `B,, G,, A,,/2 B,,/2` (G2, A2, B♭2, rising stepwise).
-- Soprano `d :-` plus the pickup `m` = 3 pulses, so `B2 || d`.
-
-### Step 5: final output
-
+### Step 5: Final ABC Output
 ```abc
 X:1
 T:Warrington
@@ -332,10 +452,9 @@ W: And kindling noonday's fiery beams;
 
 ---
 
-## 8. Worked Example 2: Hursley (key F, 3 pulses per bar, SATB + Descant)
+## 8. Worked Example 2: Hursley (Key F, 3/4 Time, SATB + Descant)
 
-### Step 1 (internal): raw extraction, system 1, first three bars, and a chromatic bar from system 2
-
+### Step 1 (Internal Raw Extraction, System 1 & Chromatic Bar):
 ```text
 D: d¹ :t.l :s.f | m :r :d | s :- :f |      ...   | t :l.t :de¹ |
 S: d :d :d      | d :t₁ :d | r :m :r |      ...   | r :r :m |
@@ -344,16 +463,13 @@ T: m :m :m      | m :r :m  | f :s :f |      ...   | s :l :s |
 B: d :d :d      | d :- :d  | s₁ :- :s₁ |    ...   | s :f :m |
 ```
 
-### Spot checks
-
+### Steps 2 to 4 (Internal Round-Trip Checks):
 - `d¹` (Descant) is F5 = `f`; `t.l` = `e/2 d/2`; `s.f` = `c/2 B/2`.
 - Alto `s₁` is C4 = `C`. Tenor `m` is A3 = `A,`. Bass `d` is F3 = `F,`; Bass `s₁` is C3 = `C,`.
 - `de¹` (Descant) = raised d, an octave up = F♯5 = `^f`. Alto `de` = F♯4 = `^F`.
-- Every bar has 3 pulses and there is no split bar before any `||`.
-- No hymn name, meter or verses are printed, so those metadata lines are omitted. No lyrics are printed, so there are no `W:` lines.
+- In K:F, `F G A B c d e` all fall in the central solfa register, so they display without dots on-screen.
 
-### Final output
-
+### Step 5: Final ABC Output
 ```abc
 X:1
 T:Hursley
@@ -389,4 +505,4 @@ V:4 name="Bass" clef=bass
 
 ## 9. Final Output Rule
 
-Return **only** the verified ABC code block. Do not include the raw extraction, round-trip notes, validation commentary or explanations. The SolfaTunes parser is strict about header order and voice declarations; any deviation, and any sol-fa character in a music line, will break rendering.
+Return **ONLY** the verified ABC code block. Do not include raw extraction logs, round-trip notes, validation commentary or markdown conversation text. The SolfaTunes parser is strict about header order and voice declarations; any extra text outside the code block or any sol-fa character inside a music line will break transcription and rendering.
