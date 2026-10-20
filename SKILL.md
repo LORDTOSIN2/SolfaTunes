@@ -1,6 +1,14 @@
 ---
 name: create-abc-notation-from-image-solfa
-description: Use when asked to convert a Curwen Tonic Sol-fa hymn score image (photo, scan, screenshot) into real, standard ABC notation for the SolfaTunes app. Triggers on "solfa to ABC", "convert this tonic sol-fa", "transcribe this hymn for SolfaTunes", or any image of d r m f s l t notation, with or without a descant. Operates in two defined instructions: (1) extract tonic sol-fa from the image into neat plain text with all timing, rhythm, and punctuation intact, and (2) convert the plain text into SolfaTunes-compliant ABC notation. The final output presents both the neat plain text tonic sol-fa and the converted ABC notation.
+description: >-
+  Use when asked to convert a Curwen Tonic Sol-fa hymn score image (photo, scan,
+  screenshot) into real, standard ABC notation for the SolfaTunes app. Triggers
+  on "solfa to ABC", "convert this tonic sol-fa", "transcribe this hymn for
+  SolfaTunes", or any image of d r m f s l t notation, with or without a descant.
+  Operates in two defined instructions: (1) extract tonic sol-fa from the image
+  into neat plain text with all timing, rhythm, and punctuation intact, and (2)
+  convert the plain text into SolfaTunes-compliant ABC notation. The final output
+  presents both the neat plain text tonic sol-fa and the converted ABC notation.
 ---
 
 # SKILL: Convert Curwen Tonic Sol-fa Image to ABC for SolfaTunes
