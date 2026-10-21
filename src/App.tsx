@@ -8,7 +8,7 @@ import { Sidebar } from './components/Sidebar';
 import { ScoreRenderer } from './components/ScoreRenderer';
 import { AbcParser } from './engine/abc_parser';
 import { SolfaTransformer } from './engine/solfa_transformer';
-import { ExampleSong, EXAMPLES } from './utils/examples';
+import { SCORES, ScoreLibraryItem } from './utils/scores';
 import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
@@ -18,7 +18,7 @@ import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
 
 export default function App() {
   // 1. App States
-  const [abcText, setAbcText] = useState<string>(EXAMPLES[0].abcText);
+  const [abcText, setAbcText] = useState<string>(SCORES[0]?.abcText || '');
   const [score, setScore] = useState<ParsedScore | null>(null);
   const [warnings, setWarnings] = useState<ParseWarning[]>([]);
   
@@ -38,6 +38,7 @@ export default function App() {
   // Selected note state for visual editing
   const [selectedNote, setSelectedNote] = useState<SelectedNoteLocation | null>(null);
   const [studioMode, setStudioMode] = useState<'read' | 'lyrics' | 'interactive' | 'source'>('interactive');
+  const scoreContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Compute total duration of score in sixteenth ticks
   const totalTicks = useMemo(() => {
@@ -179,9 +180,12 @@ export default function App() {
     }));
   };
 
-  const handleLoadExample = (song: ExampleSong) => {
+  const handleLoadScore = (song: ScoreLibraryItem) => {
     setAbcText(song.abcText);
     setSelectedNote(null);
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      scoreContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const handleUpdateScore = (newScore: ParsedScore) => {
@@ -283,12 +287,13 @@ export default function App() {
           <Sidebar
             setAbcText={setAbcText}
             warnings={warnings}
-            onLoadExample={handleLoadExample}
+            onLoadScore={handleLoadScore}
+            selectedScoreId={SCORES.find(song => song.abcText === abcText)?.id}
           />
         </div>
 
         {/* Put the score first on phones so it is visible without scrolling past the library. */}
-        <div className="order-1 min-w-0 h-[70vh] min-h-[32rem] lg:order-2 lg:flex-1 lg:h-full lg:min-h-0">
+        <div ref={scoreContainerRef} className="order-1 min-w-0 h-[70vh] min-h-[32rem] scroll-mt-3 lg:order-2 lg:flex-1 lg:h-full lg:min-h-0">
           <ScoreRenderer
             score={score}
             abcText={abcText}
