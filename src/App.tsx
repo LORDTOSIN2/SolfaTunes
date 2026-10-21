@@ -13,7 +13,7 @@ import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
 import { serializeScoreToAbc } from './engine/abc_serializer';
-import { Play, Pause, Square, Music, Sliders, SlidersHorizontal, Download, Volume2, FileDown } from 'lucide-react';
+import { Music, Download, FileDown } from 'lucide-react';
 import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
 
 export default function App() {
@@ -237,147 +237,58 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-stone-200 flex flex-col antialiased font-sans">
+    <div className="min-h-screen lg:h-screen overflow-x-clip bg-[#0A0A0B] text-stone-200 flex flex-col antialiased font-sans">
       {/* Editorial Page Header */}
-      <header className="px-8 py-5 border-b border-white/5 bg-[#0F1115] flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
+      <header className="px-4 py-3 sm:px-6 sm:py-4 lg:px-8 lg:py-5 border-b border-white/5 bg-[#0F1115] flex items-center justify-between gap-3 shadow-xl">
         <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-2.5 rounded-xl text-white shadow-lg border border-indigo-500">
-            <Music className="h-6 w-6" />
+          <div className="bg-indigo-600 p-2 sm:p-2.5 rounded-xl text-white shadow-lg border border-indigo-500">
+            <Music className="h-5 w-5 sm:h-6 sm:w-6" />
           </div>
-          <div>
-            <h1 className="font-sans font-black text-xl uppercase tracking-widest text-white flex items-center gap-2">
+          <div className="min-w-0">
+            <h1 className="font-sans font-black text-lg sm:text-xl uppercase tracking-widest text-white flex items-center gap-2">
               SolfaTunes
             </h1>
-            <p className="text-[10px] font-mono uppercase tracking-wider text-stone-500 font-bold mt-0.5">
-              ABC Notation to Aligned Movable-Do Tonic Sol-fa Studio
+            <p className="text-[9px] sm:text-[10px] font-mono tracking-wide text-stone-500 font-bold mt-0.5">
+              ABC & Tonic Sol-fa music studio
             </p>
           </div>
         </div>
 
-        {/* Dynamic Status Display */}
-        <div className="flex items-center gap-4 text-[10px] font-mono uppercase font-bold tracking-wider text-stone-400 bg-black/40 border border-white/5 px-4 py-2 rounded-xl">
-          <div className="flex items-center gap-1.5">
-            <Volume2 size={14} className="text-stone-500" />
-            <span className="text-stone-500">Synthesizer:</span>
-            <span className="text-[#10B981]">Ready</span>
-          </div>
-          {isPlaying && (
-            <div className="flex items-center gap-1.5 border-l border-white/10 pl-4">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
-              <span className="text-stone-500">Tick:</span>
-              <span className="font-mono text-indigo-400">{Math.round(currentTick)}</span>
-            </div>
-          )}
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={handleExportAbc}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+            title="Download ABC notation"
+            aria-label="Download ABC notation"
+          >
+            <FileDown size={16} />
+            <span className="hidden sm:inline text-xs font-semibold">ABC</span>
+          </button>
+          <button
+            onClick={handleExportMidi}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-indigo-500/60 bg-indigo-600 px-3 text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+            title="Export MIDI"
+            aria-label="Export MIDI"
+          >
+            <Download size={16} />
+            <span className="hidden sm:inline text-xs font-semibold">MIDI</span>
+          </button>
         </div>
       </header>
 
-      {/* Global Playback Control Toolbar */}
-      <section className="bg-[#0F1115] px-8 py-4 border-b border-white/5 flex flex-wrap items-center justify-between gap-6 shadow-md">
-        {/* Playback Buttons */}
-        <div className="flex items-center gap-2">
-          {isPlaying ? (
-            <button
-              onClick={handlePause}
-              className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 active:scale-95 transition-all shadow-md font-sans font-black text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer border border-indigo-500"
-            >
-              <Pause size={14} />
-              Pause
-            </button>
-          ) : (
-            <button
-              onClick={handlePlay}
-              className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 active:scale-95 transition-all shadow-md font-sans font-black text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer border border-indigo-500"
-            >
-              <Play size={14} fill="currentColor" />
-              Play Score
-            </button>
-          )}
-
-          <button
-            onClick={handleStop}
-            className="p-2.5 text-stone-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl active:scale-95 transition-all border border-white/10 cursor-pointer"
-            title="Stop Playback"
-          >
-            <Square size={14} fill="currentColor" />
-          </button>
-        </div>
-
-        {/* Sliders & Dropdowns */}
-        <div className="flex flex-wrap items-center gap-6 flex-1 max-w-2xl justify-end">
-          {/* Tempo BPM Slider */}
-          <div className="flex items-center gap-3 bg-black/40 border border-white/5 px-4 py-2 rounded-xl flex-1 min-w-[200px] max-w-[280px]">
-            <SlidersHorizontal size={14} className="text-stone-500 flex-shrink-0" />
-            <div className="flex-1">
-              <div className="flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-stone-500 mb-1">
-                <span>Tempo (BPM)</span>
-                <span className="text-indigo-400 font-bold">{bpm}</span>
-              </div>
-              <input
-                type="range"
-                min="40"
-                max="220"
-                value={bpm}
-                onChange={(e) => setBpm(parseInt(e.target.value, 10))}
-                className="w-full accent-indigo-600 h-1 bg-white/10 rounded-lg cursor-pointer"
-              />
-            </div>
-          </div>
-
-          {/* Transposition Dropdown */}
-          <div className="flex items-center gap-2 bg-black/40 border border-white/5 px-3.5 py-2 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider text-stone-400">
-            <span className="text-stone-500 font-bold">
-              Transpose:
-            </span>
-            <select
-              value={transpose}
-              onChange={(e) => setTranspose(parseInt(e.target.value, 10))}
-              className="bg-stone-900 border border-white/10 rounded-lg px-2.5 py-1 text-xs font-bold text-stone-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            >
-              {Array.from({ length: 13 }).map((_, i) => {
-                const val = i - 6; // range -6 to +6
-                return (
-                  <option key={`transpose-opt-${val}`} value={val}>
-                    {getTranspositionLabel(val)}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          {/* Export MIDI button */}
-          <button
-            onClick={handleExportMidi}
-            className="px-4 py-2.5 bg-[#1C1E24] hover:bg-[#252830] border border-white/5 text-white rounded-xl active:scale-95 transition-all text-xs font-sans font-black uppercase tracking-wider flex items-center gap-2 shadow-md cursor-pointer"
-            title="Download MIDI File"
-          >
-            <Download size={14} />
-            Export MIDI
-          </button>
-
-          {/* Download ABC button */}
-          <button
-            onClick={handleExportAbc}
-            className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 border border-indigo-500 text-white rounded-xl active:scale-95 transition-all text-xs font-sans font-black uppercase tracking-wider flex items-center gap-2 shadow-md cursor-pointer"
-            title="Download ABC notation text file"
-          >
-            <FileDown size={14} />
-            Download ABC
-          </button>
-        </div>
-      </section>
-
       {/* Main Work Area Dashboard */}
-      <main className="flex-1 flex flex-col lg:flex-row p-6 lg:p-8 gap-6 lg:gap-8 overflow-hidden h-[calc(100vh-175px)]">
+      <main className="flex-1 min-h-0 flex flex-col lg:flex-row p-3 sm:p-5 lg:p-8 pb-36 lg:pb-8 gap-4 lg:gap-8 lg:overflow-hidden">
         {/* Editor panel on Left */}
-        <Sidebar
-          abcText={abcText}
-          setAbcText={setAbcText}
-          warnings={warnings}
-          onLoadExample={handleLoadExample}
-        />
+        <div className="order-2 min-w-0 lg:order-1 lg:w-[380px] lg:shrink-0 lg:h-full lg:min-h-0">
+          <Sidebar
+            setAbcText={setAbcText}
+            warnings={warnings}
+            onLoadExample={handleLoadExample}
+          />
+        </div>
 
-        {/* Visualizer pane on Right */}
-        <div className="flex-1 min-w-0 h-full">
+        {/* Put the score first on phones so it is visible without scrolling past the library. */}
+        <div className="order-1 min-w-0 h-[70vh] min-h-[32rem] lg:order-2 lg:flex-1 lg:h-full lg:min-h-0">
           <ScoreRenderer
             score={score}
             abcText={abcText}

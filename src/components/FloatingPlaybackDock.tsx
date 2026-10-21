@@ -60,7 +60,9 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
   toggleLoop,
   getTranspositionLabel,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  );
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [hoverPosition, setHoverPosition] = useState<{ xPercent: number; tick: number } | null>(null);
 
@@ -440,12 +442,13 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
                 </div>
 
                 {/* Transposition Dropdown */}
-                <div className="hidden md:flex items-center gap-1.5 bg-black/40 border border-white/5 px-2.5 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider text-stone-400">
+                <div className="flex items-center gap-1.5 bg-black/40 border border-white/5 px-2.5 py-1.5 rounded-xl text-[10px] font-mono font-bold uppercase tracking-wider text-stone-400">
                   <span className="text-stone-500">Key:</span>
                   <select
                     value={transpose}
                     onChange={(e) => setTranspose(parseInt(e.target.value, 10))}
-                    className="bg-stone-900 border border-white/10 rounded-lg px-2 py-0.5 text-xs font-bold text-stone-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                    aria-label="Transpose score"
+                    className="w-[118px] md:w-auto max-w-full bg-stone-900 border border-white/10 rounded-lg px-2 py-0.5 text-xs font-bold text-stone-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                   >
                     {Array.from({ length: 13 }).map((_, i) => {
                       const val = i - 6; // range -6 to +6

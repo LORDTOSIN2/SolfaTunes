@@ -6,17 +6,15 @@
 import React, { useState, useRef } from 'react';
 import { ExampleSong, EXAMPLES } from '../utils/examples';
 import { ParseWarning } from '../types';
-import { FileMusic, AlertTriangle, Upload, ChevronDown, ChevronUp, Download } from 'lucide-react';
+import { FileMusic, AlertTriangle, Upload, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface SidebarProps {
-  abcText: string;
   setAbcText: (text: string) => void;
   warnings: ParseWarning[];
   onLoadExample: (example: ExampleSong) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  abcText,
   setAbcText,
   warnings,
   onLoadExample
@@ -76,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <h2 className="font-sans font-black text-sm uppercase tracking-wider">Workspace Studio</h2>
         </div>
         <p className="text-[11px] text-stone-400 mt-1">
-          Select or load masterpiece settings, or import your own music files below.
+          Open an example score or import an ABC file.
         </p>
       </div>
 
@@ -85,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Example Selector */}
         <div>
           <label className="block text-[10px] uppercase tracking-[0.2em] font-bold text-[#4F46E5] mb-2 font-sans">
-            Load Masterpieces
+            Example scores
           </label>
           <div className="grid grid-cols-1 gap-2">
             {EXAMPLES.map((eg) => (
@@ -113,7 +111,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onDragLeave={handleDrag}
           onDrop={handleDrop}
           onClick={triggerFileSelect}
-          className={`border-2 border-dashed rounded-lg p-5 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2 shadow-sm ${
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              triggerFileSelect();
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label="Import an ABC or TXT music file"
+          className={`border-2 border-dashed rounded-lg p-5 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
             dragActive
               ? 'border-[#4F46E5] bg-[#4F46E5]/10 scale-[0.99]'
               : 'border-white/10 hover:border-[#4F46E5]/50 bg-white/[0.01] hover:bg-white/[0.03]'
@@ -136,31 +143,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="hidden"
           />
         </div>
-
-        {/* Download ABC notation option */}
-        <button
-          onClick={() => {
-            const blob = new Blob([abcText], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            let fileName = 'score.abc';
-            const titleMatch = abcText.match(/^T:\s*(.+)$/m);
-            if (titleMatch && titleMatch[1]) {
-              fileName = `${titleMatch[1].trim().toLowerCase().replace(/[^a-z0-9]+/g, '_')}.abc`;
-            }
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-          }}
-          className="w-full py-2.5 px-4 bg-[#1C1E24] hover:bg-[#252830] text-stone-200 hover:text-white rounded-lg active:scale-95 transition-all text-xs font-sans font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm border border-white/5 cursor-pointer"
-          title="Download the currently edited ABC notation"
-        >
-          <Download size={14} className="text-[#4F46E5]" />
-          Download ABC File
-        </button>
 
         {/* Collapsible Parser Warnings Banner */}
         {warnings.length > 0 && (
