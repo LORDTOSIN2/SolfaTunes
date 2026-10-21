@@ -143,10 +143,7 @@ export default function App() {
     setIsPlaying(true);
     playerRef.current?.play((tick) => {
       setCurrentTick(tick);
-      if (tick === 0) {
-        setIsPlaying(false);
-      }
-    });
+    }, () => setIsPlaying(false));
   };
 
   const handlePause = () => {

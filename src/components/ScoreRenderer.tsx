@@ -9,6 +9,7 @@ import { SolfaTransformer, analyzeMeasureCells } from '../engine/solfa_transform
 import { serializeScoreToSolfa } from '../engine/solfa_serializer';
 import { parseSolfaToAbc } from '../engine/solfa_parser';
 import { alignSolfaGrid } from '../engine/solfa_aligner';
+import { findActiveMeasureRange, getScoreMeasureRanges } from '../utils/playback_timeline';
 import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle, FileText, CheckSquare, Square } from 'lucide-react';
 
 interface ScoreRendererProps {
@@ -903,51 +904,12 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   };
 
   // 1. Calculate measure tick ranges to highlight active measures
-  const measureRanges = useMemo(() => {
-    if (!score || score.voices.length === 0) return [];
-
-    const ranges: {
-      systemIndex: number;
-      measureIndex: number;
-      start: number;
-      end: number;
-    }[] = [];
-
-    // Let's use the first voice's measures as the timeline reference
-    const refVoiceId = score.voices[0].id;
-    let globalOffset = 0;
-
-    score.systems.forEach((system) => {
-      const line = system.voices[refVoiceId];
-      if (!line) return;
-
-      line.measures.forEach((measure, mIndex) => {
-        // Calculate length of this measure in ticks
-        let measureLen = 0;
-        measure.notes.forEach((note) => {
-          measureLen += note.durationTicks;
-        });
-
-        ranges.push({
-          systemIndex: system.systemIndex,
-          measureIndex: mIndex,
-          start: globalOffset,
-          end: globalOffset + measureLen
-        });
-
-        globalOffset += measureLen;
-      });
-    });
-
-    return ranges;
-  }, [score]);
+  const measureRanges = useMemo(() => getScoreMeasureRanges(score), [score]);
 
   // Find currently active measure
   const activeMeasure = useMemo(() => {
     const playhead = currentTick !== undefined ? currentTick : (currentEighth || 0);
-    return measureRanges.find(
-      (r) => playhead >= r.start && playhead < r.end
-    );
+    return findActiveMeasureRange(measureRanges, playhead);
   }, [measureRanges, currentTick, currentEighth]);
 
   const selectedNoteObj = useMemo(() => {
@@ -1775,7 +1737,10 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               <div className="flex flex-col gap-12 select-none">
                 {score.systems.map((system) => {
                   const refVoice = score.voices[0].id;
-                  const systemMeasuresCount = system.voices[refVoice]?.measures.length || 0;
+                  const systemMeasuresCount = Math.max(
+                    0,
+                    ...score.voices.map(voice => system.voices[voice.id]?.measures.length || 0)
+                  );
 
                   // Compute the exact height of the voice rows in this system for barline alignment
                   const rowHeight = fontSize * 2.2;

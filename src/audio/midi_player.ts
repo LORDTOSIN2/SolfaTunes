@@ -131,6 +131,7 @@ export class MidiPlayer {
   // Interval for playhead polling
   private pollingTimer: number | null = null;
   private onProgressCallback: ((currentTick: number) => void) | null = null;
+  private onPlaybackEndedCallback: (() => void) | null = null;
 
   constructor() {}
 
@@ -235,13 +236,16 @@ export class MidiPlayer {
    * Set BPM on the fly.
    */
   public setBpm(newBpm: number) {
-    this.bpm = newBpm;
     if (this.isPlaying && this.score) {
       const currentPos = this.getCurrentTick();
       this.pause();
       this.pausedTick = currentPos;
-      this.play(this.onProgressCallback!);
+      this.bpm = newBpm;
+      this.play(this.onProgressCallback!, this.onPlaybackEndedCallback || undefined);
+      return;
     }
+
+    this.bpm = newBpm;
   }
 
   /**
@@ -253,19 +257,20 @@ export class MidiPlayer {
       const currentPos = this.getCurrentTick();
       this.pause();
       this.pausedTick = currentPos;
-      this.play(this.onProgressCallback!);
+      this.play(this.onProgressCallback!, this.onPlaybackEndedCallback || undefined);
     }
   }
 
   /**
    * Play or Resume.
    */
-  public play(onProgress: (currentTick: number) => void) {
+  public play(onProgress: (currentTick: number) => void, onEnded?: () => void) {
     if (this.isPlaying) return;
     if (!this.score) return;
 
     this.initAudio();
     this.onProgressCallback = onProgress;
+    if (onEnded) this.onPlaybackEndedCallback = onEnded;
     const ctx = this.ctx!;
 
     const secondsPerTick = 15 / this.bpm; // 1 sixteenth note = 15 / bpm seconds
@@ -334,10 +339,11 @@ export class MidiPlayer {
           // Smooth loop back to 0
           this.pause();
           this.pausedTick = 0;
-          this.play(this.onProgressCallback!);
+          this.play(this.onProgressCallback!, this.onPlaybackEndedCallback || undefined);
         } else {
           this.stop();
           onProgress(0);
+          this.onPlaybackEndedCallback?.();
         }
       } else {
         scheduleNextNotes();
@@ -389,7 +395,7 @@ export class MidiPlayer {
     if (wasPlaying) {
       this.pause();
       this.pausedTick = boundedTick;
-      this.play(this.onProgressCallback!);
+      this.play(this.onProgressCallback!, this.onPlaybackEndedCallback || undefined);
     } else {
       this.pausedTick = boundedTick;
     }

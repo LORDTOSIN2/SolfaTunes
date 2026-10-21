@@ -15,7 +15,8 @@ import {
   ChevronUp,
   ChevronDown
 } from 'lucide-react';
-import { ParsedScore, VoiceLine } from '../types';
+import { ParsedScore } from '../types';
+import { findActiveMeasureRange, getScoreMeasureRanges } from '../utils/playback_timeline';
 
 export interface FloatingPlaybackDockProps {
   score: ParsedScore | null;
@@ -87,40 +88,15 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
 
   // Approximate current measure index based on score structure
   const currentMeasureInfo = useMemo(() => {
-    if (!score || !score.systems.length) return { current: 1, total: 1 };
-    
-    // Calculate total measures
-    let totalMeasures = 0;
-    score.systems.forEach((sys) => {
-      const firstVoice = (Object.values(sys.voices)[0] as VoiceLine | undefined);
-      if (firstVoice) {
-        totalMeasures += firstVoice.measures.length;
-      }
-    });
-
-    // Find measure matching current tick
-    let curMeasure = 1;
-    let measureCounter = 0;
-    for (const sys of score.systems) {
-      const firstVoice = (Object.values(sys.voices)[0] as VoiceLine | undefined);
-      if (!firstVoice) continue;
-      for (const m of firstVoice.measures) {
-        measureCounter++;
-        const mStart = m.notes[0]?.timestamp ?? 0;
-        const lastNote = m.notes[m.notes.length - 1];
-        const mEnd = lastNote ? lastNote.timestamp + lastNote.durationTicks : mStart;
-        if (currentTick >= mStart && currentTick <= mEnd) {
-          curMeasure = measureCounter;
-          break;
-        } else if (currentTick > mEnd) {
-          curMeasure = measureCounter;
-        }
-      }
-    }
+    const measureRanges = getScoreMeasureRanges(score);
+    const activeRange = findActiveMeasureRange(measureRanges, currentTick);
+    const current = activeRange
+      ? measureRanges.indexOf(activeRange) + 1
+      : currentTick <= 0 ? 1 : measureRanges.length;
 
     return {
-      current: Math.max(1, Math.min(curMeasure, totalMeasures || 1)),
-      total: Math.max(1, totalMeasures || 1),
+      current: Math.max(1, current),
+      total: Math.max(1, measureRanges.length),
     };
   }, [score, currentTick]);
 
