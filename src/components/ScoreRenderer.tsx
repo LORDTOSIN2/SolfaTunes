@@ -1398,7 +1398,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                   {/* Background Highlighted Pre */}
                   <pre
                     ref={solfaHighlightRef}
-                    className="absolute inset-0 w-full h-full p-4 font-mono text-[11px] leading-relaxed text-indigo-100/30 whitespace-pre break-all overflow-hidden pointer-events-none select-none border border-transparent"
+                    className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed text-indigo-100/30 whitespace-pre break-all overflow-hidden pointer-events-none select-none border border-transparent"
                     aria-hidden="true"
                     style={{ lineHeight: '21px' }}
                   >
@@ -1412,7 +1412,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                     onChange={(e) => handleSolfaChange(e.target.value)}
                     onBlur={handleSolfaBlur}
                     onScroll={handleSolfaScroll}
-                    className="absolute inset-0 w-full h-full p-4 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
+                    className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
                     placeholder="Type or paste Tonic Sol-fa notation here (e.g. KEY Bb, S: | s1 : s1 : f1 | m1 : s1 : d | ...)"
                     spellCheck="false"
                     style={{ lineHeight: '21px' }}
@@ -1424,7 +1424,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 {/* Gutter with line numbers for ABC */}
                 <div
                   ref={editorGutterRef}
-                  className="w-12 flex-shrink-0 bg-[#0A0A0B] border-r border-white/5 py-4 font-mono text-[11px] leading-relaxed text-stone-600 text-right pr-3 select-none overflow-hidden"
+                  className="w-12 flex-shrink-0 bg-[#0A0A0B] border-r border-white/5 py-4 pb-36 font-mono text-[11px] leading-relaxed text-stone-600 text-right pr-3 select-none overflow-hidden"
                 >
                   {abcText.split('\n').map((_, i) => (
                     <div key={`abc-ln-${i}`} className="h-[21px] leading-[21px]">
@@ -1438,7 +1438,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                   {/* Background Highlighted Pre */}
                   <pre
                     ref={editorHighlightRef}
-                    className="absolute inset-0 w-full h-full p-4 font-mono text-[11px] leading-relaxed text-indigo-100/30 whitespace-pre break-all overflow-hidden pointer-events-none select-none border border-transparent"
+                    className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed text-indigo-100/30 whitespace-pre break-all overflow-hidden pointer-events-none select-none border border-transparent"
                     aria-hidden="true"
                     style={{ lineHeight: '21px' }}
                   >
@@ -1451,7 +1451,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                     value={abcText}
                     onChange={(e) => setAbcText(e.target.value)}
                     onScroll={handleEditorScroll}
-                    className="absolute inset-0 w-full h-full p-4 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
+                    className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
                     placeholder="Type or paste ABC notation here..."
                     spellCheck="false"
                     style={{ lineHeight: '21px' }}
@@ -1488,7 +1488,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
         </div>
       ) : studioMode === 'lyrics' ? (
         /* Hymn Lyrics View */
-        <div className="flex-1 overflow-auto p-8 relative bg-[#0A0A0B]">
+        <div className="flex-1 overflow-auto p-8 pb-36 relative bg-[#0A0A0B]">
           <div
             className="mx-auto max-w-2xl bg-[#FDFCF8] text-black border border-black/5 shadow-2xl rounded-2xl p-10 font-sans relative transition-all overflow-hidden"
             style={{
@@ -1583,7 +1583,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
         </div>
       ) : (
         /* Sheet Music Visual Area */
-        <div className="flex-1 overflow-auto p-8 relative bg-[#0A0A0B]">
+        <div className="flex-1 overflow-auto p-8 pb-36 relative bg-[#0A0A0B]">
           {selectedNote && selectedNoteObj && (
             <div className="mx-auto max-w-4xl mb-8 bg-[#161920] border border-white/10 rounded-2xl p-6 shadow-2xl relative text-white sticky top-0 z-30 transition-all duration-300">
               {/* Header info */}

@@ -14,6 +14,7 @@ import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
 import { serializeScoreToAbc } from './engine/abc_serializer';
 import { Play, Pause, Square, Music, Sliders, SlidersHorizontal, Download, Volume2, FileDown } from 'lucide-react';
+import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
 
 export default function App() {
   // 1. App States
@@ -27,6 +28,8 @@ export default function App() {
   const [currentTick, setCurrentTick] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [mutedVoices, setMutedVoices] = useState<{ [voiceId: string]: boolean }>({});
+  const [masterVolume, setMasterVolume] = useState<number>(0.8);
+  const [isLooping, setIsLooping] = useState<boolean>(false);
 
   // Sheet display states
   const [fontSize, setFontSize] = useState<number>(18);
@@ -35,6 +38,28 @@ export default function App() {
   // Selected note state for visual editing
   const [selectedNote, setSelectedNote] = useState<SelectedNoteLocation | null>(null);
   const [studioMode, setStudioMode] = useState<'read' | 'lyrics' | 'interactive' | 'source'>('interactive');
+
+  // Compute total duration of score in sixteenth ticks
+  const totalTicks = useMemo(() => {
+    if (!score) return 0;
+    let maxTick = 0;
+    score.voices.forEach((v) => {
+      score.systems.forEach((sys) => {
+        const line = sys.voices[v.id];
+        if (line) {
+          line.measures.forEach((measure) => {
+            measure.notes.forEach((note) => {
+              const end = note.timestamp + note.durationTicks;
+              if (end > maxTick) {
+                maxTick = end;
+              }
+            });
+          });
+        }
+      });
+    });
+    return maxTick;
+  }, [score]);
 
   // 2. Playback Engine reference
   const playerRef = useRef<MidiPlayer | null>(null);
@@ -96,6 +121,20 @@ export default function App() {
     }
   }, [mutedVoices]);
 
+  // Sync Master Volume with player
+  useEffect(() => {
+    if (playerRef.current) {
+      playerRef.current.setMasterVolume(masterVolume);
+    }
+  }, [masterVolume]);
+
+  // Sync Looping with player
+  useEffect(() => {
+    if (playerRef.current) {
+      playerRef.current.setLooping(isLooping);
+    }
+  }, [isLooping]);
+
   // 4. Player Controls Event Handlers
   const handlePlay = () => {
     if (!score) return;
@@ -118,6 +157,19 @@ export default function App() {
     setIsPlaying(false);
     playerRef.current?.stop();
     setCurrentTick(0);
+  };
+
+  const handleSeek = (tick: number) => {
+    playerRef.current?.seek(tick);
+    setCurrentTick(tick);
+  };
+
+  const toggleLoop = () => {
+    setIsLooping(prev => {
+      const next = !prev;
+      playerRef.current?.setLooping(next);
+      return next;
+    });
   };
 
   const toggleMute = (voiceId: string) => {
@@ -347,6 +399,29 @@ export default function App() {
           />
         </div>
       </main>
+
+      {/* Unified Floating Playback Dock ("Always Within Reach") */}
+      <FloatingPlaybackDock
+        score={score}
+        isPlaying={isPlaying}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onStop={handleStop}
+        currentTick={currentTick}
+        totalTicks={totalTicks}
+        bpm={bpm}
+        setBpm={setBpm}
+        transpose={transpose}
+        setTranspose={setTranspose}
+        masterVolume={masterVolume}
+        setMasterVolume={setMasterVolume}
+        onSeek={handleSeek}
+        mutedVoices={mutedVoices}
+        toggleMute={toggleMute}
+        isLooping={isLooping}
+        toggleLoop={toggleLoop}
+        getTranspositionLabel={getTranspositionLabel}
+      />
     </div>
   );
 }

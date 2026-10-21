@@ -122,6 +122,8 @@ export class MidiPlayer {
   private startCtxTime = 0;
   private totalTicks = 0;
   private nextScheduleWindowStartTick = 0;
+  private masterVolume = 0.8;
+  private isLooping = false;
 
   // Active playing voices
   private scheduledVoices: SynthVoice[] = [];
@@ -139,7 +141,7 @@ export class MidiPlayer {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.setValueAtTime(0.8, this.ctx.currentTime);
+      this.masterGain.gain.setValueAtTime(this.masterVolume, this.ctx.currentTime);
       this.masterGain.connect(this.ctx.destination);
     }
     if (this.ctx.state === 'suspended') {
@@ -328,13 +330,85 @@ export class MidiPlayer {
       const current = this.getCurrentTick();
       
       if (current >= this.totalTicks) {
-        this.stop();
-        onProgress(0);
+        if (this.isLooping && this.totalTicks > 0) {
+          // Smooth loop back to 0
+          this.pause();
+          this.pausedTick = 0;
+          this.play(this.onProgressCallback!);
+        } else {
+          this.stop();
+          onProgress(0);
+        }
       } else {
         scheduleNextNotes();
         onProgress(current);
       }
     }, 25); // Faster 25ms poll for tightly scheduled lookahead checks
+  }
+
+  /**
+   * Set Master Volume (0.0 to 1.0).
+   */
+  public setMasterVolume(volume: number) {
+    this.masterVolume = Math.max(0, Math.min(1, volume));
+    if (this.ctx && this.masterGain) {
+      const now = this.ctx.currentTime;
+      this.masterGain.gain.cancelScheduledValues(now);
+      this.masterGain.gain.setValueAtTime(this.masterGain.gain.value, now);
+      this.masterGain.gain.linearRampToValueAtTime(this.masterVolume, now + 0.02);
+    }
+  }
+
+  /**
+   * Get Master Volume.
+   */
+  public getMasterVolume(): number {
+    return this.masterVolume;
+  }
+
+  /**
+   * Set Looping mode.
+   */
+  public setLooping(loop: boolean) {
+    this.isLooping = loop;
+  }
+
+  /**
+   * Get Looping mode.
+   */
+  public getLooping(): boolean {
+    return this.isLooping;
+  }
+
+  /**
+   * Seeks to a specific tick position.
+   */
+  public seek(targetTick: number) {
+    const boundedTick = Math.max(0, Math.min(targetTick, this.totalTicks));
+    const wasPlaying = this.isPlaying;
+    if (wasPlaying) {
+      this.pause();
+      this.pausedTick = boundedTick;
+      this.play(this.onProgressCallback!);
+    } else {
+      this.pausedTick = boundedTick;
+    }
+  }
+
+  /**
+   * Gets total score duration in ticks.
+   */
+  public getTotalTicks(): number {
+    return this.totalTicks;
+  }
+
+  /**
+   * Returns whether the Web Audio context is initialized and active.
+   */
+  public getAudioStatus(): 'ready' | 'active' | 'suspended' {
+    if (!this.ctx) return 'ready';
+    if (this.isPlaying) return 'active';
+    return this.ctx.state === 'running' ? 'ready' : 'suspended';
   }
 
   /**
