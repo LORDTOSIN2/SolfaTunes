@@ -380,13 +380,19 @@ export class AbcParser {
         }
 
         if (token.type === 'bar') {
-          // Commit notes to the current measure for this voice
-          this.addMeasureToVoice(
-            currentSystemVoices,
-            currentVoiceInLine,
-            currentMeasureNotes,
-            token.value
-          );
+          // If this is a leading opening barline at the start of the voice with no notes prior, ignore creating an empty measure
+          const existingVoice = currentSystemVoices[currentVoiceInLine];
+          const isInitialBarline = currentMeasureNotes.length === 0 && (!existingVoice || existingVoice.measures.length === 0);
+          
+          if (!isInitialBarline) {
+            // Commit notes to the current measure for this voice
+            this.addMeasureToVoice(
+              currentSystemVoices,
+              currentVoiceInLine,
+              currentMeasureNotes,
+              token.value
+            );
+          }
           currentMeasureNotes = [];
         }
       }

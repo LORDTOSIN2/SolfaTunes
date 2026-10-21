@@ -5,6 +5,7 @@
 
 import { ParsedScore } from '../types';
 import { analyzeMeasureCells, pulseTicks } from './solfa_transformer';
+import { alignSolfaGrid } from './solfa_aligner';
 
 /**
  * Returns clean Curwen Tonic Sol-fa syllable with unicode subscript/superscript.
@@ -113,5 +114,5 @@ export function serializeScoreToSolfa(score: ParsedScore): string {
     });
   }
 
-  return lines.join('\n');
+  return alignSolfaGrid(lines.join('\n'));
 }

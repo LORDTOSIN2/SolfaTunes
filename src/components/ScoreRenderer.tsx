@@ -882,6 +882,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   };
 
   const handleAlignSolfa = () => {
+    isEditingSolfaRef.current = true;
     const aligned = alignSolfaGrid(solfaText);
     setSolfaText(aligned);
     try {
@@ -890,6 +891,9 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
         setAbcText(newAbc);
       }
     } catch (e) {}
+    setTimeout(() => {
+      isEditingSolfaRef.current = false;
+    }, 800);
   };
 
   const handleSolfaBlur = () => {

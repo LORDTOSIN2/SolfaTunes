@@ -357,12 +357,20 @@ export function parseSolfaToAbc(solfaText: string): { abcText: string; warnings:
       return;
     }
 
+    // Ignore headers, lyrics, comments in pass 2
+    if (trimmed.startsWith('%') || /^W:/i.test(trimmed) || /^KEY\s+/i.test(trimmed) || (/^(?:M:|TITLE:|C:)\s*/i.test(trimmed) && !trimmed.includes('|'))) {
+      return;
+    }
+
     // Check voice lines: S:, A:, T:, B:, D: or V:id:
     const voiceMatch = trimmed.match(/^([A-Za-z0-9_]+:)\s*(.*)$/);
     if (!voiceMatch) return;
 
     const prefix = voiceMatch[1].toUpperCase();
     const content = voiceMatch[2];
+
+    const isKnownVoice = !!voiceMap[prefix] || /^V:[A-Za-z0-9_]+:?$/i.test(prefix);
+    if (!isKnownVoice) return;
 
     const voiceEntry = voiceMap[prefix] || {
       prefix,

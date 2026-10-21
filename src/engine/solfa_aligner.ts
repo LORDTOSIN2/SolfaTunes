@@ -13,15 +13,30 @@
  * - Octave 3 above: d^3, d''', d*** -> d³
  */
 export function normalizeSolfaOctaves(text: string): string {
-  return text
-    // Lower octaves
-    .replace(/\b([drsmflt](?:[eia])?)(?:_3|3|,,,|₃)\b/gi, '$1₃')
-    .replace(/\b([drsmflt](?:[eia])?)(?:_2|2|,,|₂)\b/gi, '$1₂')
-    .replace(/\b([drsmflt](?:[eia])?)(?:_1|1|,|₁)\b/gi, '$1₁')
-    // Upper octaves
-    .replace(/([drsmflt](?:[eia])?)(?:\^3|'{3}|\*{3}|³)/gi, '$1³')
-    .replace(/([drsmflt](?:[eia])?)(?:\^2|'{2}|\*{2}|²)/gi, '$1²')
-    .replace(/([drsmflt](?:[eia])?)(?:\^1|'|\*|¹)/gi, '$1¹');
+  return text.split('\n').map(line => {
+    const trimmed = line.trim();
+    // Do not touch comments, lyrics, or header lines
+    if (trimmed.startsWith('%') || /^W:/i.test(trimmed) || /^KEY\s+/i.test(trimmed) || /^M:/i.test(trimmed)) {
+      return line;
+    }
+    // For voice lines, preserve the prefix (e.g. "S:") and normalize the music content
+    const match = line.match(/^([A-Za-z0-9_]+:\s*)(.*)$/);
+    if (match) {
+      const prefix = match[1];
+      const rest = match[2];
+      const normRest = rest
+        // Lower octaves: e.g. s1, s_1, s, -> s₁; d2, d_2, d,, -> d₂
+        .replace(/\b([drsmflt](?:[eia])?)(?:_3|3|,,,|₃)\b/gi, '$1₃')
+        .replace(/\b([drsmflt](?:[eia])?)(?:_2|2|,,|₂)\b/gi, '$1₂')
+        .replace(/\b([drsmflt](?:[eia])?)(?:_1|1|,|₁)\b/gi, '$1₁')
+        // Upper octaves: e.g. d^1, d', d* -> d¹; d^2, d'', d** -> d²
+        .replace(/([drsmflt](?:[eia])?)(?:\^3|'{3}|\*{3}|³)/gi, '$1³')
+        .replace(/([drsmflt](?:[eia])?)(?:\^2|'{2}|\*{2}|²)/gi, '$1²')
+        .replace(/([drsmflt](?:[eia])?)(?:\^1|'|\*|¹)/gi, '$1¹');
+      return prefix + normRest;
+    }
+    return line;
+  }).join('\n');
 }
 
 /**
@@ -29,105 +44,142 @@ export function normalizeSolfaOctaves(text: string): string {
  * Also normalizes forgiving octave notation.
  */
 export function alignSolfaGrid(solfaText: string): string {
-  // 1. Normalize octave representations
+  // 1. Normalize forgiving octave representations
   const normalized = normalizeSolfaOctaves(solfaText);
   const lines = normalized.split('\n');
   const resultLines: string[] = [];
 
-  let currentVoiceBlock: string[] = [];
-
+  let currentBlock: string[] = [];
   const barRegex = /(\|\]|\|\||::|:\||\|:|\|)/;
 
-  const flushVoiceBlock = () => {
-    if (currentVoiceBlock.length === 0) return;
+  const flushBlock = () => {
+    if (currentBlock.length === 0) return;
 
-    if (currentVoiceBlock.length === 1) {
-      resultLines.push(currentVoiceBlock[0]);
-      currentVoiceBlock = [];
+    if (currentBlock.length === 1) {
+      resultLines.push(currentBlock[0]);
+      currentBlock = [];
       return;
     }
 
-    const parsedVoices = currentVoiceBlock.map(line => {
+    const parsedVoices = currentBlock.map(line => {
       const match = line.match(/^([A-Za-z0-9_]+:)\s*(.*)$/);
       const prefix = match ? match[1] : '';
       const content = match ? match[2] : line;
-      const parts = content.split(barRegex).map(p => p.trim());
-      return { prefix, parts };
+      const rawParts = content.split(barRegex);
+      return { prefix, rawParts };
     });
 
-    const maxParts = Math.max(...parsedVoices.map(v => v.parts.length));
-    const alignedPartsPerVoice: string[][] = parsedVoices.map(() => []);
+    const maxPrefixLen = Math.max(...parsedVoices.map(v => v.prefix.length));
+    const maxPartsCount = Math.max(...parsedVoices.map(v => v.rawParts.length));
 
-    for (let partIdx = 0; partIdx < maxParts; partIdx++) {
-      const isBarline = parsedVoices.some(v => v.parts[partIdx] && barRegex.test(v.parts[partIdx]));
+    // Step 1: For each measure token (even index), split by ':' and align internal beat cells
+    const formattedPartsPerVoice: string[][] = parsedVoices.map(() => []);
 
-      if (isBarline) {
+    for (let partIdx = 0; partIdx < maxPartsCount; partIdx++) {
+      if (partIdx % 2 === 1) {
+        // Barline token (odd index)
         parsedVoices.forEach((v, vIdx) => {
-          const bar = v.parts[partIdx] || '|';
-          alignedPartsPerVoice[vIdx].push(bar);
+          const bar = partIdx < v.rawParts.length ? v.rawParts[partIdx].trim() : '';
+          formattedPartsPerVoice[vIdx].push(bar);
         });
       } else {
-        // Measure note text: split each voice's measure into beat cells by ':'
-        const cellLists = parsedVoices.map(v => {
-          const text = v.parts[partIdx] || '';
+        // Measure token (even index)
+        const measureTexts = parsedVoices.map(v => {
+          if (partIdx < v.rawParts.length) return v.rawParts[partIdx].trim();
+          return '';
+        });
+
+        const voiceCells = measureTexts.map(text => {
           if (!text) return [];
           return text.split(':').map(c => c.trim());
         });
 
-        const maxCells = Math.max(...cellLists.map(c => c.length));
-        const cellWidths: number[] = Array.from({ length: maxCells }, () => 0);
+        const maxCells = Math.max(...voiceCells.map(c => c.length));
 
-        for (let c = 0; c < maxCells; c++) {
-          cellWidths[c] = Math.max(...cellLists.map(list => (list[c] || '').length));
-        }
-
-        parsedVoices.forEach((v, vIdx) => {
-          const list = cellLists[vIdx];
-          if (list.length === 0) {
-            alignedPartsPerVoice[vIdx].push('');
-            return;
+        if (maxCells > 1) {
+          const cellWidths = Array.from({ length: maxCells }, () => 0);
+          for (let c = 0; c < maxCells; c++) {
+            cellWidths[c] = Math.max(...voiceCells.map(cells => (cells[c] || '').length));
           }
-          const formattedCells = list.map((cell, cIdx) => cell.padEnd(cellWidths[cIdx], ' '));
-          alignedPartsPerVoice[vIdx].push(formattedCells.join(' : '));
-        });
+
+          parsedVoices.forEach((_, vIdx) => {
+            const cells = voiceCells[vIdx];
+            if (cells.length === 0) {
+              formattedPartsPerVoice[vIdx].push('');
+            } else {
+              const formatted = cells.map((cell, cIdx) => cell.padEnd(cellWidths[cIdx], ' ')).join(' : ');
+              formattedPartsPerVoice[vIdx].push(formatted);
+            }
+          });
+        } else {
+          parsedVoices.forEach((_, vIdx) => {
+            formattedPartsPerVoice[vIdx].push(measureTexts[vIdx]);
+          });
+        }
       }
     }
 
-    const formattedBlock = parsedVoices.map((v, vIdx) => {
-      const parts = alignedPartsPerVoice[vIdx];
-      let line = v.prefix.padEnd(3, ' ') + ' ';
-      for (let i = 0; i < parts.length; i++) {
-        const p = parts[i];
-        if (barRegex.test(p)) {
-          line += (i === 0 ? '' : ' ') + p + ' ';
+    // Step 2: Calculate max width for every part/column across all voices
+    const maxColumnWidths = Array.from({ length: maxPartsCount }, () => 0);
+    for (let partIdx = 0; partIdx < maxPartsCount; partIdx++) {
+      let maxLen = 0;
+      formattedPartsPerVoice.forEach(parts => {
+        if (partIdx < parts.length) {
+          maxLen = Math.max(maxLen, parts[partIdx].length);
+        }
+      });
+      maxColumnWidths[partIdx] = maxLen;
+    }
+
+    // Step 3: Reconstruct each line with exact column padding
+    const formattedLines = parsedVoices.map((v, vIdx) => {
+      const parts = formattedPartsPerVoice[vIdx];
+      let line = v.prefix.padEnd(maxPrefixLen, ' ');
+
+      for (let partIdx = 0; partIdx < parts.length; partIdx++) {
+        const part = parts[partIdx];
+        const maxLen = maxColumnWidths[partIdx];
+
+        if (partIdx % 2 === 1) {
+          // Barline
+          if (part.length > 0) {
+            line += part.padEnd(maxLen, ' ');
+          }
         } else {
-          line += p;
+          // Measure content
+          if (partIdx === 0) {
+            if (part.length > 0) {
+              line += ' ' + part.padEnd(maxLen, ' ') + ' ';
+            } else {
+              line += ' ';
+            }
+          } else if (partIdx === parts.length - 1 && part === '') {
+            // Trailing empty
+          } else {
+            line += ' ' + part.padEnd(maxLen, ' ') + ' ';
+          }
         }
       }
       return line.trimEnd();
     });
 
-    resultLines.push(...formattedBlock);
-    currentVoiceBlock = [];
+    resultLines.push(...formattedLines);
+    currentBlock = [];
   };
 
   lines.forEach(line => {
     const trimmed = line.trim();
-    const isVoiceLine = /^(?:[A-Z]:|V:[A-Za-z0-9_]+:)/i.test(trimmed);
-    const isSystemHeader = trimmed.startsWith('% --- System');
-    const isHeader = /^KEY\s+/i.test(trimmed) || /^[A-Z]:\s*(?!\|)/i.test(trimmed);
-    const isComment = trimmed.startsWith('%');
-    const isLyrics = /^W:/i.test(trimmed);
-    const isEmpty = trimmed === '';
+    // A voice line starts with S:, A:, T:, B:, D:, or V:<id>:
+    const isVoiceLine = /^(?:[SABTD]|V:[A-Za-z0-9_]+):/i.test(trimmed);
 
     if (isVoiceLine) {
-      currentVoiceBlock.push(line);
+      currentBlock.push(line);
     } else {
-      flushVoiceBlock();
+      flushBlock();
       resultLines.push(line);
     }
   });
 
-  flushVoiceBlock();
+  flushBlock();
   return resultLines.join('\n');
 }
