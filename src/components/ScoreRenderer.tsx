@@ -6,7 +6,10 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { ParsedScore, System, VoiceLine, Measure, SolfaNote, SelectedNoteLocation, ParseWarning } from '../types';
 import { SolfaTransformer, analyzeMeasureCells } from '../engine/solfa_transformer';
-import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle, FileText } from 'lucide-react';
+import { serializeScoreToSolfa } from '../engine/solfa_serializer';
+import { parseSolfaToAbc } from '../engine/solfa_parser';
+import { alignSolfaGrid } from '../engine/solfa_aligner';
+import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle, FileText, CheckSquare, Square } from 'lucide-react';
 
 interface ScoreRendererProps {
   score: ParsedScore | null;
@@ -150,6 +153,145 @@ const highlightAbc = (text: string): React.ReactNode => {
       }
 
       // Any other characters (whitespace, punctuation, etc.)
+      tokens.push(line[i]);
+      i++;
+    }
+
+    return (
+      <span key={lineIdx}>
+        {tokens}
+        {lineIdx < lines.length - 1 && '\n'}
+      </span>
+    );
+  });
+};
+
+/**
+ * High-fidelity syntax highlighter for Tonic Sol-fa notation.
+ */
+const highlightSolfa = (text: string): React.ReactNode => {
+  const lines = text.split('\n');
+  return lines.map((line, lineIdx) => {
+    const trimmed = line.trim();
+
+    // 1. Comments
+    if (trimmed.startsWith('%')) {
+      return (
+        <span key={lineIdx} className="text-stone-500 italic">
+          {line}
+          {lineIdx < lines.length - 1 && '\n'}
+        </span>
+      );
+    }
+
+    // 2. Header / Key line
+    if (/^KEY\s+/i.test(trimmed) || /^(?:TITLE|METER|COMPOSER):/i.test(trimmed)) {
+      return (
+        <span key={lineIdx}>
+          <span className="text-amber-400 font-bold">{line}</span>
+          {lineIdx < lines.length - 1 && '\n'}
+        </span>
+      );
+    }
+
+    // 3. Lyrics
+    if (/^W:/i.test(trimmed)) {
+      return (
+        <span key={lineIdx} className="text-emerald-400 font-serif">
+          {line}
+          {lineIdx < lines.length - 1 && '\n'}
+        </span>
+      );
+    }
+
+    // 4. Music lines
+    const tokens: React.ReactNode[] = [];
+    let i = 0;
+
+    // Check voice prefix at start (e.g. "S: ", "A: ")
+    const prefixMatch = line.match(/^([A-Za-z0-9_]+:)\s*/);
+    if (prefixMatch) {
+      tokens.push(
+        <span key="prefix" className="text-[#818CF8] font-bold">
+          {prefixMatch[0]}
+        </span>
+      );
+      i += prefixMatch[0].length;
+    }
+
+    while (i < line.length) {
+      // Double/Final barlines
+      if (line.slice(i, i + 2) === '||' || line.slice(i, i + 2) === '|]' || line.slice(i, i + 2) === ':|' || line.slice(i, i + 2) === '|:') {
+        tokens.push(
+          <span key={i} className="text-cyan-400 font-black">
+            {line.slice(i, i + 2)}
+          </span>
+        );
+        i += 2;
+        continue;
+      }
+
+      // Single barline
+      if (line[i] === '|') {
+        tokens.push(
+          <span key={i} className="text-cyan-400/90 font-bold">
+            |
+          </span>
+        );
+        i++;
+        continue;
+      }
+
+      // Pulse divider colon
+      if (line[i] === ':') {
+        tokens.push(
+          <span key={i} className="text-amber-300 font-black">
+            :
+          </span>
+        );
+        i++;
+        continue;
+      }
+
+      // Continuation dash
+      if (line[i] === '-') {
+        tokens.push(
+          <span key={i} className="text-rose-400 font-bold">
+            -
+          </span>
+        );
+        i++;
+        continue;
+      }
+
+      // Half-pulse and quarter-pulse dividers
+      if (line[i] === '.' || line[i] === ',') {
+        tokens.push(
+          <span key={i} className="text-indigo-400 font-bold">
+            {line[i]}
+          </span>
+        );
+        i++;
+        continue;
+      }
+
+      // Syllables and notes
+      if (/[A-Za-z]/.test(line[i])) {
+        let noteWord = '';
+        const startIdx = i;
+        while (i < line.length && /[A-Za-z0-9_₀₁₂₃₄₅⁶⁷⁸⁹⁰¹²³⁴'*^]/.test(line[i])) {
+          noteWord += line[i];
+          i++;
+        }
+        tokens.push(
+          <span key={startIdx} className="text-stone-100 font-semibold">
+            {noteWord}
+          </span>
+        );
+        continue;
+      }
+
+      // Whitespace and other characters
       tokens.push(line[i]);
       i++;
     }
@@ -664,10 +806,21 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     return rows;
   }, [score]);
 
-  // Synchronized scrolling for our high-fidelity IDE
+  // Source Editor Tab: 'solfa' or 'abc'
+  const [sourceTab, setSourceTab] = useState<'solfa' | 'abc'>('solfa');
+  const [solfaText, setSolfaText] = useState<string>(() => score ? serializeScoreToSolfa(score) : '');
+  const [autoFormatOnBlur, setAutoFormatOnBlur] = useState<boolean>(false);
+  const isEditingSolfaRef = useRef<boolean>(false);
+
+  // Synchronized scrolling for ABC IDE
   const editorTextareaRef = useRef<HTMLTextAreaElement>(null);
   const editorHighlightRef = useRef<HTMLPreElement>(null);
   const editorGutterRef = useRef<HTMLDivElement>(null);
+
+  // Synchronized scrolling for Solfa IDE
+  const solfaTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const solfaHighlightRef = useRef<HTMLPreElement>(null);
+  const solfaGutterRef = useRef<HTMLDivElement>(null);
 
   const handleEditorScroll = () => {
     if (editorTextareaRef.current) {
@@ -682,11 +835,68 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     }
   };
 
-  useEffect(() => {
-    if (studioMode === 'source' && editorTextareaRef.current) {
-      handleEditorScroll();
+  const handleSolfaScroll = () => {
+    if (solfaTextareaRef.current) {
+      const { scrollTop, scrollLeft } = solfaTextareaRef.current;
+      if (solfaHighlightRef.current) {
+        solfaHighlightRef.current.scrollTop = scrollTop;
+        solfaHighlightRef.current.scrollLeft = scrollLeft;
+      }
+      if (solfaGutterRef.current) {
+        solfaGutterRef.current.scrollTop = scrollTop;
+      }
     }
-  }, [abcText, studioMode]);
+  };
+
+  // Sync solfa text when score changes from external sources (e.g. interactive editor or example switch)
+  useEffect(() => {
+    if (score && !isEditingSolfaRef.current) {
+      setSolfaText(serializeScoreToSolfa(score));
+    }
+  }, [score]);
+
+  useEffect(() => {
+    if (studioMode === 'source') {
+      if (sourceTab === 'abc' && editorTextareaRef.current) {
+        handleEditorScroll();
+      } else if (sourceTab === 'solfa' && solfaTextareaRef.current) {
+        handleSolfaScroll();
+      }
+    }
+  }, [abcText, solfaText, studioMode, sourceTab]);
+
+  const handleSolfaChange = (newText: string) => {
+    isEditingSolfaRef.current = true;
+    setSolfaText(newText);
+    try {
+      const { abcText: newAbc } = parseSolfaToAbc(newText);
+      if (newAbc) {
+        setAbcText(newAbc);
+      }
+    } catch (e) {
+      // In-progress typing syntax errors handled gracefully
+    }
+    setTimeout(() => {
+      isEditingSolfaRef.current = false;
+    }, 400);
+  };
+
+  const handleAlignSolfa = () => {
+    const aligned = alignSolfaGrid(solfaText);
+    setSolfaText(aligned);
+    try {
+      const { abcText: newAbc } = parseSolfaToAbc(aligned);
+      if (newAbc) {
+        setAbcText(newAbc);
+      }
+    } catch (e) {}
+  };
+
+  const handleSolfaBlur = () => {
+    if (autoFormatOnBlur) {
+      handleAlignSolfa();
+    }
+  };
 
   // 1. Calculate measure tick ranges to highlight active measures
   const measureRanges = useMemo(() => {
@@ -926,10 +1136,10 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                   ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
                   : 'text-stone-400 hover:text-indigo-400'
               }`}
-              title="Switch to ABC Source Code Editor"
+              title="Switch to Source Code Editor (Tonic Sol-fa & ABC)"
             >
               <Code size={12} />
-              ABC Source
+              Source Editor
             </button>
           </div>
           
@@ -979,33 +1189,95 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
 
       {studioMode === 'source' ? (
         <div className="flex-1 flex flex-col overflow-hidden bg-[#0F1115]">
-          {/* Editor Toolbar */}
-          <div className="flex items-center justify-between px-6 py-3 bg-[#161920] border-b border-white/5 text-xs text-stone-400 select-none">
+          {/* Editor Header Toolbar */}
+          <div className="flex items-center justify-between px-6 py-2.5 bg-[#161920] border-b border-white/5 text-xs text-stone-400 select-none">
+            {/* Left: Tab Switcher */}
             <div className="flex items-center gap-3">
-              <span className="font-mono text-[10px] text-stone-500 uppercase font-black tracking-widest bg-black/40 px-2 py-1 rounded border border-white/5">
-                abc notation editor
-              </span>
-              <span className="text-stone-500">|</span>
-              <span className="font-sans font-semibold text-[#818CF8] flex items-center gap-1.5">
+              <div className="flex items-center bg-black/60 p-0.5 rounded-lg border border-white/10 shadow-inner">
+                <button
+                  onClick={() => {
+                    setSourceTab('solfa');
+                    if (score) {
+                      setSolfaText(serializeScoreToSolfa(score));
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-md text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                    sourceTab === 'solfa'
+                      ? 'bg-indigo-600 text-white shadow'
+                      : 'text-stone-400 hover:text-white'
+                  }`}
+                  title="Switch to Tonic Sol-fa Plain Text Editor"
+                >
+                  <Music size={12} />
+                  Tonic Sol-fa Editor
+                </button>
+                <button
+                  onClick={() => setSourceTab('abc')}
+                  className={`px-3 py-1.5 rounded-md text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                    sourceTab === 'abc'
+                      ? 'bg-indigo-600 text-white shadow'
+                      : 'text-stone-400 hover:text-white'
+                  }`}
+                  title="Switch to ABC Notation Editor"
+                >
+                  <Code size={12} />
+                  ABC Notation Editor
+                </button>
+              </div>
+
+              <span className="text-stone-600">|</span>
+
+              <span className="font-sans font-semibold text-[#818CF8] text-[11px] flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                Dynamic Auto-formatting & Grid Alignment enabled
+                {sourceTab === 'solfa'
+                  ? 'Two-Way Live Sync & Forgiving Octaves (s1 / s₁ / d¹)'
+                  : 'Dynamic Auto-formatting & Grid Alignment enabled'}
               </span>
             </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Align Bar Lines Button */}
-              <button
-                onClick={() => {
-                  const aligned = alignAbcBarLines(abcText);
-                  setAbcText(aligned);
-                }}
-                className="px-3.5 py-1.5 bg-[#4F46E5] hover:bg-[#5A52FF] text-white rounded-lg active:scale-95 transition-all font-sans font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md"
-                title="Align vertical measure bar lines ('|') across different voices"
-              >
-                <Sparkles size={12} />
-                Align Bar Lines
-              </button>
-              
+
+            {/* Right: Actions */}
+            <div className="flex items-center gap-2.5">
+              {sourceTab === 'solfa' ? (
+                <>
+                  {/* Format on Blur Toggle */}
+                  <label
+                    className="flex items-center gap-1.5 text-[10px] text-stone-300 font-sans font-bold cursor-pointer select-none px-2.5 py-1.5 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
+                    title="Automatically format and align grid when leaving the editor"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={autoFormatOnBlur}
+                      onChange={(e) => setAutoFormatOnBlur(e.target.checked)}
+                      className="w-3.5 h-3.5 text-indigo-600 rounded focus:ring-0 cursor-pointer accent-indigo-500"
+                    />
+                    <span>Format on Blur</span>
+                  </label>
+
+                  {/* Auto Grid Alignment Button */}
+                  <button
+                    onClick={handleAlignSolfa}
+                    className="px-3.5 py-1.5 bg-[#4F46E5] hover:bg-[#5A52FF] text-white rounded-lg active:scale-95 transition-all font-sans font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md"
+                    title="Align beat pulses (':') and measure bars ('|') across all vocal parts and normalize octaves"
+                  >
+                    <Sparkles size={12} />
+                    Format & Align Grid
+                  </button>
+                </>
+              ) : (
+                /* Align Bar Lines Button for ABC */
+                <button
+                  onClick={() => {
+                    const aligned = alignAbcBarLines(abcText);
+                    setAbcText(aligned);
+                  }}
+                  className="px-3.5 py-1.5 bg-[#4F46E5] hover:bg-[#5A52FF] text-white rounded-lg active:scale-95 transition-all font-sans font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md"
+                  title="Align vertical measure bar lines ('|') across different voices"
+                >
+                  <Sparkles size={12} />
+                  Align Bar Lines
+                </button>
+              )}
+
               {/* Cheat Sheet Toggle */}
               <button
                 onClick={() => setShowHelp(!showHelp)}
@@ -1014,6 +1286,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                     ? 'bg-white/10 border-white/20 text-white'
                     : 'bg-white/5 border-white/5 text-stone-300 hover:bg-white/10'
                 }`}
+                title="Toggle Reference Cheat Sheet"
               >
                 <HelpCircle size={12} />
                 Cheat Sheet
@@ -1023,78 +1296,169 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
 
           {/* Cheat Sheet Panel (Conditional) */}
           {showHelp && (
-            <div className="px-6 py-4 bg-[#4F46E5]/10 border-b border-[#4F46E5]/20 text-[11px] text-indigo-200 font-sans leading-relaxed flex flex-col md:flex-row gap-6 md:items-start select-none">
-              <div className="flex-1">
-                <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
-                  ABC Headers & Voices
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-indigo-100/80 font-medium">
-                  <li><span className="font-bold font-mono text-white">T: Title</span>, <span className="font-bold font-mono text-white">C: Composer</span>.</li>
-                  <li><span className="font-bold font-mono text-white">K: Key</span> (e.g., <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">K:G</span>, <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">K:C</span>).</li>
-                  <li><span className="font-bold font-mono text-white">M: Meter</span> (e.g., <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">M:4/4</span>).</li>
-                  <li><span className="font-bold font-mono text-white">V:S name="Soprano"</span> Voice declaration header.</li>
-                </ul>
+            sourceTab === 'solfa' ? (
+              <div className="px-6 py-4 bg-[#4F46E5]/10 border-b border-[#4F46E5]/20 text-[11px] text-indigo-200 font-sans leading-relaxed flex flex-col md:flex-row gap-6 md:items-start select-none">
+                <div className="flex-1">
+                  <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
+                    Score Headers & Voices
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-indigo-100/80 font-medium">
+                    <li><span className="font-bold font-mono text-white">KEY Bb</span> or <span className="font-bold font-mono text-white">KEY F</span> at start of score.</li>
+                    <li><span className="font-bold font-mono text-white">M:3/4</span>, <span className="font-bold font-mono text-white">M:4/4</span>, <span className="font-bold font-mono text-white">M:6/8</span>.</li>
+                    <li><span className="font-bold font-mono text-white">S:</span> Soprano, <span className="font-bold font-mono text-white">A:</span> Alto, <span className="font-bold font-mono text-white">T:</span> Tenor, <span className="font-bold font-mono text-white">B:</span> Bass, <span className="font-bold font-mono text-white">D:</span> Descant.</li>
+                    <li><span className="font-bold font-mono text-white">% --- System N ---</span> System section breaks.</li>
+                  </ul>
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
+                    Syllables & Forgiving Octaves
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-indigo-100/80 font-medium">
+                    <li>Diatonic: <span className="font-mono text-white font-bold">d r m f s l t</span>.</li>
+                    <li>Lower Octave: Type <span className="font-mono text-white font-bold">s1</span>, <span className="font-mono text-white font-bold">s_1</span>, <span className="font-mono text-white font-bold">s,</span>, or <span className="font-mono text-white font-bold">s₁</span>.</li>
+                    <li>Two Below: Type <span className="font-mono text-white font-bold">d2</span>, <span className="font-mono text-white font-bold">d_2</span>, <span className="font-mono text-white font-bold">d,,</span>, or <span className="font-mono text-white font-bold">d₂</span>.</li>
+                    <li>Upper Octave: Type <span className="font-mono text-white font-bold">d'</span>, <span className="font-mono text-white font-bold">d^1</span>, or <span className="font-mono text-white font-bold">d¹</span>.</li>
+                  </ul>
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
+                    Rhythm & Punctuation
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-indigo-100/80 font-medium">
+                    <li><span className="font-mono text-white font-bold">|</span> Barline, <span className="font-mono text-white font-bold">||</span> Double/Phrase bar, <span className="font-mono text-white font-bold">|]</span> End bar.</li>
+                    <li><span className="font-mono text-white font-bold">:</span> Separates beats (e.g. <span className="font-mono text-white bg-black/30 px-1">d : m : s</span>).</li>
+                    <li><span className="font-mono text-white font-bold">-</span> Sustained beat (e.g. <span className="font-mono text-white bg-black/30 px-1">d : -</span>).</li>
+                    <li><span className="font-mono text-white font-bold">.</span> Half-pulse (<span className="font-mono text-white bg-black/30 px-1">r.d</span>). <span className="font-mono text-white font-bold">:-.r</span> = sustained + late starter.</li>
+                    <li><span className="font-mono text-white font-bold">,</span> Quarter-pulse sixteenths (<span className="font-mono text-white bg-black/30 px-1">d,r.m</span>).</li>
+                  </ul>
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
+                    Auto-Align Grid & Tips
+                  </p>
+                  <p className="text-indigo-100/80 font-medium font-sans">
+                    Click <span className="font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded">Format & Align Grid</span> to normalize octaves to unicode subscripts (<span className="font-mono text-white">s₁</span>, <span className="font-mono text-white">d₂</span>) and perfectly align vertical choir bars and colons. Enable <span className="font-bold text-white">Format on Blur</span> to align automatically as you edit!
+                  </p>
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
-                  Pitches & Accidentals
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-indigo-100/80 font-medium">
-                  <li>Uppercase <span className="font-mono font-semibold text-white">C..B</span> (octave 4), lowercase <span className="font-mono font-semibold text-white">c..b</span> (octave 5).</li>
-                  <li>Comma <span className="font-mono text-white font-bold">,</span> lowers pitch, apostrophe <span className="font-mono text-white font-bold">'</span> raises pitch.</li>
-                  <li>Accidentals: <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">^</span> sharp, <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">_</span> flat, <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">=</span> natural.</li>
-                  <li>Rest is <span className="font-mono text-white font-bold bg-black/30 px-1 py-0.2 rounded">z</span> or <span className="font-mono text-white font-bold bg-black/30 px-1 py-0.2 rounded">x</span>.</li>
-                </ul>
+            ) : (
+              <div className="px-6 py-4 bg-[#4F46E5]/10 border-b border-[#4F46E5]/20 text-[11px] text-indigo-200 font-sans leading-relaxed flex flex-col md:flex-row gap-6 md:items-start select-none">
+                <div className="flex-1">
+                  <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
+                    ABC Headers & Voices
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-indigo-100/80 font-medium">
+                    <li><span className="font-bold font-mono text-white">T: Title</span>, <span className="font-bold font-mono text-white">C: Composer</span>.</li>
+                    <li><span className="font-bold font-mono text-white">K: Key</span> (e.g., <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">K:G</span>, <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">K:C</span>).</li>
+                    <li><span className="font-bold font-mono text-white">M: Meter</span> (e.g., <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">M:4/4</span>).</li>
+                    <li><span className="font-bold font-mono text-white">V:S name="Soprano"</span> Voice declaration header.</li>
+                  </ul>
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
+                    Pitches & Accidentals
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-indigo-100/80 font-medium">
+                    <li>Uppercase <span className="font-mono font-semibold text-white">C..B</span> (octave 4), lowercase <span className="font-mono font-semibold text-white">c..b</span> (octave 5).</li>
+                    <li>Comma <span className="font-mono text-white font-bold">,</span> lowers pitch, apostrophe <span className="font-mono text-white font-bold">'</span> raises pitch.</li>
+                    <li>Accidentals: <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">^</span> sharp, <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">_</span> flat, <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">=</span> natural.</li>
+                    <li>Rest is <span className="font-mono text-white font-bold bg-black/30 px-1 py-0.2 rounded">z</span> or <span className="font-mono text-white font-bold bg-black/30 px-1 py-0.2 rounded">x</span>.</li>
+                  </ul>
+                </div>
+                <div className="flex-1">
+                  <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
+                    Grid Aligner Hint
+                  </p>
+                  <p className="text-indigo-100/80 font-medium font-sans">
+                    Write notes for different voices (e.g., <span className="font-mono text-white bg-black/30 px-1">V:S</span>, <span className="font-mono text-white bg-black/30 px-1">V:A</span>, etc.) in consecutive lines. Use <span className="font-mono text-white">|</span> for measure lines. Click <span className="font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded">Align Bar Lines</span> to instantly make them line up vertically for a beautiful choir grid layout!
+                  </p>
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
-                  Grid Aligner Hint
-                </p>
-                <p className="text-indigo-100/80 font-medium font-sans">
-                  Write notes for different voices (e.g., <span className="font-mono text-white bg-black/30 px-1">V:S</span>, <span className="font-mono text-white bg-black/30 px-1">V:A</span>, etc.) in consecutive lines. Use <span className="font-mono text-white">|</span> for measure lines. Click <span className="font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded">Align Bar Lines</span> to instantly make them line up vertically for a beautiful choir grid layout!
-                </p>
-              </div>
-            </div>
+            )
           )}
 
           {/* Editor Main Area (Lines & Scrollable Panel) */}
           <div className="flex-1 flex overflow-hidden relative">
-            {/* Gutter with line numbers */}
-            <div
-              ref={editorGutterRef}
-              className="w-12 flex-shrink-0 bg-[#0A0A0B] border-r border-white/5 py-4 font-mono text-[11px] leading-relaxed text-stone-600 text-right pr-3 select-none overflow-hidden"
-            >
-              {abcText.split('\n').map((_, i) => (
-                <div key={`ln-${i}`} className="h-[21px] leading-[21px]">
-                  {i + 1}
+            {sourceTab === 'solfa' ? (
+              <>
+                {/* Gutter with line numbers for Solfa */}
+                <div
+                  ref={solfaGutterRef}
+                  className="w-12 flex-shrink-0 bg-[#0A0A0B] border-r border-white/5 py-4 font-mono text-[11px] leading-relaxed text-stone-600 text-right pr-3 select-none overflow-hidden"
+                >
+                  {solfaText.split('\n').map((_, i) => (
+                    <div key={`solfa-ln-${i}`} className="h-[21px] leading-[21px]">
+                      {i + 1}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {/* Code Textarea/Highlight overlays */}
-            <div className="flex-1 relative bg-[#0D0E12] overflow-hidden">
-              {/* Background Highlighted Pre */}
-              <pre
-                ref={editorHighlightRef}
-                className="absolute inset-0 w-full h-full p-4 font-mono text-[11px] leading-relaxed text-indigo-100/30 whitespace-pre break-all overflow-hidden pointer-events-none select-none border border-transparent"
-                aria-hidden="true"
-                style={{ lineHeight: '21px' }}
-              >
-                {highlightAbc(abcText)}
-              </pre>
+                {/* Solfa Textarea/Highlight overlays */}
+                <div className="flex-1 relative bg-[#0D0E12] overflow-hidden">
+                  {/* Background Highlighted Pre */}
+                  <pre
+                    ref={solfaHighlightRef}
+                    className="absolute inset-0 w-full h-full p-4 font-mono text-[11px] leading-relaxed text-indigo-100/30 whitespace-pre break-all overflow-hidden pointer-events-none select-none border border-transparent"
+                    aria-hidden="true"
+                    style={{ lineHeight: '21px' }}
+                  >
+                    {highlightSolfa(solfaText)}
+                  </pre>
 
-              {/* Foreground Textarea */}
-              <textarea
-                ref={editorTextareaRef}
-                value={abcText}
-                onChange={(e) => setAbcText(e.target.value)}
-                onScroll={handleEditorScroll}
-                className="absolute inset-0 w-full h-full p-4 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
-                placeholder="Type or paste ABC notation here..."
-                spellCheck="false"
-                style={{ lineHeight: '21px' }}
-              />
-            </div>
+                  {/* Foreground Textarea */}
+                  <textarea
+                    ref={solfaTextareaRef}
+                    value={solfaText}
+                    onChange={(e) => handleSolfaChange(e.target.value)}
+                    onBlur={handleSolfaBlur}
+                    onScroll={handleSolfaScroll}
+                    className="absolute inset-0 w-full h-full p-4 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
+                    placeholder="Type or paste Tonic Sol-fa notation here (e.g. KEY Bb, S: | s1 : s1 : f1 | m1 : s1 : d | ...)"
+                    spellCheck="false"
+                    style={{ lineHeight: '21px' }}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Gutter with line numbers for ABC */}
+                <div
+                  ref={editorGutterRef}
+                  className="w-12 flex-shrink-0 bg-[#0A0A0B] border-r border-white/5 py-4 font-mono text-[11px] leading-relaxed text-stone-600 text-right pr-3 select-none overflow-hidden"
+                >
+                  {abcText.split('\n').map((_, i) => (
+                    <div key={`abc-ln-${i}`} className="h-[21px] leading-[21px]">
+                      {i + 1}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Code Textarea/Highlight overlays */}
+                <div className="flex-1 relative bg-[#0D0E12] overflow-hidden">
+                  {/* Background Highlighted Pre */}
+                  <pre
+                    ref={editorHighlightRef}
+                    className="absolute inset-0 w-full h-full p-4 font-mono text-[11px] leading-relaxed text-indigo-100/30 whitespace-pre break-all overflow-hidden pointer-events-none select-none border border-transparent"
+                    aria-hidden="true"
+                    style={{ lineHeight: '21px' }}
+                  >
+                    {highlightAbc(abcText)}
+                  </pre>
+
+                  {/* Foreground Textarea */}
+                  <textarea
+                    ref={editorTextareaRef}
+                    value={abcText}
+                    onChange={(e) => setAbcText(e.target.value)}
+                    onScroll={handleEditorScroll}
+                    className="absolute inset-0 w-full h-full p-4 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
+                    placeholder="Type or paste ABC notation here..."
+                    spellCheck="false"
+                    style={{ lineHeight: '21px' }}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Problems/Warnings Panel at the bottom */}

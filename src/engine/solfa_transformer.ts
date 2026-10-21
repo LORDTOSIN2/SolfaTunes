@@ -9,12 +9,12 @@ import { ParsedScore, System, VoiceLine, Measure, SolfaNote, ParseWarning } from
  * Key mapping of standard major and minor keys to their tonic pitch class and sharp/flat count.
  * Pitch classes: C=0, C#/Db=1, D=2, D#/Eb=3, E=4, F=5, F#/Gb=6, G=7, G#/Ab=8, A=9, A#/Bb=10, B=11.
  */
-interface KeyInfo {
+export interface KeyInfo {
   tonic: number;
   sharpsFlats: number;
 }
 
-const KEYS: { [key: string]: KeyInfo } = {
+export const KEYS: { [key: string]: KeyInfo } = {
   // Major keys
   'C': { tonic: 0, sharpsFlats: 0 },
   'G': { tonic: 7, sharpsFlats: 1 },
@@ -53,7 +53,7 @@ const KEYS: { [key: string]: KeyInfo } = {
 /**
  * Normalizes a key signature string into a dictionary-compliant format.
  */
-function normalizeKey(keyStr: string | undefined): string {
+export function normalizeKey(keyStr: string | undefined): string {
   let clean = (keyStr || 'C').trim();
   let isMinor = false;
   
@@ -78,7 +78,7 @@ function normalizeKey(keyStr: string | undefined): string {
 /**
  * Returns key details. Defaults to C major if not found.
  */
-function getKeyInfo(keyStr: string): KeyInfo {
+export function getKeyInfo(keyStr: string): KeyInfo {
   const norm = normalizeKey(keyStr);
   return KEYS[norm] || { tonic: 0, sharpsFlats: 0 };
 }
@@ -86,7 +86,7 @@ function getKeyInfo(keyStr: string): KeyInfo {
 /**
  * Returns standard chromatic accidental overrides for letters A-G from circle of fifths.
  */
-function getKeyDefaultAccidentals(sharpsFlats: number): { [letter: string]: number } {
+export function getKeyDefaultAccidentals(sharpsFlats: number): { [letter: string]: number } {
   const map: { [letter: string]: number } = { 'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0, 'F': 0, 'G': 0 };
   const sharpOrder = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
   const flatOrder = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
@@ -107,7 +107,7 @@ function getKeyDefaultAccidentals(sharpsFlats: number): { [letter: string]: numb
 /**
  * Maps pitch letter to base pitch class.
  */
-function basePitchClass(letter: string): number {
+export function basePitchClass(letter: string): number {
   switch (letter.toUpperCase()) {
     case 'C': return 0;
     case 'D': return 2;
