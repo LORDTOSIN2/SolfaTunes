@@ -70,6 +70,7 @@ const multipartCompatibilityXml = `<?xml version="1.0"?>
   <part-list>
     <score-part id="P1"><part-name>Soprano</part-name></score-part>
     <score-part id="P2"><part-name>Bass</part-name></score-part>
+    <score-part id="P3"><part-name>Descant</part-name></score-part>
   </part-list>
   <part id="P1">
     <measure number="1">
@@ -84,6 +85,7 @@ const multipartCompatibilityXml = `<?xml version="1.0"?>
       <note><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type><lyric><text>one</text></lyric></note>
     </measure>
     <measure number="2">
+      <direction><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>60</per-minute></metronome></direction-type><sound tempo="60"/></direction>
       <attributes><divisions>8</divisions></attributes>
       <attributes><key><fifths>1</fifths></key></attributes>
       <attributes><time><beats>2</beats><beat-type>4</beat-type></time></attributes>
@@ -113,6 +115,14 @@ const multipartCompatibilityXml = `<?xml version="1.0"?>
       <note><pitch><step>C</step><octave>3</octave></pitch><duration>6</duration><voice>1</voice></note>
       <note><grace/><pitch><step>D</step><octave>3</octave></pitch><voice>1</voice></note>
       <note><unpitched><display-step>C</display-step><display-octave>3</display-octave></unpitched><duration>4</duration><voice>1</voice></note>
+    </measure>
+  </part>
+  <part id="P3">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <attributes><key><fifths>0</fifths></key></attributes>
+      <attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+      <note><pitch><step>G</step><octave>5</octave></pitch><duration>12</duration><voice>1</voice></note>
     </measure>
   </part>
 </score-partwise>`;
@@ -202,35 +212,67 @@ describe('MusicXML document import/export workflow', () => {
     expect(cancelled).toBeNull();
     expect(confirm).toHaveBeenCalledOnce();
     expect(confirm.mock.calls[0][0]).toContain('Ties');
-    expect(confirm.mock.calls[0][0]).toContain('Tempo markings');
+    expect(confirm.mock.calls[0][0]).not.toContain('Tempo markings');
     expect(confirm.mock.calls[0][0]).toContain('Note-aligned lyrics');
 
     const accepted = importMusicXmlDocument(lossyXml, () => true);
     if (!accepted) throw new Error('Confirmed lossy import was unexpectedly cancelled.');
     expect(accepted.conversionReport?.isLossless).toBe(false);
     expect(accepted.conversionReport?.unsupportedConstructs).toEqual(
-      expect.arrayContaining(['Ties', 'Tempo markings', 'Note-aligned lyrics'])
+      expect.arrayContaining(['Ties', 'Note-aligned lyrics'])
     );
+    expect(accepted.conversionReport?.unsupportedConstructs).not.toContain('Tempo markings');
+    expect(accepted.score.tempoBpm).toBe(96);
     expect(accepted.source?.text).toBe(lossyXml);
   });
 
   it('retains the original lossy source and loss report in exported MusicXML metadata', () => {
     const imported = importMusicXmlDocument(lossyXml, () => true);
     if (!imported) throw new Error('Confirmed lossy import was unexpectedly cancelled.');
+    const editedNote = imported.score.systems[0].voices.P1.measures[0].notes[0];
+    editedNote.rawLetter = 'D';
+    editedNote.midiPitch = 62;
+    editedNote.syllable = 'r';
+    editedNote.scaleDegree = 2;
 
     const exported = exportMusicXmlDocument(imported);
     expect(exported.report.isLossless).toBe(false);
     expect(exported.xml).toContain(ORIGINAL_MUSICXML_SOURCE_FIELD);
     expect(exported.xml).toContain(CONVERSION_LOSSINESS_FIELD);
+    expect(exported.xml).toContain('<step>D</step>');
 
     const reopened = importMusicXmlDocument(exported.xml, () => true);
     if (!reopened) throw new Error('Reopening the lossy export was unexpectedly cancelled.');
+    expect(reopened.score.systems[0].voices.P1.measures[0].notes[0].midiPitch).toBe(62);
+    expect(reopened.score.systems[0].voices.P1.measures[0].notes[0].syllable).toBe('r');
     expect(reopened.conversionReport?.isLossless).toBe(false);
     expect(reopened.conversionReport?.unsupportedConstructs).toEqual(
-      expect.arrayContaining(['Ties', 'Tempo markings', 'Note-aligned lyrics'])
+      expect.arrayContaining(['Ties', 'Note-aligned lyrics'])
     );
+    expect(reopened.score.tempoBpm).toBe(96);
+    expect(reopened.score.tempoBpm).not.toBe(100);
     expect(reopened.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toBe(lossyXml);
+    expect(reopened.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toContain('<tie type="start"/>');
+    expect(reopened.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toContain('<lyric><text>one</text></lyric>');
     expect(formatLossinessReport(reopened.conversionReport!)).toContain('LOSSY / WARNINGS DETECTED');
+  });
+
+  it('exports a user-adjusted tempo without losing the original unsupported source', () => {
+    const imported = importMusicXmlDocument(lossyXml, () => true);
+    if (!imported) throw new Error('Confirmed tempo import was unexpectedly cancelled.');
+    imported.score.tempoBpm = 84;
+
+    const exported = exportMusicXmlDocument(imported);
+    expect(exported.xml).toContain('<per-minute>84</per-minute>');
+    const reopened = importMusicXmlDocument(exported.xml, () => true);
+    if (!reopened) throw new Error('Tempo edit export was unexpectedly cancelled.');
+
+    expect(reopened.score.tempoBpm).toBe(84);
+    expect(reopened.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toBe(lossyXml);
+    expect(reopened.conversionReport?.isLossless).toBe(false);
+    expect(Array.from(MidiWriter.generateMidiBytes(reopened.score, 84))).not.toEqual(
+      Array.from(MidiWriter.generateMidiBytes(reopened.score, 100))
+    );
   });
 
   it('round-trips multipart rhythms and rests while retaining loss and metadata reports', () => {
@@ -240,7 +282,6 @@ describe('MusicXML document import/export workflow', () => {
     expect(imported.conversionReport?.isLossless).toBe(false);
     expect(imported.conversionReport?.unsupportedConstructs).toEqual(
       expect.arrayContaining([
-        'Tempo markings',
         'Ties',
         'Note-aligned lyrics',
         'Mid-score key changes',
@@ -252,14 +293,21 @@ describe('MusicXML document import/export workflow', () => {
         'Complex meters',
         'Direction markings',
         'Note notations',
+        'Tempo changes',
       ])
     );
+    expect(imported.score.tempoBpm).toBe(72);
     expect(imported.conversionReport?.warnings).toContain(
       'Mid-score key change detected at measure 3 (fifths: 1, mode: minor). SolfaTunes currently supports a single global key; initial key "C" was retained.'
     );
     expect(imported.score.key).toBe('C');
     expect(imported.score.meter).toBe('3/4');
-    expect(imported.score.voices.map(voice => voice.name)).toEqual(['Soprano', 'Bass']);
+    expect(imported.score.voices.map(voice => voice.name)).toEqual(['Soprano', 'Bass', 'Descant']);
+    expect(imported.score.systems[0].voices.P3.measures[0].notes.map(note => [
+      note.isRest,
+      note.durationTicks,
+      note.midiPitch,
+    ])).toEqual([[false, 12, 79]]);
     expect(imported.score.systems[0].voices.P1.measures[0].notes.map(note => [
       note.isRest,
       note.durationTicks,
@@ -281,7 +329,6 @@ describe('MusicXML document import/export workflow', () => {
     expect(exported.report.isLossless).toBe(false);
     expect(exported.report.unsupportedConstructs).toEqual(
       expect.arrayContaining([
-        'Tempo markings',
         'Ties',
         'Note-aligned lyrics',
         'Mid-score key changes',
@@ -293,21 +340,27 @@ describe('MusicXML document import/export workflow', () => {
         'Complex meters',
         'Direction markings',
         'Note notations',
+        'Tempo changes',
       ])
     );
+    expect(exported.xml).toContain('<per-minute>72</per-minute>');
+    expect(exported.xml).toContain('<sound tempo="72"/>');
 
     const reopened = importMusicXmlDocument(exported.xml, () => true);
     if (!reopened) throw new Error('Reopening the multipart export was unexpectedly cancelled.');
+    expect(reopened.score.tempoBpm).toBe(72);
     expect(noteEvents(reopened.score)).toEqual(noteEvents(imported.score));
-    expect(Array.from(MidiWriter.generateMidiBytes(reopened.score, 100))).toEqual(
-      Array.from(MidiWriter.generateMidiBytes(imported.score, 100))
+    expect(Array.from(MidiWriter.generateMidiBytes(reopened.score, reopened.score.tempoBpm!))).toEqual(
+      Array.from(MidiWriter.generateMidiBytes(imported.score, imported.score.tempoBpm!))
+    );
+    expect(Array.from(MidiWriter.generateMidiBytes(reopened.score, 72))).not.toEqual(
+      Array.from(MidiWriter.generateMidiBytes(reopened.score, 100))
     );
     expect(reopened.metadata?.extraFields?.['solfatunes:futureField']).toBe('preserve me');
     expect(reopened.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toBe(multipartCompatibilityXml);
     expect(reopened.conversionReport?.isLossless).toBe(false);
     expect(reopened.conversionReport?.unsupportedConstructs).toEqual(
       expect.arrayContaining([
-        'Tempo markings',
         'Ties',
         'Note-aligned lyrics',
         'Mid-score key changes',
@@ -319,8 +372,40 @@ describe('MusicXML document import/export workflow', () => {
         'Complex meters',
         'Direction markings',
         'Note notations',
+        'Tempo changes',
       ])
     );
+  });
+
+  it('normalizes metronome beat units to quarter-note playback tempo', () => {
+    const halfNoteBeatXml = `<score-partwise version="4.0">
+      <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+      <part id="P1"><measure number="1">
+        <attributes><divisions>4</divisions><key><fifths>0</fifths></key></attributes>
+        <direction><direction-type><metronome><beat-unit>half</beat-unit><per-minute>60</per-minute></metronome></direction-type></direction>
+        <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice></note>
+      </measure></part>
+    </score-partwise>`;
+    const imported = importMusicXmlDocument(halfNoteBeatXml, summary => {
+      throw new Error(`Valid metronome marking was unexpectedly lossy: ${summary}`);
+    });
+    if (!imported) throw new Error('Metronome import was unexpectedly cancelled.');
+
+    expect(imported.score.tempoBpm).toBe(120);
+    const exported = exportMusicXmlDocument(imported);
+    expect(exported.xml).toContain('<beat-unit>quarter</beat-unit>');
+    expect(exported.xml).toContain('<per-minute>120</per-minute>');
+    const reopened = importMusicXmlDocument(exported.xml, () => true);
+    if (!reopened) throw new Error('Metronome export was unexpectedly cancelled.');
+    expect(reopened.score.tempoBpm).toBe(120);
+
+    const uninterpretable = importMusicXmlDocument(
+      halfNoteBeatXml.replace('<per-minute>60</per-minute>', '<per-minute>Allegro</per-minute>'),
+      () => true
+    );
+    if (!uninterpretable) throw new Error('Confirmed uninterpretable tempo import was cancelled.');
+    expect(uninterpretable.score.tempoBpm).toBeUndefined();
+    expect(uninterpretable.conversionReport?.unsupportedConstructs).toContain('Tempo markings');
   });
 
   it('uses the MusicXML key as authoritative and preserves supported minor semantics', () => {

@@ -104,6 +104,9 @@ export default function App() {
       const resolvedScore = transformer.transform(rawScore);
       
       const importedDocument = musicXmlProvenanceRef.current;
+      if (importedDocument) {
+        resolvedScore.tempoBpm = importedDocument.score.tempoBpm;
+      }
       const nextDocument = importedDocument
         ? createMusicalDocument(resolvedScore, {
             metadata: importedDocument.metadata,
@@ -207,6 +210,25 @@ export default function App() {
     }));
   };
 
+  const handleSetBpm = (nextBpm: number) => {
+    setBpm(nextBpm);
+    setMusicalDocument(current => {
+      if (!current) return current;
+      const nextDocument = createMusicalDocument(
+        { ...current.score, tempoBpm: nextBpm },
+        {
+          metadata: current.metadata,
+          conversionReport: current.conversionReport,
+          source: current.source,
+        }
+      );
+      if (musicXmlProvenanceRef.current) {
+        musicXmlProvenanceRef.current = nextDocument;
+      }
+      return nextDocument;
+    });
+  };
+
   const handleLoadScore = (song: ScoreLibraryItem) => {
     musicXmlProvenanceRef.current = null;
     setMusicXmlStatus(null);
@@ -237,6 +259,20 @@ export default function App() {
 
   const handleExportAbc = () => {
     if (!abcText) return;
+    const abcDropsMusicXmlData =
+      musicalDocument?.source?.format === 'musicxml' &&
+      (musicalDocument.conversionReport?.isLossless === false ||
+        musicalDocument.score.tempoBpm !== undefined);
+    if (abcDropsMusicXmlData && !window.confirm(
+      'ABC export does not preserve the imported MusicXML tempo, ties, note-aligned lyrics, or other unsupported notation. The original MusicXML is not embedded in the ABC file. Export ABC anyway? Keep the original MusicXML or download a recovery copy first.'
+    )) {
+      setMusicXmlStatus({
+        type: 'info',
+        message: 'ABC export cancelled so the imported MusicXML data can be retained.',
+      });
+      return;
+    }
+
     const blob = new Blob([abcText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -272,6 +308,8 @@ export default function App() {
       }
 
       musicXmlProvenanceRef.current = imported;
+      const importedBpm = imported.score.tempoBpm ?? bpm;
+      setBpm(importedBpm);
       const importedAbc = serializeScoreToAbc(imported.score);
       if (importedAbc !== abcText) {
         skipNextAbcParseRef.current = true;
@@ -283,7 +321,7 @@ export default function App() {
       setIsPlaying(false);
       setCurrentTick(0);
       playerRef.current?.stop();
-      playerRef.current?.loadScore(imported.score, bpm, mutedVoices);
+      playerRef.current?.loadScore(imported.score, importedBpm, mutedVoices);
       setMusicXmlStatus({
         type: imported.conversionReport?.isLossless === false ? 'warning' : 'success',
         message: imported.conversionReport?.isLossless === false
@@ -303,7 +341,17 @@ export default function App() {
     if (!musicalDocument) return;
 
     try {
-      const result = exportMusicXmlDocument(musicalDocument);
+      const exportDocument = musicalDocument.score.tempoBpm === bpm
+        ? musicalDocument
+        : createMusicalDocument(
+            { ...musicalDocument.score, tempoBpm: bpm },
+            {
+              metadata: musicalDocument.metadata,
+              conversionReport: musicalDocument.conversionReport,
+              source: musicalDocument.source,
+            }
+          );
+      const result = exportMusicXmlDocument(exportDocument);
       if (!result.report.isLossless && !window.confirm(
         `This MusicXML export includes conversion losses or unsupported constructs.\n\n${formatLossinessReport(result.report)}\n\nThe original MusicXML source, when available, is embedded in the exported metadata as a recovery copy. Continue?`
       )) {
@@ -496,7 +544,7 @@ export default function App() {
         currentTick={currentTick}
         totalTicks={totalTicks}
         bpm={bpm}
-        setBpm={setBpm}
+        setBpm={handleSetBpm}
         transpose={transpose}
         setTranspose={setTranspose}
         masterVolume={masterVolume}

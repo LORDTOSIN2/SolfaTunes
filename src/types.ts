@@ -62,6 +62,7 @@ export interface ParsedScore {
   composer: string;
   key: string;               // Raw key, e.g., "G", "Eb"
   meter: string;             // Raw meter, e.g., "4/4", "3/4"
+  tempoBpm?: number;         // Quarter notes per minute when specified by the source
   defaultLength: string;     // Raw L:, e.g., "1/4", "1/8"
   index: string;             // X: index
   voices: VoiceDeclaration[];

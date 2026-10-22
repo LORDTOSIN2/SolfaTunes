@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ParsedScore, SolfaNote } from '../types';
 import { MidiPlayer } from './midi_player';
+import { MusicXmlParser } from '../engine/musicxml/musicxml_parser';
 
 let audioClock = 0;
 let nextIntervalId = 1;
@@ -137,6 +138,24 @@ describe('MidiPlayer playback clock', () => {
     expect(player.getCurrentTick()).toBe(4);
     intervals.values().next().value?.();
     expect(onProgress).toHaveBeenLastCalledWith(4);
+  });
+
+  it('plays an imported 72 BPM score at its source tempo', () => {
+    const { score } = MusicXmlParser.parse(`<score-partwise version="4.0">
+      <part-list><score-part id="P1"><part-name>Soprano</part-name></score-part></part-list>
+      <part id="P1"><measure number="1">
+        <attributes><divisions>4</divisions><key><fifths>0</fifths></key></attributes>
+        <direction><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>72</per-minute></metronome></direction-type><sound tempo="72"/></direction>
+        <note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration><voice>1</voice></note>
+      </measure></part>
+    </score-partwise>`);
+    player.loadScore(score, score.tempoBpm ?? 100, {});
+
+    player.play(vi.fn());
+    audioClock += 0.5;
+
+    expect(score.tempoBpm).toBe(72);
+    expect(player.getCurrentTick()).toBeCloseTo(2.4);
   });
 
   it('does not signal playback completion for the initial tick-zero progress update', () => {

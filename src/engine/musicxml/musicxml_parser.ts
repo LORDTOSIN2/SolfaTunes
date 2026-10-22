@@ -34,6 +34,54 @@ export class MusicXmlParseError extends Error {
   }
 }
 
+function parsePositiveNumber(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function getMetronomeQuarterBpm(direction: XmlElement): number | undefined {
+  const metronome = direction.findChild('direction-type')?.findChild('metronome');
+  if (!metronome) return undefined;
+
+  const perMinute = parsePositiveNumber(metronome.getChildText('per-minute'));
+  const beatUnit = metronome.getChildText('beat-unit')?.toLowerCase();
+  const beatUnitQuarterLength: Record<string, number> = {
+    maxima: 32,
+    long: 16,
+    breve: 8,
+    whole: 4,
+    half: 2,
+    quarter: 1,
+    eighth: 0.5,
+    '16th': 0.25,
+    '32nd': 0.125,
+    '64th': 0.0625,
+    '128th': 0.03125,
+    '256th': 0.015625,
+  };
+  const quarterLength = beatUnit ? beatUnitQuarterLength[beatUnit] : undefined;
+  if (!perMinute || quarterLength === undefined) return undefined;
+
+  const dots = metronome.findChildren('beat-unit-dot').length;
+  const dotMultiplier = dots === 0 ? 1 : 2 - 1 / 2 ** dots;
+  return perMinute * quarterLength * dotMultiplier;
+}
+
+function getDirectionTempo(direction: XmlElement): {
+  hasTempoMarking: boolean;
+  bpm?: number;
+} {
+  const soundTempoText = direction.findChild('sound')?.attrs['tempo'];
+  const soundTempo = parsePositiveNumber(soundTempoText);
+  const metronome = direction.findChild('direction-type')?.findChild('metronome');
+  const hasTempoMarking = soundTempoText !== undefined || Boolean(metronome);
+  return {
+    hasTempoMarking,
+    bpm: soundTempo ?? getMetronomeQuarterBpm(direction),
+  };
+}
+
 export interface MusicXmlParseResult {
   score: ParsedScore;
   metadata: SolfaTunesMetadata | null;
@@ -162,9 +210,12 @@ export class MusicXmlParser {
     let initialMode = metadata?.mode || 'major';
     let initialKeySignatureFifths: number | null = null;
     let initialKeySignatureMode: string | null = null;
+    let initialTempoBpm: number | undefined;
 
     let meter = '4/4';
     let initialMeterFound = false;
+    let hasUnsupportedTempoMarking = false;
+    let hasTempoChange = false;
     const measureDivisionsByVoice: Record<string, number[]> = {};
 
     // Check all measures across parts to detect initial and mid-score key changes,
@@ -179,18 +230,31 @@ export class MusicXmlParser {
       for (const mEl of measureEls) {
         const mNum = mEl.attrs['number'] || '1';
 
-        const hasTempoMarking = mEl.findChildren('direction').some((direction) => {
-          const directionType = direction.findChild('direction-type');
-          return Boolean(
-            direction.findChild('sound')?.attrs['tempo'] ||
-            directionType?.findChild('metronome')
-          );
-        });
-        if (hasTempoMarking && !report.unsupportedConstructs.includes('Tempo markings')) {
+        for (const direction of mEl.findChildren('direction')) {
+          const tempo = getDirectionTempo(direction);
+          if (tempo.hasTempoMarking && tempo.bpm === undefined) {
+            hasUnsupportedTempoMarking = true;
+          } else if (tempo.bpm !== undefined) {
+            if (initialTempoBpm === undefined) {
+              initialTempoBpm = tempo.bpm;
+            } else if (Math.abs(initialTempoBpm - tempo.bpm) > 0.01) {
+              hasTempoChange = true;
+            }
+          }
+        }
+
+        if (hasUnsupportedTempoMarking && !report.unsupportedConstructs.includes('Tempo markings')) {
           report.warnings.push(
-            `Part "${voice.id}" measure ${mNum} contains a tempo marking. Tempo is not represented in the imported score and was not retained.`
+            `Part "${voice.id}" measure ${mNum} contains a tempo marking that cannot be interpreted as a numeric quarter-note tempo. It was not applied to playback.`
           );
           report.unsupportedConstructs.push('Tempo markings');
+          report.isLossless = false;
+        }
+        if (hasTempoChange && !report.unsupportedConstructs.includes('Tempo changes')) {
+          report.warnings.push(
+            `Part "${voice.id}" measure ${mNum} contains a tempo change. SolfaTunes currently applies only the initial tempo of ${initialTempoBpm} BPM.`
+          );
+          report.unsupportedConstructs.push('Tempo changes');
           report.isLossless = false;
         }
 
@@ -665,6 +729,7 @@ export class MusicXmlParser {
       composer,
       key: initialMode === 'minor' ? `${initialKey}m` : initialKey,
       meter,
+      tempoBpm: initialTempoBpm,
       defaultLength: '1/4',
       index: metadata?.songId ? metadata.songId.replace(/^score-/, '') : '1',
       voices,

@@ -188,6 +188,18 @@ export class MusicXmlSerializer {
             lines.push('      </attributes>');
           }
 
+          if (voiceIndex === 0 && mNum === 1 && score.tempoBpm !== undefined) {
+            lines.push('      <direction>');
+            lines.push('        <direction-type>');
+            lines.push('          <metronome>');
+            lines.push('            <beat-unit>quarter</beat-unit>');
+            lines.push(`            <per-minute>${escapeXml(String(score.tempoBpm))}</per-minute>`);
+            lines.push('          </metronome>');
+            lines.push('        </direction-type>');
+            lines.push(`        <sound tempo="${escapeXml(String(score.tempoBpm))}"/>`);
+            lines.push('      </direction>');
+          }
+
           // Output notes
           measure.notes.forEach((note, noteIdx) => {
             const noteId = generateStableNoteId(voice.id, mNum, noteIdx);
