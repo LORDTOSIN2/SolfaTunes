@@ -8,6 +8,7 @@ import {
   SolfaTunesMetadata,
   extractMetadataFromMusicXml,
   deriveKeyFromFifthsAndMode,
+  reconcileMetadataWithKey,
   generateStableNoteId,
   SOLFATUNES_VOICE_ID_MAP_FIELD,
 } from './schema';
@@ -71,7 +72,7 @@ export class MusicXmlParser {
     }
 
     // 2. Extract SolfaTunes metadata if present
-    const { metadata } = extractMetadataFromMusicXml(xmlString);
+    let { metadata } = extractMetadataFromMusicXml(xmlString);
 
     // 3. Work & Movement Title
     const work = root.findChild('work');
@@ -159,11 +160,12 @@ export class MusicXmlParser {
     // 7. Track global musical attributes
     let initialKey = metadata?.tonic || 'C';
     let initialMode = metadata?.mode || 'major';
-    let initialKeyFound = Boolean(metadata?.tonic);
     let initialKeySignatureFifths: number | null = null;
+    let initialKeySignatureMode: string | null = null;
 
     let meter = '4/4';
-    let defaultDivisions = 4;
+    let initialMeterFound = false;
+    const measureDivisionsByVoice: Record<string, number[]> = {};
 
     // Check all measures across parts to detect initial and mid-score key changes,
     // and multi-voice polyphony (<backup> and multiple <voice> tags)
@@ -172,6 +174,8 @@ export class MusicXmlParser {
       if (!partEl) continue;
 
       const measureEls = partEl.findChildren('measure');
+      let currentDivisions = 4;
+      measureDivisionsByVoice[voice.id] = [];
       for (const mEl of measureEls) {
         const mNum = mEl.attrs['number'] || '1';
 
@@ -190,6 +194,19 @@ export class MusicXmlParser {
           report.isLossless = false;
         }
 
+        const hasUnrepresentedDirection = mEl.findChildren('direction').some((direction) =>
+          direction.findChild('direction-type')?.children.some(
+            element => element.tag.toLowerCase() !== 'metronome'
+          )
+        );
+        if (hasUnrepresentedDirection && !report.unsupportedConstructs.includes('Direction markings')) {
+          report.warnings.push(
+            `Part "${voice.id}" measure ${mNum} contains direction text or expressive markings that are not retained.`
+          );
+          report.unsupportedConstructs.push('Direction markings');
+          report.isLossless = false;
+        }
+
         // Check for backup tags (Requirement 1)
         const backups = mEl.findChildren('backup');
         if (backups.length > 0) {
@@ -197,6 +214,17 @@ export class MusicXmlParser {
             `Part "${voice.id}" measure ${mNum} contains <backup> elements (multi-voice polyphony). Secondary voice layers are unsupported in SolfaTunes and were skipped.`
           );
           report.unsupportedConstructs.push('Polyphonic <backup> elements');
+          report.isLossless = false;
+        }
+
+        if (
+          mEl.findChildren('forward').length > 0 &&
+          !report.unsupportedConstructs.includes('Forward elements')
+        ) {
+          report.warnings.push(
+            `Part "${voice.id}" measure ${mNum} contains <forward> elements. Skipped rhythmic positions are not represented in the imported score.`
+          );
+          report.unsupportedConstructs.push('Forward elements');
           report.isLossless = false;
         }
 
@@ -216,18 +244,53 @@ export class MusicXmlParser {
         }
 
         // Check attributes for key, time, divisions, clef
-        const attrsEl = mEl.findChild('attributes');
-        if (attrsEl) {
+        for (const attrsEl of mEl.findChildren('attributes')) {
           const divText = attrsEl.getChildText('divisions');
           if (divText) {
-            defaultDivisions = parseInt(divText, 10) || 4;
+            currentDivisions = parseInt(divText, 10) || 4;
           }
 
           const timeEl = attrsEl.findChild('time');
           if (timeEl) {
             const beats = timeEl.getChildText('beats') || '4';
             const beatType = timeEl.getChildText('beat-type') || '4';
-            meter = `${beats}/${beatType}`;
+            const currentMeter = `${beats}/${beatType}`;
+            if (
+              (timeEl.findChildren('beats').length !== 1 ||
+                beats.includes('+') ||
+                timeEl.findChild('senza-misura')) &&
+              !report.unsupportedConstructs.includes('Complex meters')
+            ) {
+              report.warnings.push(
+                `Part "${voice.id}" measure ${mNum} contains a complex or unmetered time signature. Only simple numeric meters are represented.`
+              );
+              report.unsupportedConstructs.push('Complex meters');
+              report.isLossless = false;
+            }
+            if (!initialMeterFound) {
+              meter = currentMeter;
+              initialMeterFound = true;
+            } else if (
+              currentMeter !== meter &&
+              !report.unsupportedConstructs.includes('Mid-score meter changes')
+            ) {
+              report.warnings.push(
+                `Mid-score meter change detected at measure ${mNum} (${currentMeter}). SolfaTunes currently supports one global meter; initial meter "${meter}" was retained.`
+              );
+              report.unsupportedConstructs.push('Mid-score meter changes');
+              report.isLossless = false;
+            }
+          }
+
+          if (
+            attrsEl.findChild('transpose') &&
+            !report.unsupportedConstructs.includes('Transposing instruments')
+          ) {
+            report.warnings.push(
+              `Part "${voice.id}" measure ${mNum} contains a transposition setting. Written and sounding pitch are not reconciled; written pitches are used for playback.`
+            );
+            report.unsupportedConstructs.push('Transposing instruments');
+            report.isLossless = false;
           }
 
           const clefEl = attrsEl.findChild('clef');
@@ -241,19 +304,42 @@ export class MusicXmlParser {
           const keyEl = attrsEl.findChild('key');
           if (keyEl) {
             const fifthsText = keyEl.getChildText('fifths');
-            const modeText = keyEl.getChildText('mode') || 'major';
-            if (fifthsText !== undefined) {
+            const modeText = keyEl.getChildText('mode') || metadata?.mode || 'major';
+            if (
+              fifthsText === undefined &&
+              !report.unsupportedConstructs.includes('Non-traditional key signatures')
+            ) {
+              report.warnings.push(
+                `Part "${voice.id}" measure ${mNum} contains a key signature without <fifths>. Non-traditional key signatures are not represented.`
+              );
+              report.unsupportedConstructs.push('Non-traditional key signatures');
+              report.isLossless = false;
+            } else if (fifthsText !== undefined) {
               const fifths = parseInt(fifthsText, 10);
               const derived = deriveKeyFromFifthsAndMode(fifths, modeText);
 
-              if (!initialKeyFound) {
+              if (initialKeySignatureFifths === null) {
+                initialKeySignatureFifths = fifths;
+                initialKeySignatureMode = derived.mode;
                 initialKey = derived.tonic;
                 initialMode = derived.mode;
-                initialKeySignatureFifths = fifths;
-                initialKeyFound = true;
+                if (metadata) {
+                  metadata = reconcileMetadataWithKey(metadata, fifths, derived.mode);
+                }
+                if (
+                  derived.mode !== 'major' &&
+                  derived.mode !== 'minor' &&
+                  !report.unsupportedConstructs.includes('Non-major/minor modes')
+                ) {
+                  report.warnings.push(
+                    `MusicXML mode "${modeText}" is not represented by SolfaTunes scoring semantics and was interpreted using the key signature's major-key mapping.`
+                  );
+                  report.unsupportedConstructs.push('Non-major/minor modes');
+                  report.isLossless = false;
+                }
               } else if (
-                initialKeySignatureFifths !== null &&
-                initialKeySignatureFifths !== fifths
+                initialKeySignatureFifths !== fifths ||
+                initialKeySignatureMode !== derived.mode
               ) {
                 // Mid-score key change detected (Requirement 3)
                 report.warnings.push(
@@ -263,6 +349,7 @@ export class MusicXmlParser {
                 report.isLossless = false;
               }
             }
+            measureDivisionsByVoice[voice.id].push(currentDivisions);
           }
         }
       }
@@ -326,6 +413,18 @@ export class MusicXmlParser {
             report.isLossless = false;
           }
 
+          const unsupportedNotations = nEl.findChild('notations')?.children.filter(
+            element => element.tag.toLowerCase() !== 'tied'
+          ) || [];
+          if (unsupportedNotations.length > 0 && !report.unsupportedConstructs.includes('Note notations')) {
+            const notationNames = [...new Set(unsupportedNotations.map(element => element.tag))].join(', ');
+            report.warnings.push(
+              `Part "${voice.id}" measure ${mNum} contains unsupported note notation (${notationNames}) that is not retained.`
+            );
+            report.unsupportedConstructs.push('Note notations');
+            report.isLossless = false;
+          }
+
           if (nEl.findChildren('lyric').length > 0 &&
             !report.unsupportedConstructs.includes('Note-aligned lyrics')) {
             report.warnings.push(
@@ -341,6 +440,30 @@ export class MusicXmlParser {
             continue;
           }
 
+          if (nEl.findChild('grace')) {
+            if (!report.unsupportedConstructs.includes('Grace notes')) {
+              report.warnings.push(
+                `Part "${voice.id}" measure ${mNum} contains a grace note. Grace notes are not represented in the imported score and were skipped.`
+              );
+              report.unsupportedConstructs.push('Grace notes');
+              report.isLossless = false;
+            }
+            noteIdxInMeasure++;
+            continue;
+          }
+
+          if (nEl.findChild('unpitched')) {
+            if (!report.unsupportedConstructs.includes('Unpitched notes')) {
+              report.warnings.push(
+                `Part "${voice.id}" measure ${mNum} contains an unpitched note. Unpitched notes are not represented in the imported score and were skipped.`
+              );
+              report.unsupportedConstructs.push('Unpitched notes');
+              report.isLossless = false;
+            }
+            noteIdxInMeasure++;
+            continue;
+          }
+
           // If note is part of a chord cluster (not first note), skip or report
           if (nEl.findChild('chord')) {
             report.warnings.push(
@@ -352,10 +475,11 @@ export class MusicXmlParser {
           }
 
           const durationText = nEl.getChildText('duration');
-          const rawDuration = durationText ? parseInt(durationText, 10) : defaultDivisions;
+          const divisions = measureDivisionsByVoice[voice.id]?.[mIndex] || 4;
+          const rawDuration = durationText ? parseInt(durationText, 10) : divisions;
           // SolfaTransformer scales note.durationTicks as durationMult * defaultLengthVal * 16 (where defaultLengthVal=0.25, mult*4)
-          // Thus durationMult must be rawDuration / defaultDivisions
-          const durationMult = rawDuration / defaultDivisions;
+          // Thus durationMult must be rawDuration / divisions.
+          const durationMult = rawDuration / divisions;
 
           const stableId = generateStableNoteId(voice.id, mNum, noteIdxInMeasure);
           const override = metadata?.noteOverrides?.[stableId];
@@ -539,7 +663,7 @@ export class MusicXmlParser {
     const parsedScore: ParsedScore = {
       title,
       composer,
-      key: initialKey,
+      key: initialMode === 'minor' ? `${initialKey}m` : initialKey,
       meter,
       defaultLength: '1/4',
       index: metadata?.songId ? metadata.songId.replace(/^score-/, '') : '1',

@@ -73,6 +73,7 @@ export class MusicXmlSerializer {
     const isMinor = score.key.toLowerCase().includes('m') && !score.key.toLowerCase().includes('maj');
     const mode = isMinor ? 'minor' : 'major';
     const keyDefaultAccs = getKeyDefaultAccidentals(fifths);
+    const tonic = isMinor ? score.key.replace(/\s*(?:minor|min|m)$/i, '') : score.key;
 
     // 2. Determine meter
     const meterParts = (score.meter || '4/4').split('/');
@@ -91,7 +92,7 @@ export class MusicXmlSerializer {
     });
 
     const metadata: SolfaTunesMetadata = {
-      ...createDefaultSolfaMetadata(score.key, mode, songId),
+      ...createDefaultSolfaMetadata(tonic, mode, songId),
       hymn: {
         hymnMeter: score.hymnMeter,
         tuneName: score.tuneName,

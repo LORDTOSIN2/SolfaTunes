@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import { AbcParser } from '../abc_parser';
 import { SolfaTransformer } from '../solfa_transformer';
 import { createAbcMusicalDocument } from '../musical_document';
+import { MidiWriter } from '../../audio/midi_writer';
 import { ParsedScore } from '../../types';
 import { formatLossinessReport } from './lossiness_report';
 import { createDefaultSolfaMetadata } from './schema';
@@ -55,7 +56,78 @@ const lossyXml = `<?xml version="1.0"?>
   <part id="P1"><measure number="1">
     <attributes><divisions>4</divisions><key><fifths>0</fifths></key></attributes>
     <direction><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>96</per-minute></metronome></direction-type></direction>
-    <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><tie type="start"/><lyric><text>one</text></lyric></note>
+    <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><tie type="start"/><voice>1</voice><type>quarter</type><notations><tied type="start"/></notations><lyric><text>one</text></lyric></note>
+  </measure></part>
+</score-partwise>`;
+
+const multipartCompatibilityXml = `<?xml version="1.0"?>
+<score-partwise version="4.0">
+  <identification>
+    <miscellaneous>
+      <miscellaneous-field name="solfatunes:futureField">preserve me</miscellaneous-field>
+    </miscellaneous>
+  </identification>
+  <part-list>
+    <score-part id="P1"><part-name>Soprano</part-name></score-part>
+    <score-part id="P2"><part-name>Bass</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <attributes><key><fifths>0</fifths></key></attributes>
+      <attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+      <direction><direction-type><metronome><beat-unit>quarter</beat-unit><per-minute>72</per-minute></metronome></direction-type><sound tempo="72"/></direction>
+      <direction><direction-type><words>Maestoso</words></direction-type></direction>
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>2</duration><tie type="start"/><voice>1</voice><type>eighth</type><notations><tied type="start"/></notations></note>
+      <note><pitch><step>C</step><octave>5</octave></pitch><duration>2</duration><tie type="stop"/><voice>1</voice><type>eighth</type><notations><tied type="stop"/><articulations><breath-mark/></articulations></notations></note>
+      <note><rest/><duration>4</duration><voice>1</voice></note>
+      <note><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>quarter</type><lyric><text>one</text></lyric></note>
+    </measure>
+    <measure number="2">
+      <attributes><divisions>8</divisions></attributes>
+      <attributes><key><fifths>1</fifths></key></attributes>
+      <attributes><time><beats>2</beats><beat-type>4</beat-type></time></attributes>
+      <note><pitch><step>D</step><octave>5</octave></pitch><duration>16</duration><voice>1</voice></note>
+    </measure>
+    <measure number="3">
+      <attributes><time><beats>2+3</beats><beat-type>8</beat-type></time></attributes>
+      <attributes><key><fifths>1</fifths><mode>minor</mode></key></attributes>
+      <note><pitch><step>D</step><octave>5</octave></pitch><duration>20</duration><voice>1</voice></note>
+    </measure>
+  </part>
+  <part id="P2">
+    <measure number="1">
+      <attributes><divisions>4</divisions></attributes>
+      <attributes><key><fifths>0</fifths></key></attributes>
+      <attributes><transpose><diatonic>-1</diatonic><chromatic>-2</chromatic></transpose></attributes>
+      <attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+      <note><pitch><step>G</step><octave>3</octave></pitch><duration>12</duration><voice>1</voice></note>
+    </measure>
+    <measure number="2">
+      <forward><duration>4</duration></forward>
+      <note><pitch><step>A</step><octave>3</octave></pitch><duration>2</duration><voice>1</voice></note>
+      <note><rest/><duration>2</duration><voice>1</voice></note>
+    </measure>
+    <measure number="3">
+      <attributes><time><beats>2+3</beats><beat-type>8</beat-type></time></attributes>
+      <note><pitch><step>C</step><octave>3</octave></pitch><duration>6</duration><voice>1</voice></note>
+      <note><grace/><pitch><step>D</step><octave>3</octave></pitch><voice>1</voice></note>
+      <note><unpitched><display-step>C</display-step><display-octave>3</display-octave></unpitched><duration>4</duration><voice>1</voice></note>
+    </measure>
+  </part>
+</score-partwise>`;
+
+const staleMajorMetadataMinorXml = `<?xml version="1.0"?>
+<score-partwise version="4.0">
+  <identification><miscellaneous>
+    <miscellaneous-field name="solfatunes:tonic">C</miscellaneous-field>
+    <miscellaneous-field name="solfatunes:mode">major</miscellaneous-field>
+  </miscellaneous></identification>
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1"><measure number="1">
+    <attributes><divisions>4</divisions><key><fifths>0</fifths><mode>minor</mode></key></attributes>
+    <note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice></note>
+    <note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice></note>
   </measure></part>
 </score-partwise>`;
 
@@ -159,6 +231,138 @@ describe('MusicXML document import/export workflow', () => {
     );
     expect(reopened.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toBe(lossyXml);
     expect(formatLossinessReport(reopened.conversionReport!)).toContain('LOSSY / WARNINGS DETECTED');
+  });
+
+  it('round-trips multipart rhythms and rests while retaining loss and metadata reports', () => {
+    const imported = importMusicXmlDocument(multipartCompatibilityXml, () => true);
+    if (!imported) throw new Error('Confirmed multipart import was unexpectedly cancelled.');
+
+    expect(imported.conversionReport?.isLossless).toBe(false);
+    expect(imported.conversionReport?.unsupportedConstructs).toEqual(
+      expect.arrayContaining([
+        'Tempo markings',
+        'Ties',
+        'Note-aligned lyrics',
+        'Mid-score key changes',
+        'Mid-score meter changes',
+        'Transposing instruments',
+        'Forward elements',
+        'Grace notes',
+        'Unpitched notes',
+        'Complex meters',
+        'Direction markings',
+        'Note notations',
+      ])
+    );
+    expect(imported.conversionReport?.warnings).toContain(
+      'Mid-score key change detected at measure 3 (fifths: 1, mode: minor). SolfaTunes currently supports a single global key; initial key "C" was retained.'
+    );
+    expect(imported.score.key).toBe('C');
+    expect(imported.score.meter).toBe('3/4');
+    expect(imported.score.voices.map(voice => voice.name)).toEqual(['Soprano', 'Bass']);
+    expect(imported.score.systems[0].voices.P1.measures[0].notes.map(note => [
+      note.isRest,
+      note.durationTicks,
+      note.midiPitch,
+    ])).toEqual([
+      [false, 2, 72],
+      [false, 2, 72],
+      [true, 4, 0],
+      [false, 4, 74],
+    ]);
+    expect(imported.score.systems[0].voices.P2.measures[0].notes.map(note => [
+      note.isRest,
+      note.durationTicks,
+      note.midiPitch,
+    ])).toEqual([[false, 12, 55]]);
+    expect(imported.score.systems[0].voices.P1.measures[1].notes[0].durationTicks).toBe(8);
+
+    const exported = exportMusicXmlDocument(imported);
+    expect(exported.report.isLossless).toBe(false);
+    expect(exported.report.unsupportedConstructs).toEqual(
+      expect.arrayContaining([
+        'Tempo markings',
+        'Ties',
+        'Note-aligned lyrics',
+        'Mid-score key changes',
+        'Mid-score meter changes',
+        'Transposing instruments',
+        'Forward elements',
+        'Grace notes',
+        'Unpitched notes',
+        'Complex meters',
+        'Direction markings',
+        'Note notations',
+      ])
+    );
+
+    const reopened = importMusicXmlDocument(exported.xml, () => true);
+    if (!reopened) throw new Error('Reopening the multipart export was unexpectedly cancelled.');
+    expect(noteEvents(reopened.score)).toEqual(noteEvents(imported.score));
+    expect(Array.from(MidiWriter.generateMidiBytes(reopened.score, 100))).toEqual(
+      Array.from(MidiWriter.generateMidiBytes(imported.score, 100))
+    );
+    expect(reopened.metadata?.extraFields?.['solfatunes:futureField']).toBe('preserve me');
+    expect(reopened.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toBe(multipartCompatibilityXml);
+    expect(reopened.conversionReport?.isLossless).toBe(false);
+    expect(reopened.conversionReport?.unsupportedConstructs).toEqual(
+      expect.arrayContaining([
+        'Tempo markings',
+        'Ties',
+        'Note-aligned lyrics',
+        'Mid-score key changes',
+        'Mid-score meter changes',
+        'Transposing instruments',
+        'Forward elements',
+        'Grace notes',
+        'Unpitched notes',
+        'Complex meters',
+        'Direction markings',
+        'Note notations',
+      ])
+    );
+  });
+
+  it('uses the MusicXML key as authoritative and preserves supported minor semantics', () => {
+    const imported = importMusicXmlDocument(staleMajorMetadataMinorXml, summary => {
+      throw new Error(`Supported minor-key import was unexpectedly lossy: ${summary}`);
+    });
+    if (!imported) throw new Error('Minor-key import was unexpectedly cancelled.');
+
+    expect(imported.score.key).toBe('Am');
+    expect(imported.score.systems[0].voices.P1.measures[0].notes.map(note => note.syllable))
+      .toEqual(['d', 'ri']);
+    expect(imported.metadata?.tonic).toBe('A');
+    expect(imported.metadata?.mode).toBe('minor');
+
+    const exported = exportMusicXmlDocument(imported);
+    expect(exported.xml).toContain('<mode>minor</mode>');
+    const reopened = importMusicXmlDocument(exported.xml, () => true);
+    if (!reopened) throw new Error('Minor-key export was unexpectedly cancelled.');
+    expect(reopened.score.key).toBe('Am');
+    expect(reopened.metadata?.tonic).toBe('A');
+    expect(reopened.metadata?.mode).toBe('minor');
+    expect(reopened.score.systems[0].voices.P1.measures[0].notes.map(note => note.syllable))
+      .toEqual(['d', 'ri']);
+
+    const metadataModeXml = staleMajorMetadataMinorXml
+      .replace('name="solfatunes:mode">major', 'name="solfatunes:mode">minor')
+      .replace('<mode>minor</mode>', '');
+    const metadataMode = importMusicXmlDocument(metadataModeXml, summary => {
+      throw new Error(`Supported metadata minor-key import was unexpectedly lossy: ${summary}`);
+    });
+    if (!metadataMode) throw new Error('Metadata minor-key import was unexpectedly cancelled.');
+    expect(metadataMode.score.key).toBe('Am');
+    expect(metadataMode.metadata?.mode).toBe('minor');
+
+    const unsupportedModeXml = staleMajorMetadataMinorXml.replace(
+      '<mode>minor</mode>',
+      '<mode>dorian</mode>'
+    );
+    const unsupportedMode = importMusicXmlDocument(unsupportedModeXml, () => true);
+    if (!unsupportedMode) throw new Error('Confirmed modal import was unexpectedly cancelled.');
+    expect(unsupportedMode.conversionReport?.isLossless).toBe(false);
+    expect(unsupportedMode.conversionReport?.unsupportedConstructs).toContain('Non-major/minor modes');
   });
 
   it('rejects malformed XML without producing an import document', () => {
