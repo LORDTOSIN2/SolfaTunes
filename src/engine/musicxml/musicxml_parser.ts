@@ -9,9 +9,11 @@ import {
   extractMetadataFromMusicXml,
   deriveKeyFromFifthsAndMode,
   generateStableNoteId,
+  SOLFATUNES_VOICE_ID_MAP_FIELD,
 } from './schema';
 import { LossinessReport, createEmptyLossinessReport } from './lossiness_report';
 import { parseXml, XmlElement } from './xml_utils';
+import { createMusicalDocument, MusicalDocument } from '../musical_document';
 import {
   basePitchClass,
   getKeyInfo,
@@ -107,8 +109,34 @@ export class MusicXmlParser {
       throw new MusicXmlParseError(err, report);
     }
 
+    let voiceIdMap: Record<string, string> = {};
+    const rawVoiceIdMap = metadata?.extraFields?.[SOLFATUNES_VOICE_ID_MAP_FIELD];
+    if (rawVoiceIdMap) {
+      try {
+        const parsed: unknown = JSON.parse(rawVoiceIdMap);
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          !Array.isArray(parsed) &&
+          Object.values(parsed).every(value => typeof value === 'string' && value.length > 0) &&
+          new Set(Object.values(parsed)).size === Object.values(parsed).length
+        ) {
+          voiceIdMap = parsed as Record<string, string>;
+        } else {
+          throw new Error('Invalid voice ID mapping shape.');
+        }
+      } catch {
+        report.warnings.push('SolfaTunes voice ID mapping could not be read; MusicXML part IDs were used.');
+        report.unsupportedConstructs.push('Invalid SolfaTunes voice ID mapping');
+        report.isLossless = false;
+      }
+    }
+
+    const xmlPartIdToVoiceId = new Map<string, string>();
     const voices: VoiceDeclaration[] = scorePartEls.map((sp, idx) => {
-      const id = sp.attrs['id'] || `P${idx + 1}`;
+      const xmlPartId = sp.attrs['id'] || `P${idx + 1}`;
+      const id = Object.hasOwn(voiceIdMap, xmlPartId) ? voiceIdMap[xmlPartId] : xmlPartId;
+      xmlPartIdToVoiceId.set(xmlPartId, id);
       const name = sp.getChildText('part-name') || id;
       return {
         id,
@@ -122,8 +150,10 @@ export class MusicXmlParser {
     const partEls = root.findChildren('part');
     const partMap = new Map<string, XmlElement>();
     partEls.forEach((p) => {
-      const id = p.attrs['id'];
-      if (id) partMap.set(id, p);
+      const xmlPartId = p.attrs['id'];
+      if (xmlPartId) {
+        partMap.set(xmlPartIdToVoiceId.get(xmlPartId) || xmlPartId, p);
+      }
     });
 
     // 7. Track global musical attributes
@@ -144,6 +174,21 @@ export class MusicXmlParser {
       const measureEls = partEl.findChildren('measure');
       for (const mEl of measureEls) {
         const mNum = mEl.attrs['number'] || '1';
+
+        const hasTempoMarking = mEl.findChildren('direction').some((direction) => {
+          const directionType = direction.findChild('direction-type');
+          return Boolean(
+            direction.findChild('sound')?.attrs['tempo'] ||
+            directionType?.findChild('metronome')
+          );
+        });
+        if (hasTempoMarking && !report.unsupportedConstructs.includes('Tempo markings')) {
+          report.warnings.push(
+            `Part "${voice.id}" measure ${mNum} contains a tempo marking. Tempo is not represented in the imported score and was not retained.`
+          );
+          report.unsupportedConstructs.push('Tempo markings');
+          report.isLossless = false;
+        }
 
         // Check for backup tags (Requirement 1)
         const backups = mEl.findChildren('backup');
@@ -271,6 +316,25 @@ export class MusicXmlParser {
 
         let noteIdxInMeasure = 0;
         for (const nEl of noteEls) {
+          const noteHasTie = nEl.findChildren('tie').length > 0 ||
+            (nEl.findChild('notations')?.findChildren('tied').length || 0) > 0;
+          if (noteHasTie && !report.unsupportedConstructs.includes('Ties')) {
+            report.warnings.push(
+              `Part "${voice.id}" measure ${mNum} contains a tie. Ties are not represented in the imported score.`
+            );
+            report.unsupportedConstructs.push('Ties');
+            report.isLossless = false;
+          }
+
+          if (nEl.findChildren('lyric').length > 0 &&
+            !report.unsupportedConstructs.includes('Note-aligned lyrics')) {
+            report.warnings.push(
+              `Part "${voice.id}" measure ${mNum} contains note-aligned lyrics. The imported score only retains unmetered lyrics.`
+            );
+            report.unsupportedConstructs.push('Note-aligned lyrics');
+            report.isLossless = false;
+          }
+
           // If note belongs to a secondary voice on a multi-voice staff, skip it
           const noteVoice = nEl.getChildText('voice');
           if (noteVoice && noteVoice !== primaryVoice) {
@@ -532,4 +596,13 @@ export class MusicXmlParser {
 
 export function parseMusicXmlToScore(xmlString: string): MusicXmlParseResult {
   return MusicXmlParser.parse(xmlString);
+}
+
+export function parseMusicXmlToDocument(xmlString: string): MusicalDocument {
+  const result = MusicXmlParser.parse(xmlString);
+  return createMusicalDocument(result.score, {
+    metadata: result.metadata,
+    conversionReport: result.report,
+    source: { format: 'musicxml', text: xmlString },
+  });
 }

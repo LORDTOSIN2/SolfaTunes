@@ -48,6 +48,7 @@
  */
 
 export const SOLFATUNES_METADATA_VERSION = '1.0';
+export const SOLFATUNES_VOICE_ID_MAP_FIELD = 'solfatunes:voiceIds';
 
 export type SolfaSystem = 'movable-do';
 

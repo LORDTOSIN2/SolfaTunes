@@ -65,20 +65,20 @@ describe('MusicXML Phase 3 Conversion & Round-Trip', () => {
       const { xml, report } = serializeScoreToMusicXml(initialScore);
       expect(report.isLossless).toBe(true);
 
-      expect(xml).toContain('<score-part id="1">');
+      expect(xml).toContain('<score-part id="P1">');
       expect(xml).toContain('<part-name>Soprano</part-name>');
-      expect(xml).toContain('<score-part id="2">');
+      expect(xml).toContain('<score-part id="P2">');
       expect(xml).toContain('<part-name>Alto</part-name>');
-      expect(xml).toContain('<score-part id="3">');
+      expect(xml).toContain('<score-part id="P3">');
       expect(xml).toContain('<part-name>Tenor</part-name>');
-      expect(xml).toContain('<score-part id="4">');
+      expect(xml).toContain('<score-part id="P4">');
       expect(xml).toContain('<part-name>Bass</part-name>');
 
       // Verify each part tag exists
-      expect(xml).toContain('<part id="1">');
-      expect(xml).toContain('<part id="2">');
-      expect(xml).toContain('<part id="3">');
-      expect(xml).toContain('<part id="4">');
+      expect(xml).toContain('<part id="P1">');
+      expect(xml).toContain('<part id="P2">');
+      expect(xml).toContain('<part id="P3">');
+      expect(xml).toContain('<part id="P4">');
     });
 
     it('emits explicit warnings when importing multi-voice staves and backup tags', () => {

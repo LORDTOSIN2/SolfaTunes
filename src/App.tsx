@@ -8,19 +8,32 @@ import { Sidebar } from './components/Sidebar';
 import { ScoreRenderer } from './components/ScoreRenderer';
 import { AbcParser } from './engine/abc_parser';
 import { SolfaTransformer } from './engine/solfa_transformer';
+import { createAbcMusicalDocument, createMusicalDocument, MusicalDocument } from './engine/musical_document';
+import {
+  applyExplicitSolfaOverrides,
+  exportMusicXmlDocument,
+  importMusicXmlDocument,
+} from './engine/musicxml/document_io';
+import { formatLossinessReport } from './engine/musicxml/lossiness_report';
 import { SCORES, ScoreLibraryItem } from './utils/scores';
 import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
 import { serializeScoreToAbc } from './engine/abc_serializer';
-import { Music, Download, FileDown } from 'lucide-react';
+import { Music, Download, FileDown, FileUp } from 'lucide-react';
 import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
 
 export default function App() {
   // 1. App States
   const [abcText, setAbcText] = useState<string>(SCORES[0]?.abcText || '');
-  const [score, setScore] = useState<ParsedScore | null>(null);
+  const [abcLoadVersion, setAbcLoadVersion] = useState(0);
+  const [musicalDocument, setMusicalDocument] = useState<MusicalDocument | null>(null);
+  const score = musicalDocument?.score ?? null;
   const [warnings, setWarnings] = useState<ParseWarning[]>([]);
+  const [musicXmlStatus, setMusicXmlStatus] = useState<{
+    type: 'success' | 'warning' | 'error' | 'info';
+    message: string;
+  } | null>(null);
   
   // Player control states
   const [bpm, setBpm] = useState<number>(100);
@@ -39,6 +52,9 @@ export default function App() {
   const [selectedNote, setSelectedNote] = useState<SelectedNoteLocation | null>(null);
   const [studioMode, setStudioMode] = useState<'read' | 'lyrics' | 'interactive' | 'source'>('interactive');
   const scoreContainerRef = useRef<HTMLDivElement | null>(null);
+  const musicXmlInputRef = useRef<HTMLInputElement | null>(null);
+  const musicXmlProvenanceRef = useRef<MusicalDocument | null>(null);
+  const skipNextAbcParseRef = useRef(false);
 
   // Compute total duration of score in sixteenth ticks
   const totalTicks = useMemo(() => {
@@ -75,6 +91,11 @@ export default function App() {
 
   // 3. Compile/Parse ABC text whenever it changes
   useEffect(() => {
+    if (skipNextAbcParseRef.current) {
+      skipNextAbcParseRef.current = false;
+      return;
+    }
+
     try {
       const parser = new AbcParser();
       const { score: rawScore, warnings: parseWarns } = parser.parse(abcText);
@@ -82,7 +103,16 @@ export default function App() {
       const transformer = new SolfaTransformer();
       const resolvedScore = transformer.transform(rawScore);
       
-      setScore(resolvedScore);
+      const importedDocument = musicXmlProvenanceRef.current;
+      const nextDocument = importedDocument
+        ? createMusicalDocument(resolvedScore, {
+            metadata: importedDocument.metadata,
+            conversionReport: importedDocument.conversionReport,
+            source: importedDocument.source,
+          })
+        : createAbcMusicalDocument(resolvedScore, abcText);
+      if (importedDocument) applyExplicitSolfaOverrides(nextDocument);
+      setMusicalDocument(nextDocument);
       setWarnings(parseWarns);
 
       // Reset playhead and stop current playbacks when score changes
@@ -99,7 +129,7 @@ export default function App() {
         reason: `Fatal parser error: ${err?.message || err}`
       }]);
     }
-  }, [abcText]);
+  }, [abcText, abcLoadVersion]);
 
   // Sync BPM changes with player
   useEffect(() => {
@@ -178,11 +208,21 @@ export default function App() {
   };
 
   const handleLoadScore = (song: ScoreLibraryItem) => {
+    musicXmlProvenanceRef.current = null;
+    setMusicXmlStatus(null);
     setAbcText(song.abcText);
+    setAbcLoadVersion(version => version + 1);
     setSelectedNote(null);
     if (window.matchMedia('(max-width: 1023px)').matches) {
       scoreContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+  };
+
+  const handleLoadAbcText = (text: string) => {
+    musicXmlProvenanceRef.current = null;
+    setMusicXmlStatus(null);
+    setAbcText(text);
+    setAbcLoadVersion(version => version + 1);
   };
 
   const handleUpdateScore = (newScore: ParsedScore) => {
@@ -211,6 +251,94 @@ export default function App() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleImportMusicXml = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+
+    try {
+      const xml = await file.text();
+      const imported = importMusicXmlDocument(xml, (summary) => window.confirm(
+        `This MusicXML import is partial or lossy. Continue and replace the current score?\n\n${summary}\n\nThe original MusicXML will be retained in the document for recovery.`
+      ));
+      if (!imported) {
+        setMusicXmlStatus({
+          type: 'info',
+          message: 'MusicXML import cancelled. The current score was not changed.',
+        });
+        return;
+      }
+
+      musicXmlProvenanceRef.current = imported;
+      const importedAbc = serializeScoreToAbc(imported.score);
+      if (importedAbc !== abcText) {
+        skipNextAbcParseRef.current = true;
+        setAbcText(importedAbc);
+      }
+      setMusicalDocument(imported);
+      setWarnings([]);
+      setSelectedNote(null);
+      setIsPlaying(false);
+      setCurrentTick(0);
+      playerRef.current?.stop();
+      playerRef.current?.loadScore(imported.score, bpm, mutedVoices);
+      setMusicXmlStatus({
+        type: imported.conversionReport?.isLossless === false ? 'warning' : 'success',
+        message: imported.conversionReport?.isLossless === false
+          ? 'MusicXML imported with conversion warnings. The original file is retained for recovery.'
+          : 'MusicXML imported. No conversion losses were reported.',
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setMusicXmlStatus({
+        type: 'error',
+        message: `MusicXML import failed. The current score was not changed. ${message}`,
+      });
+    }
+  };
+
+  const handleExportMusicXml = () => {
+    if (!musicalDocument) return;
+
+    try {
+      const result = exportMusicXmlDocument(musicalDocument);
+      if (!result.report.isLossless && !window.confirm(
+        `This MusicXML export includes conversion losses or unsupported constructs.\n\n${formatLossinessReport(result.report)}\n\nThe original MusicXML source, when available, is embedded in the exported metadata as a recovery copy. Continue?`
+      )) {
+        setMusicXmlStatus({
+          type: 'info',
+          message: 'MusicXML export cancelled.',
+        });
+        return;
+      }
+
+      const blob = new Blob([result.xml], { type: 'application/vnd.recordare.musicxml+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = window.document.createElement('a');
+      const fileName = score?.title
+        ? `${score.title.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.musicxml`
+        : 'score.musicxml';
+      link.href = url;
+      link.download = fileName;
+      window.document.body.appendChild(link);
+      link.click();
+      window.document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setMusicXmlStatus({
+        type: result.report.isLossless ? 'success' : 'warning',
+        message: result.report.isLossless
+          ? 'MusicXML export completed.'
+          : 'MusicXML export completed with conversion warnings. The original source is embedded when available.',
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setMusicXmlStatus({
+        type: 'error',
+        message: `MusicXML export failed. ${message}`,
+      });
+    }
   };
 
   // Convert transpose values into helpful human-readable key steps
@@ -256,6 +384,35 @@ export default function App() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <input
+            ref={musicXmlInputRef}
+            type="file"
+            accept=".xml,.musicxml,application/xml,text/xml,application/vnd.recordare.musicxml+xml"
+            onChange={handleImportMusicXml}
+            className="hidden"
+            aria-label="Import MusicXML file"
+          />
+          <button
+            type="button"
+            onClick={() => musicXmlInputRef.current?.click()}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+            title="Import MusicXML"
+            aria-label="Import MusicXML"
+          >
+            <FileUp size={16} />
+            <span className="hidden sm:inline text-xs font-semibold">Import XML</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleExportMusicXml}
+            disabled={!musicalDocument}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
+            title="Download MusicXML"
+            aria-label="Download MusicXML"
+          >
+            <FileDown size={16} />
+            <span className="hidden sm:inline text-xs font-semibold">MusicXML</span>
+          </button>
           <button
             onClick={handleExportAbc}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
@@ -277,12 +434,28 @@ export default function App() {
         </div>
       </header>
 
+      {musicXmlStatus && (
+        <div
+          role={musicXmlStatus.type === 'error' || musicXmlStatus.type === 'warning' ? 'alert' : 'status'}
+          aria-live="polite"
+          className={`border-b px-4 py-2 text-xs ${
+            musicXmlStatus.type === 'error'
+              ? 'border-red-400/20 bg-red-950/40 text-red-200'
+              : musicXmlStatus.type === 'warning'
+                ? 'border-amber-400/20 bg-amber-950/30 text-amber-200'
+                : 'border-emerald-400/20 bg-emerald-950/20 text-emerald-200'
+          }`}
+        >
+          {musicXmlStatus.message}
+        </div>
+      )}
+
       {/* Main Work Area Dashboard */}
       <main className="flex-1 min-h-0 flex flex-col lg:flex-row p-3 sm:p-5 lg:p-8 pb-36 lg:pb-8 gap-4 lg:gap-8 lg:overflow-hidden">
         {/* Editor panel on Left */}
         <div className="order-2 min-w-0 lg:order-1 lg:w-[380px] lg:shrink-0 lg:h-full lg:min-h-0">
           <Sidebar
-            setAbcText={setAbcText}
+            onLoadAbcText={handleLoadAbcText}
             warnings={warnings}
             onLoadScore={handleLoadScore}
             selectedScoreId={SCORES.find(song => song.abcText === abcText)?.id}

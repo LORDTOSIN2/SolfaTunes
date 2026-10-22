@@ -10,6 +10,7 @@ import {
   createDefaultSolfaMetadata,
   injectMetadataIntoMusicXml,
   escapeXml,
+  SOLFATUNES_VOICE_ID_MAP_FIELD,
 } from './schema';
 import { KEYS, getKeyInfo, getKeyDefaultAccidentals } from '../solfa_semantics';
 import { LossinessReport, createEmptyLossinessReport } from './lossiness_report';
@@ -100,6 +101,11 @@ export class MusicXmlSerializer {
         voicePairingGroups: score.voicePairingGroups,
         systemVoiceMeasureCounts,
       },
+      extraFields: {
+        [SOLFATUNES_VOICE_ID_MAP_FIELD]: JSON.stringify(
+          Object.fromEntries(score.voices.map((voice, index) => [`P${index + 1}`, voice.id]))
+        ),
+      },
       unmeteredLyrics: score.lyrics && score.lyrics.length > 0 ? [...score.lyrics] : undefined,
       originalAbcSource: serializeScoreToAbc(score),
       noteOverrides: {},
@@ -131,17 +137,17 @@ export class MusicXmlSerializer {
 
     // Part list: one part per voice
     lines.push('  <part-list>');
-    score.voices.forEach((voice) => {
+    score.voices.forEach((voice, voiceIndex) => {
       const vName = voice.name || voice.id;
-      lines.push(`    <score-part id="${escapeXml(voice.id)}">`);
+      lines.push(`    <score-part id="P${voiceIndex + 1}">`);
       lines.push(`      <part-name>${escapeXml(vName)}</part-name>`);
       lines.push('    </score-part>');
     });
     lines.push('  </part-list>');
 
     // Part data
-    score.voices.forEach((voice) => {
-      lines.push(`  <part id="${escapeXml(voice.id)}">`);
+    score.voices.forEach((voice, voiceIndex) => {
+      lines.push(`  <part id="P${voiceIndex + 1}">`);
 
       let globalMeasureIndex = 0;
       const clefDef = getClefDefinition(voice.clef);
@@ -196,6 +202,7 @@ export class MusicXmlSerializer {
 
             const noteDuration = Math.max(1, note.durationTicks);
             const { type: noteType, isDotted } = durationToNoteType(noteDuration);
+            let accidentalElement: string | undefined;
 
             lines.push('      <note>');
             if (note.isRest) {
@@ -229,11 +236,11 @@ export class MusicXmlSerializer {
               lines.push('        </pitch>');
 
               if (hasExplicitAcc) {
-                if (note.rawAccidental === '=') lines.push('        <accidental>natural</accidental>');
-                else if (note.rawAccidental === '^') lines.push('        <accidental>sharp</accidental>');
-                else if (note.rawAccidental === '^^') lines.push('        <accidental>double-sharp</accidental>');
-                else if (note.rawAccidental === '_') lines.push('        <accidental>flat</accidental>');
-                else if (note.rawAccidental === '__') lines.push('        <accidental>flat-flat</accidental>');
+                if (note.rawAccidental === '=') accidentalElement = 'natural';
+                else if (note.rawAccidental === '^') accidentalElement = 'sharp';
+                else if (note.rawAccidental === '^^') accidentalElement = 'double-sharp';
+                else if (note.rawAccidental === '_') accidentalElement = 'flat';
+                else if (note.rawAccidental === '__') accidentalElement = 'flat-flat';
               }
             }
 
@@ -242,6 +249,9 @@ export class MusicXmlSerializer {
             lines.push(`        <type>${noteType}</type>`);
             if (isDotted) {
               lines.push('        <dot/>');
+            }
+            if (accidentalElement) {
+              lines.push(`        <accidental>${accidentalElement}</accidental>`);
             }
 
             lines.push('      </note>');

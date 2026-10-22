@@ -9,14 +9,14 @@ import { ParseWarning } from '../types';
 import { FileMusic, AlertTriangle, Upload, ChevronDown, ChevronUp, Music } from 'lucide-react';
 
 interface SidebarProps {
-  setAbcText: (text: string) => void;
+  onLoadAbcText: (text: string) => void;
   warnings: ParseWarning[];
   onLoadScore: (score: ScoreLibraryItem) => void;
   selectedScoreId?: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  setAbcText,
+  onLoadAbcText,
   warnings,
   onLoadScore,
   selectedScoreId,
@@ -58,7 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const reader = new FileReader();
     reader.onload = (event) => {
       if (event.target && typeof event.target.result === 'string') {
-        setAbcText(event.target.result);
+        onLoadAbcText(event.target.result);
       }
     };
     reader.readAsText(file);
