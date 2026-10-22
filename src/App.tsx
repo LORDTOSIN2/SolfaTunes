@@ -451,9 +451,9 @@ export default function App() {
       )}
 
       {/* Main Work Area Dashboard */}
-      <main className="flex-1 min-h-0 flex flex-col lg:flex-row p-3 sm:p-5 lg:p-8 pb-36 lg:pb-8 gap-4 lg:gap-8 lg:overflow-hidden">
+      <main className="flex-1 min-h-0 flex flex-col lg:flex-row p-3 sm:p-5 lg:p-6 xl:p-8 pb-36 lg:pb-8 gap-4 lg:gap-6 xl:gap-8 lg:overflow-hidden">
         {/* Editor panel on Left */}
-        <div className="order-2 min-w-0 lg:order-1 lg:w-[380px] lg:shrink-0 lg:h-full lg:min-h-0">
+        <div className="order-2 min-w-0 lg:order-1 lg:w-[320px] xl:w-[340px] 2xl:w-[380px] lg:shrink-0 lg:h-full lg:min-h-0">
           <Sidebar
             onLoadAbcText={handleLoadAbcText}
             warnings={warnings}
