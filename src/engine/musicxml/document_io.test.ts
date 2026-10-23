@@ -15,6 +15,7 @@ import { createDefaultSolfaMetadata } from './schema';
 import {
   CONVERSION_LOSSINESS_FIELD,
   ORIGINAL_MUSICXML_SOURCE_FIELD,
+  confirmLossyMusicXmlReplacement,
   exportMusicXmlDocument,
   importMusicXmlDocument,
 } from './document_io';
@@ -255,6 +256,105 @@ describe('MusicXML document import/export workflow', () => {
     expect(reopened.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toContain('<tie type="start"/>');
     expect(reopened.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toContain('<lyric><text>one</text></lyric>');
     expect(formatLossinessReport(reopened.conversionReport!)).toContain('LOSSY / WARNINGS DETECTED');
+  });
+
+  it('requires consent before replacing a lossy MusicXML document but not a lossless document', () => {
+    const lossyDocument = importMusicXmlDocument(lossyXml, () => true);
+    if (!lossyDocument) throw new Error('Confirmed lossy import was unexpectedly cancelled.');
+
+    const rejectReplacement = vi.fn((_summary: string) => false);
+    expect(confirmLossyMusicXmlReplacement(lossyDocument, rejectReplacement)).toBe(false);
+    expect(rejectReplacement).toHaveBeenCalledOnce();
+    expect(rejectReplacement.mock.calls[0][0]).toContain('Ties');
+    expect(rejectReplacement.mock.calls[0][0]).toContain('Note-aligned lyrics');
+
+    const acceptReplacement = vi.fn((_summary: string) => true);
+    expect(confirmLossyMusicXmlReplacement(lossyDocument, acceptReplacement)).toBe(true);
+    expect(acceptReplacement).toHaveBeenCalledOnce();
+
+    const losslessDocument = importMusicXmlDocument(
+      `<?xml version="1.0"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1"><measure number="1">
+    <attributes><divisions>4</divisions><key><fifths>0</fifths></key></attributes>
+    <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice></note>
+  </measure></part>
+</score-partwise>`,
+      summary => {
+        throw new Error(`Lossless import unexpectedly requested confirmation: ${summary}`);
+      }
+    );
+    if (!losslessDocument) throw new Error('Lossless import was unexpectedly cancelled.');
+    const unnecessaryConfirmation = vi.fn(() => false);
+    expect(confirmLossyMusicXmlReplacement(losslessDocument, unnecessaryConfirmation)).toBe(true);
+    expect(unnecessaryConfirmation).not.toHaveBeenCalled();
+
+    const unverifiedDocument = { ...losslessDocument, conversionReport: undefined };
+    const verifyBeforeReplacement = vi.fn((_summary: string) => false);
+    expect(confirmLossyMusicXmlReplacement(unverifiedDocument, verifyBeforeReplacement)).toBe(false);
+    expect(verifyBeforeReplacement.mock.calls[0][0]).toContain('cannot be ruled out');
+  });
+
+  it('supports repeated project save, reopen, edit, and save cycles without losing source recovery', () => {
+    const original = importMusicXmlDocument(lossyXml, () => true);
+    if (!original) throw new Error('Confirmed lossy import was unexpectedly cancelled.');
+
+    const firstSave = exportMusicXmlDocument(original);
+    const firstOpen = importMusicXmlDocument(firstSave.xml, () => true);
+    if (!firstOpen) throw new Error('First project reopen was unexpectedly cancelled.');
+    expect(firstOpen.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toBe(lossyXml);
+    expect(firstOpen.conversionReport?.unsupportedConstructs).toEqual(
+      expect.arrayContaining(['Ties', 'Note-aligned lyrics'])
+    );
+
+    const editedNote = firstOpen.score.systems[0].voices.P1.measures[0].notes[0];
+    editedNote.rawLetter = 'D';
+    editedNote.midiPitch = 62;
+    editedNote.durationTicks = 8;
+    editedNote.syllable = 'fe';
+    editedNote.scaleDegree = 5;
+    firstOpen.score.key = 'G';
+    firstOpen.score.meter = '3/4';
+    firstOpen.score.tempoBpm = 84;
+    firstOpen.metadata!.noteOverrides = {
+      'P1-m1-n0': { syllable: 'fe', scaleDegree: 5, isExplicit: true },
+    };
+
+    const secondSave = exportMusicXmlDocument(firstOpen);
+    expect(secondSave.xml).toContain('<step>D</step>');
+    expect(secondSave.xml).toContain('<per-minute>84</per-minute>');
+    const secondOpen = importMusicXmlDocument(secondSave.xml, () => true);
+    if (!secondOpen) throw new Error('Second project reopen was unexpectedly cancelled.');
+
+    const reopenedNote = secondOpen.score.systems[0].voices.P1.measures[0].notes[0];
+    expect(reopenedNote.midiPitch).toBe(62);
+    expect(reopenedNote.durationTicks).toBe(8);
+    expect(reopenedNote.timestamp).toBe(0);
+    expect(reopenedNote.syllable).toBe('fe');
+    expect(reopenedNote.scaleDegree).toBe(5);
+    expect(secondOpen.score.key).toBe('G');
+    expect(secondOpen.score.meter).toBe('3/4');
+    expect(secondOpen.score.tempoBpm).toBe(84);
+    expect(secondOpen.metadata?.noteOverrides?.['P1-m1-n0']).toMatchObject({
+      syllable: 'fe',
+      scaleDegree: 5,
+      isExplicit: true,
+    });
+    expect(secondOpen.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toBe(lossyXml);
+    expect(secondOpen.conversionReport?.isLossless).toBe(false);
+
+    const thirdSave = exportMusicXmlDocument(secondOpen);
+    const thirdOpen = importMusicXmlDocument(thirdSave.xml, () => true);
+    if (!thirdOpen) throw new Error('Repeated project reopen was unexpectedly cancelled.');
+    expect(noteEvents(thirdOpen.score)).toEqual(noteEvents(secondOpen.score));
+    expect(Array.from(MidiWriter.generateMidiBytes(thirdOpen.score, thirdOpen.score.tempoBpm!)))
+      .toEqual(Array.from(MidiWriter.generateMidiBytes(secondOpen.score, secondOpen.score.tempoBpm!)));
+    expect(thirdOpen.score.tempoBpm).toBe(84);
+    expect(thirdOpen.metadata?.extraFields?.[ORIGINAL_MUSICXML_SOURCE_FIELD]).toBe(lossyXml);
+    expect(thirdOpen.conversionReport?.unsupportedConstructs).toEqual(
+      expect.arrayContaining(['Ties', 'Note-aligned lyrics'])
+    );
   });
 
   it('exports a user-adjusted tempo without losing the original unsupported source', () => {

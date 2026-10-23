@@ -86,6 +86,21 @@ export function importMusicXmlDocument(
   return document;
 }
 
+export function confirmLossyMusicXmlReplacement(
+  document: MusicalDocument | null,
+  confirmReplacement: (summary: string) => boolean
+): boolean {
+  if (document?.source?.format !== 'musicxml') return true;
+  const report = document.conversionReport;
+  if (!report) {
+    return confirmReplacement(
+      'No conversion-loss report is available, so unsupported source content cannot be ruled out.'
+    );
+  }
+  if (report.isLossless) return true;
+  return confirmReplacement(formatLossinessReport(report));
+}
+
 function mergeMetadata(
   generated: SolfaTunesMetadata,
   existing: SolfaTunesMetadata | null | undefined,

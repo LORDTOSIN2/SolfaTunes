@@ -11,6 +11,7 @@ import { SolfaTransformer } from './engine/solfa_transformer';
 import { createAbcMusicalDocument, createMusicalDocument, MusicalDocument } from './engine/musical_document';
 import {
   applyExplicitSolfaOverrides,
+  confirmLossyMusicXmlReplacement,
   exportMusicXmlDocument,
   importMusicXmlDocument,
 } from './engine/musicxml/document_io';
@@ -210,6 +211,22 @@ export default function App() {
     }));
   };
 
+  const confirmCurrentMusicXmlReplacement = (operation: string) => {
+    const confirmed = confirmLossyMusicXmlReplacement(
+      musicXmlProvenanceRef.current,
+      summary => window.confirm(
+        `This will ${operation} and discard the current MusicXML document and its recovery copy. Unsupported source content may not be represented by the editable score.\n\n${summary}\n\nSave a MusicXML project recovery copy before continuing. Continue?`
+      )
+    );
+    if (!confirmed) {
+      setMusicXmlStatus({
+        type: 'info',
+        message: 'The current score and its MusicXML recovery source were kept.',
+      });
+    }
+    return confirmed;
+  };
+
   const handleSetBpm = (nextBpm: number) => {
     setBpm(nextBpm);
     setMusicalDocument(current => {
@@ -230,6 +247,7 @@ export default function App() {
   };
 
   const handleLoadScore = (song: ScoreLibraryItem) => {
+    if (!confirmCurrentMusicXmlReplacement('open another score')) return;
     musicXmlProvenanceRef.current = null;
     setMusicXmlStatus(null);
     setAbcText(song.abcText);
@@ -241,6 +259,7 @@ export default function App() {
   };
 
   const handleLoadAbcText = (text: string) => {
+    if (!confirmCurrentMusicXmlReplacement('open an ABC score')) return;
     musicXmlProvenanceRef.current = null;
     setMusicXmlStatus(null);
     setAbcText(text);
@@ -306,6 +325,8 @@ export default function App() {
         });
         return;
       }
+
+      if (!confirmCurrentMusicXmlReplacement('open the selected MusicXML project')) return;
 
       musicXmlProvenanceRef.current = imported;
       const importedBpm = imported.score.tempoBpm ?? bpm;
@@ -444,22 +465,22 @@ export default function App() {
             type="button"
             onClick={() => musicXmlInputRef.current?.click()}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-            title="Import MusicXML"
-            aria-label="Import MusicXML"
+            title="Open MusicXML project"
+            aria-label="Open MusicXML project"
           >
             <FileUp size={16} />
-            <span className="hidden sm:inline text-xs font-semibold">Import XML</span>
+            <span className="hidden sm:inline text-xs font-semibold">Open XML</span>
           </button>
           <button
             type="button"
             onClick={handleExportMusicXml}
             disabled={!musicalDocument}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
-            title="Download MusicXML"
-            aria-label="Download MusicXML"
+            title="Save project as MusicXML"
+            aria-label="Save project as MusicXML"
           >
             <FileDown size={16} />
-            <span className="hidden sm:inline text-xs font-semibold">MusicXML</span>
+            <span className="hidden sm:inline text-xs font-semibold">Save project</span>
           </button>
           <button
             onClick={handleExportAbc}
