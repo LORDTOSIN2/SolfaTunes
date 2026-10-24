@@ -248,21 +248,46 @@ describe('Piano Roll Adapter & Monophony Engine', () => {
     const updatedScore = formatAndReconstructScore(initialScore, notes, 8);
     expect(updatedScore).toBeDefined();
 
-    // Verify visual score system has new pitches and syllables
+    // Verify visual score system has new pitches, syllables, and PRESERVED note durations (16 ticks, not 256)
     const sNotes = updatedScore.systems[0].voices['S'].measures[0].notes;
     expect(sNotes[0].midiPitch).toBe(67);
     expect(sNotes[0].syllable).toBe('s'); // Sol (G in Key C)
+    expect(sNotes[0].durationTicks).toBe(16); // Preserved quarter note
     expect(sNotes[1].midiPitch).toBe(64);
     expect(sNotes[1].syllable).toBe('m'); // Mi (E in Key C)
+    expect(sNotes[1].durationTicks).toBe(16); // Preserved quarter note
 
-    // 5. Verify synchronization across ABC representation
+    // 5. Verify synchronization across ABC representation (not inflated to G16, E16)
     const updatedAbc = serializeScoreToAbc(updatedScore);
     expect(updatedAbc).toContain('G'); // First note is now G
     expect(updatedAbc).toContain('E'); // Second note is now E
+    expect(updatedAbc).not.toContain('G16');
+    expect(updatedAbc).not.toContain('E16');
 
     // 6. Verify synchronization across Tonic Sol-fa view
     const updatedSolfa = serializeScoreToSolfa(updatedScore);
     expect(updatedSolfa).toContain('s'); // 's' is now in the Solfa notation
     expect(updatedSolfa).toContain('m');
+  });
+
+  it('preserves exact timing across multiple consecutive formats without note elongation', async () => {
+    const { serializeScoreToAbc } = await import('./abc_serializer');
+
+    const abc = 'X:1\nT:Timing Test\nM:4/4\nL:1/4\nK:C\nV:S\n[V:S] C D E F |';
+    let score = new SolfaTransformer().transform(new AbcParser().parse(abc).score);
+
+    for (let i = 0; i < 3; i++) {
+      const { notes } = flattenScoreToPianoRoll(score);
+      score = formatAndReconstructScore(score, notes, 8);
+      const sNotes = score.systems[0].voices['S'].measures[0].notes;
+      expect(sNotes[0].durationTicks).toBe(16);
+      expect(sNotes[1].durationTicks).toBe(16);
+      expect(sNotes[2].durationTicks).toBe(16);
+      expect(sNotes[3].durationTicks).toBe(16);
+
+      const serialized = serializeScoreToAbc(score);
+      expect(serialized).not.toContain('C16');
+      expect(serialized).toContain('C D E F');
+    }
   });
 });

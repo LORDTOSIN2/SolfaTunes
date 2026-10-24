@@ -54,7 +54,8 @@ export class SolfaTransformer {
   /**
    * Performs resolution of all pitches, octave dot counts, and playback timings.
    */
-  public transform(score: ParsedScore): ParsedScore {
+  public transform(score: ParsedScore, options?: { rescaleDurations?: boolean }): ParsedScore {
+    const rescale = options?.rescaleDurations ?? true;
     const keyInfo = getKeyInfo(score.key);
     const keyDefaultAccs = getKeyDefaultAccidentals(keyInfo.sharpsFlats);
     const defaultLengthVal = parseDefaultLength(score.defaultLength);
@@ -70,10 +71,12 @@ export class SolfaTransformer {
           const activeOverrides: { [letter: string]: number } = {};
 
           measure.notes.forEach(note => {
-            // Scale duration by the default note length into piano-roll ticks.
-            const durationMult = note.durationTicks;
-            note.durationTicks = Math.round(durationMult * defaultLengthVal * TICKS_PER_WHOLE_NOTE);
-            if (note.durationTicks <= 0) note.durationTicks = 1; // Safeguard
+            if (rescale) {
+              // Scale duration by the default note length into piano-roll ticks.
+              const durationMult = note.durationTicks;
+              note.durationTicks = Math.round(durationMult * defaultLengthVal * TICKS_PER_WHOLE_NOTE);
+              if (note.durationTicks <= 0) note.durationTicks = 1; // Safeguard
+            }
 
             if (note.isRest) {
               note.syllable = '·';

@@ -466,8 +466,9 @@ export function formatAndReconstructScore(
   const keyInfo = getKeyInfo(baseScore.key);
   const meterTicks = getMeterTicksPerMeasure(baseScore.meter);
 
-  // 1. Quantize startTick and durationTicks
-  const quantizedNotes = flatNotes.map((n) => {
+  // 1. Filter sounding notes and quantize startTick and durationTicks
+  const soundingNotes = flatNotes.filter((n) => !n.isRest && n.durationTicks > 0);
+  const quantizedNotes = soundingNotes.map((n) => {
     const start = Math.max(0, Math.round(n.startTick / snapTicks) * snapTicks);
     const dur = Math.max(snapTicks, Math.round(n.durationTicks / snapTicks) * snapTicks);
     return {
@@ -487,20 +488,35 @@ export function formatAndReconstructScore(
     if (end > maxTick) maxTick = end;
   });
 
-  const totalMeasures = Math.max(1, Math.ceil(maxTick / meterTicks));
+  // Keep original total measure count if larger so empty/end measures aren't truncated
+  let origTotalMeasures = 0;
+  baseScore.systems.forEach((s) => {
+    let sysM = 0;
+    baseScore.voices.forEach((v) => {
+      const vl = s.voices[v.id];
+      if (vl && vl.measures.length > sysM) sysM = vl.measures.length;
+    });
+    origTotalMeasures += sysM;
+  });
 
-  // 4. Group notes per voice and populate measure bins
+  const totalMeasures = Math.max(origTotalMeasures || 1, Math.max(1, Math.ceil(maxTick / meterTicks)));
+
+  // 4. Group measures into systems (preserve original measures per system if available, default to 4)
+  let measuresPerSystem = 4;
+  if (baseScore.systems.length > 0) {
+    const firstSysMeasures = Object.values(baseScore.systems[0].voices)[0]?.measures.length;
+    if (firstSysMeasures && firstSysMeasures > 0) {
+      measuresPerSystem = firstSysMeasures;
+    }
+  }
+  const totalSystems = Math.ceil(totalMeasures / measuresPerSystem);
+
   const voices = baseScore.voices;
   const newSystems: System[] = [];
 
-  // Group measures into systems (e.g. 4 measures per system standard)
-  const MEASURES_PER_SYSTEM = 4;
-  const totalSystems = Math.ceil(totalMeasures / MEASURES_PER_SYSTEM);
-
   for (let sIdx = 0; sIdx < totalSystems; sIdx++) {
-    const mStartIdx = sIdx * MEASURES_PER_SYSTEM;
-    const mEndIdx = Math.min(totalMeasures, mStartIdx + MEASURES_PER_SYSTEM);
-    const numMeasuresInSystem = mEndIdx - mStartIdx;
+    const mStartIdx = sIdx * measuresPerSystem;
+    const mEndIdx = Math.min(totalMeasures, mStartIdx + measuresPerSystem);
 
     const systemVoices: { [vId: string]: VoiceLine } = {};
 
@@ -530,6 +546,7 @@ export function formatAndReconstructScore(
           const sliceStart = Math.max(measureStartTick, n.startTick);
           const sliceEnd = Math.min(measureEndTick, nEnd);
           const sliceDur = sliceEnd - sliceStart;
+          if (sliceDur <= 0) return;
 
           // Fill rest gap before this note if needed
           if (sliceStart > curTick) {
@@ -625,6 +642,7 @@ export function formatAndReconstructScore(
   };
 
   // Re-run transformer to ensure voice registers, octave dots, and timestamps are mathematically pristine
+  // Note: rescaleDurations must be false because note.durationTicks are already in absolute ticks!
   const transformer = new SolfaTransformer();
-  return transformer.transform(newScore);
+  return transformer.transform(newScore, { rescaleDurations: false });
 }
