@@ -266,7 +266,13 @@ export default function App() {
     setAbcLoadVersion(version => version + 1);
   };
 
+  const handleAbcTextChange = (text: string) => {
+    musicXmlProvenanceRef.current = null;
+    setAbcText(text);
+  };
+
   const handleUpdateScore = (newScore: ParsedScore) => {
+    musicXmlProvenanceRef.current = null;
     const newAbc = serializeScoreToAbc(newScore);
     setAbcText(newAbc);
   };
@@ -536,7 +542,7 @@ export default function App() {
           <ScoreRenderer
             score={score}
             abcText={abcText}
-            setAbcText={setAbcText}
+            setAbcText={handleAbcTextChange}
             warnings={warnings}
             currentTick={currentTick}
             currentEighth={currentTick}

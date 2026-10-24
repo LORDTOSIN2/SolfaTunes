@@ -809,9 +809,11 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
 
   // Source Editor Tab: 'solfa' or 'abc'
   const [sourceTab, setSourceTab] = useState<'solfa' | 'abc'>('solfa');
+  const [showLivePreview, setShowLivePreview] = useState<boolean>(true);
   const [solfaText, setSolfaText] = useState<string>(() => score ? serializeScoreToSolfa(score) : '');
   const [autoFormatOnBlur, setAutoFormatOnBlur] = useState<boolean>(false);
   const isEditingSolfaRef = useRef<boolean>(false);
+  const solfaEditTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Synchronized scrolling for ABC IDE
   const editorTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -822,6 +824,15 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   const solfaTextareaRef = useRef<HTMLTextAreaElement>(null);
   const solfaHighlightRef = useRef<HTMLPreElement>(null);
   const solfaGutterRef = useRef<HTMLDivElement>(null);
+
+  // Clean up any pending solfa editing timer on unmount
+  useEffect(() => {
+    return () => {
+      if (solfaEditTimerRef.current) {
+        clearTimeout(solfaEditTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleEditorScroll = () => {
     if (editorTextareaRef.current) {
@@ -868,6 +879,9 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
 
   const handleSolfaChange = (newText: string) => {
     isEditingSolfaRef.current = true;
+    if (solfaEditTimerRef.current) {
+      clearTimeout(solfaEditTimerRef.current);
+    }
     setSolfaText(newText);
     try {
       const { abcText: newAbc } = parseSolfaToAbc(newText);
@@ -877,13 +891,17 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     } catch (e) {
       // In-progress typing syntax errors handled gracefully
     }
-    setTimeout(() => {
+    solfaEditTimerRef.current = setTimeout(() => {
       isEditingSolfaRef.current = false;
-    }, 400);
+      solfaEditTimerRef.current = null;
+    }, 1200);
   };
 
   const handleAlignSolfa = () => {
     isEditingSolfaRef.current = true;
+    if (solfaEditTimerRef.current) {
+      clearTimeout(solfaEditTimerRef.current);
+    }
     const aligned = alignSolfaGrid(solfaText);
     setSolfaText(aligned);
     try {
@@ -892,12 +910,18 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
         setAbcText(newAbc);
       }
     } catch (e) {}
-    setTimeout(() => {
+    solfaEditTimerRef.current = setTimeout(() => {
       isEditingSolfaRef.current = false;
+      solfaEditTimerRef.current = null;
     }, 800);
   };
 
   const handleSolfaBlur = () => {
+    if (solfaEditTimerRef.current) {
+      clearTimeout(solfaEditTimerRef.current);
+      solfaEditTimerRef.current = null;
+    }
+    isEditingSolfaRef.current = false;
     if (autoFormatOnBlur) {
       handleAlignSolfa();
     }
@@ -1031,6 +1055,369 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     );
   };
 
+  const renderNoteInspector = () => {
+    if (!selectedNote || !selectedNoteObj || !score) return null;
+    return (
+      <div className="mx-auto max-w-4xl mb-6 bg-[#161920] border border-white/10 rounded-2xl p-5 shadow-2xl relative text-white sticky top-0 z-30 transition-all duration-300">
+        {/* Header info */}
+        <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
+              <Music size={18} />
+            </div>
+            <div>
+              <h3 className="font-sans font-bold text-sm tracking-tight">
+                Inline Note Inspector & Visual Editor
+              </h3>
+              <p className="text-[11px] text-stone-400 mt-0.5">
+                Editing <span className="text-indigo-400 font-semibold">{score.voices.find(v => v.id === selectedNote.voiceId)?.name || selectedNote.voiceId}</span> voice | Measure <span className="text-indigo-400 font-semibold">{selectedNote.measureIndex + 1}</span>, Note <span className="text-indigo-400 font-semibold">{selectedNote.noteIndex + 1}</span>
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => onSelectNote(null)}
+            className="p-1.5 hover:bg-white/10 rounded-full text-stone-400 hover:text-white transition-colors cursor-pointer"
+            title="Close Inspector"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Editing grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Col 1: Solfa Syllables Select */}
+          <div className="lg:col-span-2">
+            <label className="block text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2.5">
+              Tonic Sol-fa Syllable (Scale Degree)
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {solfaSyllables.map((syl) => {
+                const isSelected = !selectedNoteObj.isRest && selectedNoteObj.syllable === syl;
+                return (
+                  <button
+                    key={`syl-btn-${syl}`}
+                    onClick={() => handleUpdateNoteSyllable(syl)}
+                    className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all duration-150 cursor-pointer ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white shadow-lg ring-2 ring-indigo-400/50 scale-[1.04]'
+                        : 'bg-white/5 text-stone-300 border border-white/5 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    {syl}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => handleUpdateNoteSyllable('rest')}
+                className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all duration-150 cursor-pointer ${
+                  selectedNoteObj.isRest
+                    ? 'bg-red-600 text-white shadow-lg ring-2 ring-red-400/50 scale-[1.04]'
+                    : 'bg-white/5 text-stone-300 border border-white/5 hover:bg-white/10 hover:text-white'
+                }`}
+              >
+                Rest (·)
+              </button>
+            </div>
+          </div>
+
+          {/* Col 2: Octave and Duration */}
+          <div className="space-y-4">
+            {/* Octave Controls */}
+            <div>
+              <label className="block text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2">
+                Octave Register
+              </label>
+              <div className="flex items-center gap-2 bg-black/30 p-1.5 rounded-xl border border-white/5 max-w-[180px]">
+                <button
+                  onClick={() => handleUpdateNoteOctave(-1)}
+                  className="flex-1 py-1.5 hover:bg-white/5 rounded-lg text-stone-300 hover:text-white font-black text-sm cursor-pointer"
+                  title="Lower octave"
+                >
+                  -
+                </button>
+                <span className="px-3 font-mono font-bold text-xs text-indigo-400">
+                  Octave {selectedNoteObj.octaveNum !== undefined ? selectedNoteObj.octaveNum : 4}
+                </span>
+                <button
+                  onClick={() => handleUpdateNoteOctave(1)}
+                  className="flex-1 py-1.5 hover:bg-white/5 rounded-lg text-stone-300 hover:text-white font-black text-sm cursor-pointer"
+                  title="Raise octave"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* Duration Controls */}
+            <div>
+              <label className="block text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2">
+                Note Duration (Beats)
+              </label>
+              <select
+                value={selectedNoteObj ? (selectedNoteObj.durationTicks / (parseDefaultLength(score.defaultLength) * 16)) : 1.0}
+                onChange={(e) => handleUpdateNoteDuration(parseFloat(e.target.value))}
+                className="w-full max-w-[200px] bg-black/40 border border-white/10 text-stone-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer font-sans"
+              >
+                <option value="4.0">Whole Note (4 beats)</option>
+                <option value="3.0">Dotted Half (3 beats)</option>
+                <option value="2.0">Half Note (2 beats)</option>
+                <option value="1.5">Dotted Quarter (1.5 beats)</option>
+                <option value="1.0">Quarter Note (1 beat)</option>
+                <option value="0.75">Dotted Eighth (0.75 beats)</option>
+                <option value="0.5">Eighth Note (0.5 beats)</option>
+                <option value="0.25">Sixteenth Note (0.25 beats)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Tip/Info footer */}
+        <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-2 text-[11px] text-stone-400">
+          <HelpCircle size={12} className="text-indigo-400" />
+          <span>
+            Tip: Changes here will automatically update the raw ABC text on the left, sync the player, and re-draw the solfas.
+          </span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPaperSheet = (isInteractive: boolean) => {
+    if (!score) return null;
+    return (
+      <div
+        className="mx-auto max-w-4xl bg-[#FDFCF8] text-black border border-black/5 shadow-2xl rounded-2xl p-6 sm:p-10 font-sans relative transition-all overflow-hidden"
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: 'top center',
+          marginBottom: `${(scale - 1) * 100}%`
+        }}
+      >
+        {/* Subtle Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] select-none z-0">
+          <h1 className="text-[14rem] md:text-[20rem] font-black tracking-tighter">SOLFA</h1>
+        </div>
+
+        <div className="relative z-10">
+          {/* Piece Headers */}
+          <div className="mb-12 border-b-2 border-black/10 pb-4 flex justify-between items-end">
+            <div>
+              <h1 className="font-serif italic font-medium text-3xl tracking-tight text-black">
+                {score.title}
+              </h1>
+              {score.composer && (
+                <p className="font-serif italic text-black/60 text-sm mt-1">
+                  Composer: {score.composer}
+                </p>
+              )}
+            </div>
+            <div className="text-right uppercase tracking-widest font-bold text-[10px] text-black/40">
+              <p>Key: {score.key}</p>
+              <p>Meter: {score.meter}</p>
+            </div>
+          </div>
+
+          {/* Voice Mute / Solo Practice Panel */}
+          <div className="mb-8 p-4 bg-black/5 border border-black/5 rounded-xl flex flex-wrap items-center gap-3 text-xs text-black/60">
+            <span className="font-bold uppercase tracking-wider text-[10px] mr-2 text-black/50">Practice Tracks:</span>
+            {score.voices.map((v) => {
+              const active = !mutedVoices[v.id];
+              return (
+                <button
+                  key={`practice-voice-${v.id}`}
+                  onClick={() => toggleMute(v.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                    active
+                      ? 'bg-indigo-600 border border-indigo-700 text-white shadow-sm'
+                      : 'bg-black/5 border border-black/10 text-black/40'
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      active ? 'bg-white' : 'bg-black/30'
+                    }`}
+                  />
+                  {v.name}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Systems Loop */}
+          <div className="flex flex-col gap-12 select-none">
+            {score.systems.map((system) => {
+              const refVoice = score.voices[0].id;
+              const systemMeasuresCount = Math.max(
+                0,
+                ...score.voices.map(voice => system.voices[voice.id]?.measures.length || 0)
+              );
+
+              const rowHeight = fontSize * 2.2;
+              const dividerHeight = 12;
+              const voiceCount = layoutRows.filter(r => r.type === 'voice').length;
+              const dividerCount = layoutRows.filter(r => r.type === 'divider').length;
+              const systemHeight = (voiceCount * rowHeight) + (dividerCount * dividerHeight);
+
+              return (
+                <div
+                  key={`system-${system.systemIndex}`}
+                  className="flex flex-col border-b border-dashed border-black/10 pb-8 last:border-b-0"
+                >
+                  {/* System Header with Index */}
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-black/30 mb-2 font-bold">
+                    System {system.systemIndex + 1}
+                  </div>
+
+                  {/* Main Alignment Block with Autoscale wrapping both labels and measures */}
+                  <div className="flex items-start w-full">
+                    <AutoscalingMeasures systemHeight={systemHeight}>
+                      {/* Bracing & Voice Labels block */}
+                      <div className="w-20 flex-shrink-0 relative mr-6" style={{ height: `${systemHeight}px` }}>
+                        {score.voicePairingGroups.map((group, gIdx) =>
+                          renderBrackets(system, group, gIdx)
+                        )}
+
+                        <div className="flex flex-col h-full justify-start pr-2 text-right">
+                          {layoutRows.map((row, rIdx) => {
+                            if (row.type === 'divider') {
+                              return (
+                                <div 
+                                  key={`label-div-${system.systemIndex}-${rIdx}`} 
+                                  style={{ height: `${dividerHeight}px` }}
+                                />
+                              );
+                            }
+                            const voice = row.voice;
+                            const isMuted = !!mutedVoices[voice.id];
+                            return (
+                              <div
+                                key={`label-${system.systemIndex}-${voice.id}`}
+                                className="font-serif italic font-bold transition-opacity duration-200 text-black/80"
+                                style={{
+                                  fontSize: `${fontSize * 0.85}px`,
+                                  height: `${rowHeight}px`,
+                                  lineHeight: `${rowHeight}px`,
+                                  opacity: isMuted ? 0.25 : 1.0
+                                }}
+                              >
+                                {voice.name}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Measures Block */}
+                      {Array.from({ length: systemMeasuresCount }).map((_, mIndex) => {
+                        const isPlaying =
+                          activeMeasure &&
+                          activeMeasure.systemIndex === system.systemIndex &&
+                          activeMeasure.measureIndex === mIndex;
+
+                        const barType = system.voices[refVoice]?.barTypes[mIndex] || '|';
+
+                        return (
+                          <div
+                            key={`measure-${system.systemIndex}-${mIndex}`}
+                            className={`flex items-stretch transition-all duration-250 rounded-lg border ${
+                              isPlaying
+                                ? 'bg-indigo-50/70 border-indigo-200 ring-4 ring-indigo-500/10 scale-[1.01] shadow-md'
+                                : 'border-transparent'
+                            }`}
+                          >
+                            <div className="flex flex-col justify-start px-2" style={{ height: `${systemHeight}px` }}>
+                              {layoutRows.map((row, rIdx) => {
+                                if (row.type === 'divider') {
+                                  return (
+                                    <div 
+                                      key={`notes-div-${system.systemIndex}-${mIndex}-${rIdx}`}
+                                      className="flex items-center w-full px-4" 
+                                      style={{ height: `${dividerHeight}px` }}
+                                    >
+                                      <div className="w-full border-t border-black/15" />
+                                    </div>
+                                  );
+                                }
+                                const voice = row.voice;
+                                const voiceLine = system.voices[voice.id];
+                                const measure = voiceLine?.measures[mIndex];
+                                const isMuted = !!mutedVoices[voice.id];
+
+                                return (
+                                  <div
+                                    key={`notes-${system.systemIndex}-${mIndex}-${voice.id}`}
+                                    className="font-serif font-black text-center whitespace-nowrap px-4 transition-all duration-200"
+                                    style={{
+                                      fontSize: `${fontSize}px`,
+                                      height: `${rowHeight}px`,
+                                      lineHeight: `${rowHeight}px`,
+                                      opacity: isMuted ? 0.15 : 1.0
+                                    }}
+                                  >
+                                    {measure ? (
+                                      <InteractiveRhythmLine
+                                        measure={measure}
+                                        meter={score.meter}
+                                        meterDenominator={meterDen}
+                                        systemIndex={system.systemIndex}
+                                        voiceId={voice.id}
+                                        measureIndex={mIndex}
+                                        selectedNote={selectedNote}
+                                        onSelectNote={onSelectNote}
+                                        isPlaying={isPlaying}
+                                        isMuted={isMuted}
+                                        isEditorMode={isInteractive}
+                                      />
+                                    ) : (
+                                      '\u00A0'
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <BarlineGraphic type={barType} height={systemHeight} />
+                          </div>
+                        );
+                      })}
+                    </AutoscalingMeasures>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Symbol Legend Box */}
+          <div className="mt-16 pt-8 border-t border-black/10">
+            <h3 className="text-center font-serif italic text-black/70 text-sm mb-4">
+              Tonic Sol-fa Reference Legend
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-black/5 p-5 rounded-xl border border-black/5 text-[11px] text-black/60 font-sans">
+              <div>
+                <span className="font-mono font-bold text-black">d r m f s l t</span>
+                <p className="mt-1">Movable-Do scale degrees. Tonic = d.</p>
+              </div>
+              <div>
+                <span className="font-mono font-bold text-black">di ri fi si li</span>
+                <p className="mt-1">Raised passing chromatic degrees.</p>
+              </div>
+              <div>
+                <span className="font-mono font-bold text-black">ḋ (d&#x307;) / ḍ (d&#x323;)</span>
+                <p className="mt-1">Octave marks: dot above = high, dot below = low.</p>
+              </div>
+              <div>
+                <span className="font-mono font-bold text-black">:  ·  -  |  ‖</span>
+                <p className="mt-1">
+                  : divides beats. · rest. - held beat. | bar. ‖ section end.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full bg-[#13151A] border border-white/5 rounded-xl overflow-hidden shadow-2xl">
       {/* Renderer Controls Header */}
@@ -1052,6 +1439,11 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
           <div className="flex items-center bg-black/40 p-1 rounded-full border border-white/10 shadow-inner">
             <button
               onClick={() => {
+                if (solfaEditTimerRef.current) {
+                  clearTimeout(solfaEditTimerRef.current);
+                  solfaEditTimerRef.current = null;
+                }
+                isEditingSolfaRef.current = false;
                 setStudioMode('read');
                 onSelectNote(null);
               }}
@@ -1067,6 +1459,11 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             </button>
             <button
               onClick={() => {
+                if (solfaEditTimerRef.current) {
+                  clearTimeout(solfaEditTimerRef.current);
+                  solfaEditTimerRef.current = null;
+                }
+                isEditingSolfaRef.current = false;
                 setStudioMode('lyrics');
                 onSelectNote(null);
               }}
@@ -1081,7 +1478,14 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               Hymn Lyrics
             </button>
             <button
-              onClick={() => setStudioMode('interactive')}
+              onClick={() => {
+                if (solfaEditTimerRef.current) {
+                  clearTimeout(solfaEditTimerRef.current);
+                  solfaEditTimerRef.current = null;
+                }
+                isEditingSolfaRef.current = false;
+                setStudioMode('interactive');
+              }}
               className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
                 studioMode === 'interactive'
                   ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
@@ -1096,6 +1500,9 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               onClick={() => {
                 setStudioMode('source');
                 onSelectNote(null);
+                if (score && !isEditingSolfaRef.current) {
+                  setSolfaText(serializeScoreToSolfa(score));
+                }
               }}
               className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
                 studioMode === 'source'
@@ -1244,6 +1651,20 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 </button>
               )}
 
+              {/* Live Preview Toggle */}
+              <button
+                onClick={() => setShowLivePreview(!showLivePreview)}
+                className={`px-3 py-1.5 rounded-lg border text-[10px] font-sans font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                  showLivePreview
+                    ? 'bg-indigo-600/30 border-indigo-500/50 text-indigo-200 shadow-sm'
+                    : 'bg-white/5 border-white/5 text-stone-300 hover:bg-white/10'
+                }`}
+                title="Toggle Live Interactive Score Preview side-by-side"
+              >
+                <Eye size={12} />
+                {showLivePreview ? 'Live Preview: On' : 'Live Preview: Off'}
+              </button>
+
               {/* Cheat Sheet Toggle */}
               <button
                 onClick={() => setShowHelp(!showHelp)}
@@ -1344,113 +1765,135 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
           )}
 
           {/* Editor Main Area (Lines & Scrollable Panel) */}
-          <div className="flex-1 flex overflow-hidden relative">
-            {sourceTab === 'solfa' ? (
-              <>
-                {/* Gutter with line numbers for Solfa */}
-                <div
-                  ref={solfaGutterRef}
-                  className="w-12 flex-shrink-0 bg-[#0A0A0B] border-r border-white/5 py-4 font-mono text-[11px] leading-relaxed text-stone-600 text-right pr-3 select-none overflow-hidden"
-                >
-                  {solfaText.split('\n').map((_, i) => (
-                    <div key={`solfa-ln-${i}`} className="h-[21px] leading-[21px]">
-                      {i + 1}
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+            {/* Left: Code Editor Pane */}
+            <div className={`flex flex-col overflow-hidden ${showLivePreview ? 'w-full lg:w-1/2 border-b lg:border-b-0 lg:border-r border-white/10' : 'w-full flex-1'}`}>
+              <div className="flex-1 flex overflow-hidden relative">
+                {sourceTab === 'solfa' ? (
+                  <>
+                    {/* Gutter with line numbers for Solfa */}
+                    <div
+                      ref={solfaGutterRef}
+                      className="w-12 flex-shrink-0 bg-[#0A0A0B] border-r border-white/5 py-4 font-mono text-[11px] leading-relaxed text-stone-600 text-right pr-3 select-none overflow-hidden"
+                    >
+                      {solfaText.split('\n').map((_, i) => (
+                        <div key={`solfa-ln-${i}`} className="h-[21px] leading-[21px]">
+                          {i + 1}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
 
-                {/* Solfa Textarea/Highlight overlays */}
-                <div className="flex-1 relative bg-[#0D0E12] overflow-hidden">
-                  {/* Background Highlighted Pre */}
-                  <pre
-                    ref={solfaHighlightRef}
-                    className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed text-indigo-100/30 whitespace-pre break-all overflow-hidden pointer-events-none select-none border border-transparent"
-                    aria-hidden="true"
-                    style={{ lineHeight: '21px' }}
-                  >
-                    {highlightSolfa(solfaText)}
-                  </pre>
+                    {/* Solfa Textarea/Highlight overlays */}
+                    <div className="flex-1 relative bg-[#0D0E12] overflow-hidden">
+                      {/* Background Highlighted Pre */}
+                      <pre
+                        ref={solfaHighlightRef}
+                        className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed text-indigo-100/30 whitespace-pre break-all overflow-hidden pointer-events-none select-none border border-transparent"
+                        aria-hidden="true"
+                        style={{ lineHeight: '21px' }}
+                      >
+                        {highlightSolfa(solfaText)}
+                      </pre>
 
-                  {/* Foreground Textarea */}
-                  <textarea
-                    ref={solfaTextareaRef}
-                    value={solfaText}
-                    onChange={(e) => handleSolfaChange(e.target.value)}
-                    onBlur={handleSolfaBlur}
-                    onScroll={handleSolfaScroll}
-                    className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
-                    placeholder="Type or paste Tonic Sol-fa notation here (e.g. KEY Bb, S: | s1 : s1 : f1 | m1 : s1 : d | ...)"
-                    spellCheck="false"
-                    style={{ lineHeight: '21px' }}
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Gutter with line numbers for ABC */}
-                <div
-                  ref={editorGutterRef}
-                  className="w-12 flex-shrink-0 bg-[#0A0A0B] border-r border-white/5 py-4 pb-36 font-mono text-[11px] leading-relaxed text-stone-600 text-right pr-3 select-none overflow-hidden"
-                >
-                  {abcText.split('\n').map((_, i) => (
-                    <div key={`abc-ln-${i}`} className="h-[21px] leading-[21px]">
-                      {i + 1}
+                      {/* Foreground Textarea */}
+                      <textarea
+                        ref={solfaTextareaRef}
+                        value={solfaText}
+                        onChange={(e) => handleSolfaChange(e.target.value)}
+                        onBlur={handleSolfaBlur}
+                        onScroll={handleSolfaScroll}
+                        className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
+                        placeholder="Type or paste Tonic Sol-fa notation here (e.g. KEY Bb, S: | s1 : s1 : f1 | m1 : s1 : d | ...)"
+                        spellCheck="false"
+                        style={{ lineHeight: '21px' }}
+                      />
                     </div>
-                  ))}
-                </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Gutter with line numbers for ABC */}
+                    <div
+                      ref={editorGutterRef}
+                      className="w-12 flex-shrink-0 bg-[#0A0A0B] border-r border-white/5 py-4 pb-36 font-mono text-[11px] leading-relaxed text-stone-600 text-right pr-3 select-none overflow-hidden"
+                    >
+                      {abcText.split('\n').map((_, i) => (
+                        <div key={`abc-ln-${i}`} className="h-[21px] leading-[21px]">
+                          {i + 1}
+                        </div>
+                      ))}
+                    </div>
 
-                {/* Code Textarea/Highlight overlays */}
-                <div className="flex-1 relative bg-[#0D0E12] overflow-hidden">
-                  {/* Background Highlighted Pre */}
-                  <pre
-                    ref={editorHighlightRef}
-                    className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed text-indigo-100/30 whitespace-pre break-all overflow-hidden pointer-events-none select-none border border-transparent"
-                    aria-hidden="true"
-                    style={{ lineHeight: '21px' }}
-                  >
-                    {highlightAbc(abcText)}
-                  </pre>
+                    {/* Code Textarea/Highlight overlays */}
+                    <div className="flex-1 relative bg-[#0D0E12] overflow-hidden">
+                      {/* Background Highlighted Pre */}
+                      <pre
+                        ref={editorHighlightRef}
+                        className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed text-indigo-100/30 whitespace-pre break-all overflow-hidden pointer-events-none select-none border border-transparent"
+                        aria-hidden="true"
+                        style={{ lineHeight: '21px' }}
+                      >
+                        {highlightAbc(abcText)}
+                      </pre>
 
-                  {/* Foreground Textarea */}
-                  <textarea
-                    ref={editorTextareaRef}
-                    value={abcText}
-                    onChange={(e) => setAbcText(e.target.value)}
-                    onScroll={handleEditorScroll}
-                    className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
-                    placeholder="Type or paste ABC notation here..."
-                    spellCheck="false"
-                    style={{ lineHeight: '21px' }}
-                  />
+                      {/* Foreground Textarea */}
+                      <textarea
+                        ref={editorTextareaRef}
+                        value={abcText}
+                        onChange={(e) => setAbcText(e.target.value)}
+                        onScroll={handleEditorScroll}
+                        className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
+                        placeholder="Type or paste ABC notation here..."
+                        spellCheck="false"
+                        style={{ lineHeight: '21px' }}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Problems/Warnings Panel at the bottom */}
+              {warnings && warnings.length > 0 && (
+                <div className="border-t border-red-500/20 bg-red-500/5 max-h-[140px] overflow-auto select-none">
+                  <div className="flex items-center gap-2 px-6 py-2 bg-red-500/10 border-b border-red-500/10 text-red-200 text-[10px] font-sans font-black uppercase tracking-wider">
+                    <AlertTriangle size={12} className="text-red-400" />
+                    <span>Compilation Warnings & Problems ({warnings.length})</span>
+                  </div>
+                  <div className="px-6 py-2.5 divide-y divide-red-500/10">
+                    {warnings.map((warn, wIdx) => (
+                      <div key={`ide-warning-${wIdx}`} className="py-1.5 text-[10px] text-red-200/80 font-sans">
+                        <span className="font-bold text-red-400">
+                          {warn.voiceId ? `Voice [${warn.voiceId}]: ` : ''}
+                        </span>
+                        {warn.reason}
+                        {warn.rawText && (
+                          <code className="inline-block ml-2 bg-red-500/20 px-1 py-0.2 rounded text-red-300 font-mono text-[9px]">
+                            "{warn.rawText}"
+                          </code>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </>
+              )}
+            </div>
+
+            {/* Right: Live Interactive Score Preview (Instant Sync on every keystroke) */}
+            {showLivePreview && (
+              <div className="w-full lg:w-1/2 flex flex-col overflow-auto bg-[#14161C] p-4 lg:p-6 pb-36">
+                <div className="mb-4 flex items-center justify-between bg-black/40 px-3.5 py-2 rounded-xl border border-white/10 text-xs shrink-0">
+                  <div className="flex items-center gap-2 text-indigo-300 font-semibold text-[11px]">
+                    <Sparkles size={13} className="text-indigo-400" />
+                    <span>Interactive Score (Live Real-Time Sync)</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-stone-400">
+                    Click notes to inspect or edit
+                  </span>
+                </div>
+                {renderNoteInspector()}
+                {renderPaperSheet(true)}
+              </div>
             )}
           </div>
-
-          {/* Problems/Warnings Panel at the bottom */}
-          {warnings && warnings.length > 0 && (
-            <div className="border-t border-red-500/20 bg-red-500/5 max-h-[140px] overflow-auto select-none">
-              <div className="flex items-center gap-2 px-6 py-2 bg-red-500/10 border-b border-red-500/10 text-red-200 text-[10px] font-sans font-black uppercase tracking-wider">
-                <AlertTriangle size={12} className="text-red-400" />
-                <span>Compilation Warnings & Problems ({warnings.length})</span>
-              </div>
-              <div className="px-6 py-2.5 divide-y divide-red-500/10">
-                {warnings.map((warn, wIdx) => (
-                  <div key={`ide-warning-${wIdx}`} className="py-1.5 text-[10px] text-red-200/80 font-sans">
-                    <span className="font-bold text-red-400">
-                      {warn.voiceId ? `Voice [${warn.voiceId}]: ` : ''}
-                    </span>
-                    {warn.reason}
-                    {warn.rawText && (
-                      <code className="inline-block ml-2 bg-red-500/20 px-1 py-0.2 rounded text-red-300 font-mono text-[9px]">
-                        "{warn.rawText}"
-                      </code>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       ) : studioMode === 'lyrics' ? (
         /* Hymn Lyrics View */
@@ -1550,366 +1993,8 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
       ) : (
         /* Sheet Music Visual Area */
         <div className="flex-1 overflow-auto p-8 pb-36 relative bg-[#0A0A0B]">
-          {selectedNote && selectedNoteObj && (
-            <div className="mx-auto max-w-4xl mb-8 bg-[#161920] border border-white/10 rounded-2xl p-6 shadow-2xl relative text-white sticky top-0 z-30 transition-all duration-300">
-              {/* Header info */}
-              <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
-                    <Music size={18} />
-                  </div>
-                  <div>
-                    <h3 className="font-sans font-bold text-sm tracking-tight">
-                      Inline Note Inspector & Visual Editor
-                    </h3>
-                    <p className="text-[11px] text-stone-400 mt-0.5">
-                      Editing <span className="text-indigo-400 font-semibold">{score.voices.find(v => v.id === selectedNote.voiceId)?.name || selectedNote.voiceId}</span> voice | Measure <span className="text-indigo-400 font-semibold">{selectedNote.measureIndex + 1}</span>, Note <span className="text-indigo-400 font-semibold">{selectedNote.noteIndex + 1}</span>
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => onSelectNote(null)}
-                  className="p-1.5 hover:bg-white/10 rounded-full text-stone-400 hover:text-white transition-colors cursor-pointer"
-                  title="Close Inspector"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              {/* Editing grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Col 1: Solfa Syllables Select */}
-                <div className="lg:col-span-2">
-                  <label className="block text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2.5">
-                    Tonic Sol-fa Syllable (Scale Degree)
-                  </label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {solfaSyllables.map((syl) => {
-                      const isSelected = !selectedNoteObj.isRest && selectedNoteObj.syllable === syl;
-                      return (
-                        <button
-                          key={`syl-btn-${syl}`}
-                          onClick={() => handleUpdateNoteSyllable(syl)}
-                          className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all duration-150 cursor-pointer ${
-                            isSelected
-                              ? 'bg-indigo-600 text-white shadow-lg ring-2 ring-indigo-400/50 scale-[1.04]'
-                              : 'bg-white/5 text-stone-300 border border-white/5 hover:bg-white/10 hover:text-white'
-                          }`}
-                        >
-                          {syl}
-                        </button>
-                      );
-                    })}
-                    <button
-                      onClick={() => handleUpdateNoteSyllable('rest')}
-                      className={`px-3.5 py-2 rounded-xl text-sm font-bold transition-all duration-150 cursor-pointer ${
-                        selectedNoteObj.isRest
-                          ? 'bg-red-600 text-white shadow-lg ring-2 ring-red-400/50 scale-[1.04]'
-                          : 'bg-white/5 text-stone-300 border border-white/5 hover:bg-white/10 hover:text-white'
-                      }`}
-                    >
-                      Rest (·)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Col 2: Octave and Duration */}
-                <div className="space-y-4">
-                  {/* Octave Controls */}
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2">
-                      Octave Register
-                    </label>
-                    <div className="flex items-center gap-2 bg-black/30 p-1.5 rounded-xl border border-white/5 max-w-[180px]">
-                      <button
-                        onClick={() => handleUpdateNoteOctave(-1)}
-                        className="flex-1 py-1.5 hover:bg-white/5 rounded-lg text-stone-300 hover:text-white font-black text-sm cursor-pointer"
-                        title="Lower octave"
-                      >
-                        -
-                      </button>
-                      <span className="px-3 font-mono font-bold text-xs text-indigo-400">
-                        Octave {selectedNoteObj.octaveNum !== undefined ? selectedNoteObj.octaveNum : 4}
-                      </span>
-                      <button
-                        onClick={() => handleUpdateNoteOctave(1)}
-                        className="flex-1 py-1.5 hover:bg-white/5 rounded-lg text-stone-300 hover:text-white font-black text-sm cursor-pointer"
-                        title="Raise octave"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Duration Controls */}
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2">
-                      Note Duration (Beats)
-                    </label>
-                    <select
-                      value={selectedNoteObj ? (selectedNoteObj.durationTicks / (parseDefaultLength(score.defaultLength) * 16)) : 1.0}
-                      onChange={(e) => handleUpdateNoteDuration(parseFloat(e.target.value))}
-                      className="w-full max-w-[200px] bg-black/40 border border-white/10 text-stone-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer font-sans"
-                    >
-                      <option value="4.0">Whole Note (4 beats)</option>
-                      <option value="3.0">Dotted Half (3 beats)</option>
-                      <option value="2.0">Half Note (2 beats)</option>
-                      <option value="1.5">Dotted Quarter (1.5 beats)</option>
-                      <option value="1.0">Quarter Note (1 beat)</option>
-                      <option value="0.75">Dotted Eighth (0.75 beats)</option>
-                      <option value="0.5">Eighth Note (0.5 beats)</option>
-                      <option value="0.25">Sixteenth Note (0.25 beats)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Tip/Info footer */}
-              <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-2 text-[11px] text-stone-400">
-                <HelpCircle size={12} className="text-indigo-400" />
-                <span>
-                  Tip: Changes here will automatically update the raw ABC text on the left, sync the player, and re-draw the solfas.
-                </span>
-              </div>
-            </div>
-          )}
-          
-          {/* Paper Sheet Container */}
-          <div
-            className="mx-auto max-w-4xl bg-[#FDFCF8] text-black border border-black/5 shadow-2xl rounded-2xl p-10 font-sans relative transition-all overflow-hidden"
-            style={{
-              transform: `scale(${scale})`,
-              transformOrigin: 'top center',
-              marginBottom: `${(scale - 1) * 100}%` // compensate for scale transforms
-            }}
-          >
-            {/* Subtle Watermark */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] select-none z-0">
-              <h1 className="text-[14rem] md:text-[20rem] font-black tracking-tighter">SOLFA</h1>
-            </div>
-
-            <div className="relative z-10">
-              {/* Piece Headers */}
-              <div className="mb-12 border-b-2 border-black/10 pb-4 flex justify-between items-end">
-                <div>
-                  <h1 className="font-serif italic font-medium text-3xl tracking-tight text-black">
-                    {score.title}
-                  </h1>
-                  {score.composer && (
-                    <p className="font-serif italic text-black/60 text-sm mt-1">
-                      Composer: {score.composer}
-                    </p>
-                  )}
-                </div>
-                <div className="text-right uppercase tracking-widest font-bold text-[10px] text-black/40">
-                  <p>Key: {score.key}</p>
-                  <p>Meter: {score.meter}</p>
-                </div>
-              </div>
-
-              {/* Voice Mute / Solo Practice Panel */}
-              <div className="mb-8 p-4 bg-black/5 border border-black/5 rounded-xl flex flex-wrap items-center gap-3 text-xs text-black/60">
-                <span className="font-bold uppercase tracking-wider text-[10px] mr-2 text-black/50">Practice Tracks:</span>
-                {score.voices.map((v) => {
-                  const active = !mutedVoices[v.id];
-                  return (
-                    <button
-                      key={`practice-voice-${v.id}`}
-                      onClick={() => toggleMute(v.id)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
-                        active
-                          ? 'bg-indigo-600 border border-indigo-700 text-white shadow-sm'
-                          : 'bg-black/5 border border-black/10 text-black/40'
-                      }`}
-                    >
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          active ? 'bg-white' : 'bg-black/30'
-                        }`}
-                      />
-                      {v.name}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Systems Loop */}
-              <div className="flex flex-col gap-12 select-none">
-                {score.systems.map((system) => {
-                  const refVoice = score.voices[0].id;
-                  const systemMeasuresCount = Math.max(
-                    0,
-                    ...score.voices.map(voice => system.voices[voice.id]?.measures.length || 0)
-                  );
-
-                  // Compute the exact height of the voice rows in this system for barline alignment
-                  const rowHeight = fontSize * 2.2;
-                  const dividerHeight = 12;
-                  const voiceCount = layoutRows.filter(r => r.type === 'voice').length;
-                  const dividerCount = layoutRows.filter(r => r.type === 'divider').length;
-                  const systemHeight = (voiceCount * rowHeight) + (dividerCount * dividerHeight);
-
-                  return (
-                    <div
-                      key={`system-${system.systemIndex}`}
-                      className="flex flex-col border-b border-dashed border-black/10 pb-8 last:border-b-0"
-                    >
-                      {/* System Header with Index */}
-                      <div className="text-[10px] font-mono uppercase tracking-widest text-black/30 mb-2 font-bold">
-                        System {system.systemIndex + 1}
-                      </div>
-
-                      {/* Main Alignment Block with Autoscale wrapping both labels and measures */}
-                      <div className="flex items-start w-full">
-                        <AutoscalingMeasures systemHeight={systemHeight}>
-                          {/* Bracing & Voice Labels block */}
-                          <div className="w-20 flex-shrink-0 relative mr-6" style={{ height: `${systemHeight}px` }}>
-                            {/* Visual braces */}
-                            {score.voicePairingGroups.map((group, gIdx) =>
-                              renderBrackets(system, group, gIdx)
-                            )}
-
-                            {/* Voice labels stacked vertically */}
-                            <div className="flex flex-col h-full justify-start pr-2 text-right">
-                              {layoutRows.map((row, rIdx) => {
-                                if (row.type === 'divider') {
-                                  return (
-                                    <div 
-                                      key={`label-div-${system.systemIndex}-${rIdx}`} 
-                                      style={{ height: `${dividerHeight}px` }}
-                                    />
-                                  );
-                                }
-                                const voice = row.voice;
-                                const isMuted = !!mutedVoices[voice.id];
-                                return (
-                                  <div
-                                    key={`label-${system.systemIndex}-${voice.id}`}
-                                    className="font-serif italic font-bold transition-opacity duration-200 text-black/80"
-                                    style={{
-                                      fontSize: `${fontSize * 0.85}px`,
-                                      height: `${rowHeight}px`,
-                                      lineHeight: `${rowHeight}px`,
-                                      opacity: isMuted ? 0.25 : 1.0
-                                    }}
-                                  >
-                                    {voice.name}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          {/* Measures Block */}
-                          {Array.from({ length: systemMeasuresCount }).map((_, mIndex) => {
-                            const isPlaying =
-                              activeMeasure &&
-                              activeMeasure.systemIndex === system.systemIndex &&
-                              activeMeasure.measureIndex === mIndex;
-
-                            const barType = system.voices[refVoice]?.barTypes[mIndex] || '|';
-
-                            return (
-                              <div
-                                key={`measure-${system.systemIndex}-${mIndex}`}
-                                className={`flex items-stretch transition-all duration-250 rounded-lg border ${
-                                  isPlaying
-                                    ? 'bg-indigo-50/70 border-indigo-200 ring-4 ring-indigo-500/10 scale-[1.01] shadow-md'
-                                    : 'border-transparent'
-                                }`}
-                              >
-                                {/* Measure Content (Beat cells vertical stack) */}
-                                <div className="flex flex-col justify-start px-2" style={{ height: `${systemHeight}px` }}>
-                                  {layoutRows.map((row, rIdx) => {
-                                    if (row.type === 'divider') {
-                                      return (
-                                        <div 
-                                          key={`notes-div-${system.systemIndex}-${mIndex}-${rIdx}`}
-                                          className="flex items-center w-full px-4" 
-                                          style={{ height: `${dividerHeight}px` }}
-                                        >
-                                          <div className="w-full border-t border-black/15" />
-                                        </div>
-                                      );
-                                    }
-                                    const voice = row.voice;
-                                    const voiceLine = system.voices[voice.id];
-                                    const measure = voiceLine?.measures[mIndex];
-                                    const isMuted = !!mutedVoices[voice.id];
-
-                                    return (
-                                      <div
-                                        key={`notes-${system.systemIndex}-${mIndex}-${voice.id}`}
-                                        className="font-serif font-black text-center whitespace-nowrap px-4 transition-all duration-200"
-                                        style={{
-                                          fontSize: `${fontSize}px`,
-                                          height: `${rowHeight}px`,
-                                          lineHeight: `${rowHeight}px`,
-                                          opacity: isMuted ? 0.15 : 1.0
-                                        }}
-                                      >
-                                        {measure ? (
-                                          <InteractiveRhythmLine
-                                            measure={measure}
-                                            meter={score.meter}
-                                            meterDenominator={meterDen}
-                                            systemIndex={system.systemIndex}
-                                            voiceId={voice.id}
-                                            measureIndex={mIndex}
-                                            selectedNote={selectedNote}
-                                            onSelectNote={onSelectNote}
-                                            isPlaying={isPlaying}
-                                            isMuted={isMuted}
-                                            isEditorMode={studioMode === 'interactive'}
-                                          />
-                                        ) : (
-                                          '\u00A0'
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-
-                                {/* Barline Column */}
-                                <BarlineGraphic type={barType} height={systemHeight} />
-                              </div>
-                            );
-                          })}
-                        </AutoscalingMeasures>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Symbol Legend Box */}
-              <div className="mt-16 pt-8 border-t border-black/10">
-                <h3 className="text-center font-serif italic text-black/70 text-sm mb-4">
-                  Tonic Sol-fa Reference Legend
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-black/5 p-5 rounded-xl border border-black/5 text-[11px] text-black/60 font-sans">
-                  <div>
-                    <span className="font-mono font-bold text-black">d r m f s l t</span>
-                    <p className="mt-1">Movable-Do scale degrees. Tonic = d.</p>
-                  </div>
-                  <div>
-                    <span className="font-mono font-bold text-black">di ri fi si li</span>
-                    <p className="mt-1">Raised passing chromatic degrees.</p>
-                  </div>
-                  <div>
-                    <span className="font-mono font-bold text-black">ḋ (d&#x307;) / ḍ (d&#x323;)</span>
-                    <p className="mt-1">Octave marks: dot above = high, dot below = low.</p>
-                  </div>
-                  <div>
-                    <span className="font-mono font-bold text-black">:  ·  -  |  ‖</span>
-                    <p className="mt-1">
-                      : divides beats. · rest. - held beat. | bar. ‖ section end.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          {studioMode === 'interactive' && renderNoteInspector()}
+          {renderPaperSheet(studioMode === 'interactive')}
         </div>
       )}
     </div>
