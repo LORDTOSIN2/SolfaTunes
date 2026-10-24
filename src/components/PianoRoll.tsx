@@ -782,7 +782,8 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     return { activeSoundingNoteIds: soundingIds, activeSoundingPitches: soundingPitches, activePitchVoices: pitchVoices };
   }, [notes, activePianoRollTick, isPlaying, mutedVoices]);
 
-  // Auto-scroll piano roll horizontally to follow playback cursor smoothly
+  // Auto-scroll piano roll horizontally to follow playback cursor smoothly without fighting animations
+  const lastAutoScrollTimeRef = useRef<number>(0);
   useEffect(() => {
     if (!isPlaying || !followPlayhead || !scrollContainerRef.current) return;
 
@@ -792,14 +793,26 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     const viewportWidth = container.clientWidth;
     const visibleGridWidth = Math.max(200, viewportWidth - 96); // Account for 96px keyboard
 
-    const thresholdRight = viewportLeft + visibleGridWidth * 0.75;
-    const thresholdLeft = viewportLeft + 20;
+    // Only scroll right when playhead approaches the right edge (80% of visible width)
+    const thresholdRight = viewportLeft + visibleGridWidth * 0.8;
+    // Only scroll left if playhead actually went behind the left edge (e.g. looping or seeking back)
+    const isPastLeft = playheadPx < viewportLeft - 10;
+    const isPastRight = playheadPx > thresholdRight;
 
-    if (playheadPx > thresholdRight || playheadPx < thresholdLeft) {
-      container.scrollTo({
-        left: Math.max(0, playheadPx - visibleGridWidth * 0.25),
-        behavior: 'smooth',
-      });
+    const now = Date.now();
+    if ((isPastRight || isPastLeft) && now - lastAutoScrollTimeRef.current > 450) {
+      lastAutoScrollTimeRef.current = now;
+      if (isPastRight) {
+        container.scrollTo({
+          left: Math.max(0, playheadPx - visibleGridWidth * 0.25),
+          behavior: 'smooth',
+        });
+      } else {
+        container.scrollTo({
+          left: Math.max(0, playheadPx - 30),
+          behavior: 'smooth',
+        });
+      }
     }
   }, [activePianoRollTick, isPlaying, followPlayhead, pixelsPerTick]);
 
@@ -1308,9 +1321,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 <div
                   key={pitch}
                   onClick={() => playPreview(pitch)}
-                  className={`flex items-center justify-between px-2 text-[10px] font-mono font-bold border-b transition-all duration-75 cursor-pointer flex-shrink-0 ${
+                  className={`flex items-center justify-between px-2 text-[10px] font-mono font-bold border-b transition-colors duration-75 cursor-pointer flex-shrink-0 ${
                     isSounding
-                      ? 'text-white shadow-[0_0_12px_rgba(99,102,241,0.9)] z-10 scale-[1.02]'
+                      ? 'text-white shadow-[inset_0_0_8px_rgba(255,255,255,0.4)] z-10 brightness-110'
                       : isBlack
                       ? 'bg-[#181920] hover:bg-[#252835] text-stone-400 border-black/40'
                       : 'bg-[#F8F9FA] hover:bg-[#E2E8F0] text-stone-900 border-stone-300'
@@ -1385,10 +1398,10 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               {/* Ruler Scrubber Thumb */}
               {activePianoRollTick !== undefined && (
                 <div
-                  className="absolute top-0 bottom-0 pointer-events-none z-30 flex flex-col items-center"
+                  className="absolute top-0 bottom-0 pointer-events-none z-30 flex flex-col items-center will-change-transform"
                   style={{
-                    left: `${activePianoRollTick * pixelsPerTick}px`,
-                    transform: 'translateX(-50%)',
+                    left: 0,
+                    transform: `translate3d(${activePianoRollTick * pixelsPerTick}px, 0, 0) translateX(-50%)`,
                   }}
                 >
                   <div className="w-3 h-3 bg-rose-500 rounded-sm shadow-md flex items-center justify-center text-[7px] font-black text-white">
@@ -1477,9 +1490,10 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               {/* Playhead Marker */}
               {activePianoRollTick !== undefined && (
                 <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-30 pointer-events-none shadow-[0_0_10px_rgba(244,63,94,0.9)]"
+                  className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-30 pointer-events-none shadow-[0_0_10px_rgba(244,63,94,0.9)] will-change-transform"
                   style={{
-                    left: `${activePianoRollTick * pixelsPerTick}px`,
+                    left: 0,
+                    transform: `translate3d(${activePianoRollTick * pixelsPerTick}px, 0, 0)`,
                     height: `${totalGridHeight}px`,
                   }}
                 >

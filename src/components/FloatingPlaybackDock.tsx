@@ -225,7 +225,7 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
                 onClick={handleProgressBarMouseDown}
               >
                 <div
-                  className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 transition-all"
+                  className="h-full bg-gradient-to-r from-indigo-500 to-indigo-400"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -262,13 +262,13 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
               >
                 {/* Background Progress Track */}
                 <div
-                  className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-400 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.5)] transition-all"
+                  className="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-400 rounded-full shadow-[0_0_12px_rgba(99,102,241,0.5)]"
                   style={{ width: `${progressPercent}%` }}
                 />
 
                 {/* Scrubber Knob */}
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 -ml-2 w-4 h-4 rounded-full bg-white shadow-md border-2 border-indigo-600 transition-transform group-hover:scale-125"
+                  className="absolute top-1/2 -translate-y-1/2 -ml-2 w-4 h-4 rounded-full bg-white shadow-md border-2 border-indigo-600 group-hover:scale-125 transition-transform"
                   style={{ left: `${progressPercent}%` }}
                 />
 
