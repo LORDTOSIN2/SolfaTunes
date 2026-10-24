@@ -149,6 +149,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     const { notes: flatNotes } = flattenScoreToPianoRoll(score);
     setNotes(flatNotes);
     setHasUncommittedChanges(false);
+    // Format rebuilds note ids, so a previous selection would point at nothing.
+    setSelectedNoteIds(new Set());
+    setHoveredNote(null);
   }, [score]);
 
   // Containers and refs
