@@ -21,19 +21,42 @@ import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
 import { serializeScoreToAbc } from './engine/abc_serializer';
-import { Music, Download, FileDown, FileUp, ChevronRight, Settings } from 'lucide-react';
+import { Music, Download, FileDown, FileUp, ChevronRight, Settings, Command, Maximize2, Minimize2 } from 'lucide-react';
 import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
 import { SettingsModal } from './components/SettingsModal';
+import { CommandPalette, WorkspaceMode } from './components/CommandPalette';
 import { loadAppSettings, saveAppSettings, AppSettings } from './utils/settings';
 
 export default function App() {
   // 1. App States & Persistent User Settings
   const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const handleUpdateSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
     saveAppSettings(newSettings);
+  };
+
+  const handleToggleFullscreen = () => {
+    setIsFullscreen((prev) => {
+      const next = !prev;
+      if (next) {
+        try {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        } catch {}
+      } else {
+        try {
+          if (document.fullscreenElement) {
+            document.exitFullscreen().catch(() => {});
+          }
+        } catch {}
+      }
+      return next;
+    });
   };
 
   const [abcText, setAbcText] = useState<string>(SCORES[0]?.abcText || '');
@@ -59,9 +82,9 @@ export default function App() {
   const [fontSize, setFontSize] = useState<number>(18);
   const [scale, setScale] = useState<number>(1.0);
 
-  // Selected note state for visual editing
+  // Selected note state for visual editing & workspace modes
   const [selectedNote, setSelectedNote] = useState<SelectedNoteLocation | null>(null);
-  const [studioMode, setStudioMode] = useState<'read' | 'lyrics' | 'interactive' | 'source'>('interactive');
+  const [studioMode, setStudioMode] = useState<WorkspaceMode>('interactive');
   const scoreContainerRef = useRef<HTMLDivElement | null>(null);
   const musicXmlInputRef = useRef<HTMLInputElement | null>(null);
   const musicXmlProvenanceRef = useRef<MusicalDocument | null>(null);
@@ -100,28 +123,50 @@ export default function App() {
     };
   }, []);
 
-  // Keyboard shortcut listener: Cmd+, or Ctrl+, opens Settings, 'z' toggles Zen mode
+  // Global keyboard shortcuts: Cmd+K (Palette), Cmd+, (Settings), Z (Zen), F (Fullscreen), Esc (Exit fullscreen)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+
+      // Cmd+K or Ctrl+K opens Command Palette
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
+      // Cmd+, or Ctrl+, opens Settings
       if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault();
         setIsSettingsOpen((prev) => !prev);
         return;
       }
-      if (
-        (e.key === 'z' || e.key === 'Z') &&
-        !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
-      ) {
-        setSettings((prev) => {
-          const next = { ...prev, zenMode: !prev.zenMode };
-          saveAppSettings(next);
-          return next;
-        });
+
+      // Escape exits fullscreen if active
+      if (e.key === 'Escape' && isFullscreen) {
+        e.preventDefault();
+        handleToggleFullscreen();
+        return;
+      }
+
+      // Keys when not typing inside an input/textarea
+      if (!isInput) {
+        if (e.key === 'z' || e.key === 'Z') {
+          e.preventDefault();
+          setSettings((prev) => {
+            const next = { ...prev, zenMode: !prev.zenMode };
+            saveAppSettings(next);
+            return next;
+          });
+        } else if (e.key === 'f' || e.key === 'F') {
+          e.preventDefault();
+          handleToggleFullscreen();
+        }
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
+  }, [isFullscreen]);
 
   // 3. Compile/Parse ABC text whenever it changes
   useEffect(() => {
@@ -575,6 +620,35 @@ export default function App() {
               <span className="hidden sm:inline text-xs font-semibold">MIDI</span>
             </button>
 
+            {/* Quick Actions Command Palette Button */}
+            <button
+              type="button"
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 cursor-pointer shadow-sm"
+              title="Command Palette (Cmd+K)"
+              aria-label="Command Palette"
+            >
+              <Command size={15} />
+              <span className="hidden md:inline text-xs font-semibold">Commands</span>
+              <kbd className="hidden lg:inline text-[9px] font-mono text-stone-400 bg-black/40 px-1 py-0.5 rounded border border-white/10">⌘K</kbd>
+            </button>
+
+            {/* Complete Full Screen Button */}
+            <button
+              type="button"
+              onClick={handleToggleFullscreen}
+              className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border px-3 transition-colors cursor-pointer shadow-sm ${
+                isFullscreen
+                  ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_0_12px_rgba(99,102,241,0.5)]'
+                  : 'border-white/10 bg-white/5 text-stone-300 hover:bg-white/10 hover:text-white'
+              }`}
+              title={isFullscreen ? 'Exit Full Screen (Esc or F)' : 'Complete Full Screen (F)'}
+              aria-label="Toggle Full Screen"
+            >
+              {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              <span className="hidden sm:inline text-xs font-semibold">{isFullscreen ? 'Exit Full' : 'Full Screen'}</span>
+            </button>
+
             {/* Global Settings Menu Button */}
             <button
               type="button"
@@ -606,63 +680,138 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Work Area Dashboard */}
-      <main className="flex-1 min-h-0 flex flex-col lg:flex-row p-3 sm:p-5 lg:p-6 xl:p-8 pb-36 lg:pb-8 gap-4 lg:gap-6 xl:gap-8 lg:overflow-hidden">
-        {/* Collapsible Sidebar on Left (controlled by settings.showSidebar) */}
-        {settings.showSidebar && !settings.zenMode ? (
-          <div className="order-2 min-w-0 lg:order-1 lg:w-[320px] xl:w-[340px] 2xl:w-[380px] lg:shrink-0 lg:h-full lg:min-h-0 transition-all duration-200">
-            <Sidebar
-              onLoadAbcText={handleLoadAbcText}
+      {/* Main Work Area Dashboard (Full Screen or Standard Responsive Grid) */}
+      {isFullscreen ? (
+        <div className="fixed inset-0 z-50 bg-[#0A0A0B] flex flex-col w-screen h-screen overflow-hidden">
+          {/* Minimalist Fullscreen Navigation Strip */}
+          <div className="px-6 py-2 bg-[#0F1115]/95 border-b border-indigo-500/20 backdrop-blur-md flex items-center justify-between gap-3 shadow-md z-30 shrink-0">
+            <div className="flex items-center gap-3">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-bold text-xs uppercase tracking-wider text-white">
+                {score?.title || 'SolfaTunes'}
+              </span>
+              <span className="text-[10px] text-stone-400 font-mono hidden sm:inline">
+                Key: {score?.key} • Meter: {score?.meter}
+              </span>
+              <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-indigo-600/30 text-indigo-300 rounded-full border border-indigo-500/30">
+                Complete Full Screen
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsCommandPaletteOpen(true)}
+                className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-stone-300 text-xs font-semibold flex items-center gap-1 border border-white/10"
+                title="Command Palette (Cmd+K)"
+              >
+                <Command size={12} />
+                <span>Commands</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleFullscreen}
+                className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 shadow"
+                title="Exit Full Screen (Esc or F)"
+              >
+                <Minimize2 size={13} />
+                <span>Exit Full Screen (Esc)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Full Screen Score Renderer */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <ScoreRenderer
+              score={score}
+              abcText={abcText}
+              setAbcText={handleAbcTextChange}
               warnings={warnings}
-              onLoadScore={handleLoadScore}
-              selectedScoreId={SCORES.find(song => song.abcText === abcText)?.id}
-              onCollapse={() => handleUpdateSettings({ ...settings, showSidebar: false })}
+              currentTick={currentTick}
+              currentEighth={currentTick}
+              fontSize={fontSize}
+              setFontSize={setFontSize}
+              scale={scale}
+              setScale={setScale}
+              mutedVoices={mutedVoices}
+              toggleMute={toggleMute}
+              selectedNote={selectedNote}
+              onSelectNote={setSelectedNote}
+              onUpdateScore={handleUpdateScore}
+              studioMode={studioMode}
+              setStudioMode={setStudioMode}
+              playerRef={playerRef}
+              onSeekTick={handleSeek}
+              isExpanded={true}
+              onToggleExpand={handleToggleFullscreen}
+              settings={settings}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              onUpdateSettings={handleUpdateSettings}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={handleToggleFullscreen}
             />
           </div>
-        ) : !settings.zenMode ? (
-          <button
-            type="button"
-            onClick={() => handleUpdateSettings({ ...settings, showSidebar: true })}
-            className="order-2 lg:order-1 self-start lg:self-stretch flex items-center justify-center gap-2 bg-[#13161C] border border-white/10 rounded-lg px-2.5 py-1.5 lg:w-9 text-stone-300 hover:text-white hover:bg-white/10 shadow-lg cursor-pointer transition-colors"
-            title="Expand score library"
-          >
-            <ChevronRight size={16} />
-            <span className="text-[11px] font-bold uppercase tracking-wider lg:[writing-mode:vertical-rl] lg:rotate-180">
-              Library
-            </span>
-          </button>
-        ) : null}
-
-        {/* Score Area */}
-        <div ref={scoreContainerRef} className="order-1 min-w-0 h-[70vh] min-h-[32rem] scroll-mt-3 lg:order-2 lg:flex-1 lg:h-full lg:min-h-0">
-          <ScoreRenderer
-            score={score}
-            abcText={abcText}
-            setAbcText={handleAbcTextChange}
-            warnings={warnings}
-            currentTick={currentTick}
-            currentEighth={currentTick}
-            fontSize={fontSize}
-            setFontSize={setFontSize}
-            scale={scale}
-            setScale={setScale}
-            mutedVoices={mutedVoices}
-            toggleMute={toggleMute}
-            selectedNote={selectedNote}
-            onSelectNote={setSelectedNote}
-            onUpdateScore={handleUpdateScore}
-            studioMode={studioMode}
-            setStudioMode={setStudioMode}
-            playerRef={playerRef}
-            onSeekTick={handleSeek}
-            isExpanded={!settings.showSidebar || settings.zenMode}
-            onToggleExpand={() => handleUpdateSettings({ ...settings, showSidebar: !settings.showSidebar })}
-            settings={settings}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-            onUpdateSettings={handleUpdateSettings}
-          />
         </div>
-      </main>
+      ) : (
+        <main className="flex-1 min-h-0 flex flex-col lg:flex-row p-3 sm:p-5 lg:p-6 xl:p-8 pb-36 lg:pb-8 gap-4 lg:gap-6 xl:gap-8 lg:overflow-hidden">
+          {/* Collapsible Sidebar on Left (controlled by settings.showSidebar) */}
+          {settings.showSidebar && !settings.zenMode ? (
+            <div className="order-2 min-w-0 lg:order-1 lg:w-[320px] xl:w-[340px] 2xl:w-[380px] lg:shrink-0 lg:h-full lg:min-h-0 transition-all duration-200">
+              <Sidebar
+                onLoadAbcText={handleLoadAbcText}
+                warnings={warnings}
+                onLoadScore={handleLoadScore}
+                selectedScoreId={SCORES.find(song => song.abcText === abcText)?.id}
+                onCollapse={() => handleUpdateSettings({ ...settings, showSidebar: false })}
+              />
+            </div>
+          ) : !settings.zenMode ? (
+            <button
+              type="button"
+              onClick={() => handleUpdateSettings({ ...settings, showSidebar: true })}
+              className="order-2 lg:order-1 self-start lg:self-stretch flex items-center justify-center gap-2 bg-[#13161C] border border-white/10 rounded-lg px-2.5 py-1.5 lg:w-9 text-stone-300 hover:text-white hover:bg-white/10 shadow-lg cursor-pointer transition-colors"
+              title="Expand score library"
+            >
+              <ChevronRight size={16} />
+              <span className="text-[11px] font-bold uppercase tracking-wider lg:[writing-mode:vertical-rl] lg:rotate-180">
+                Library
+              </span>
+            </button>
+          ) : null}
+
+          {/* Score Area */}
+          <div ref={scoreContainerRef} className="order-1 min-w-0 h-[70vh] min-h-[32rem] scroll-mt-3 lg:order-2 lg:flex-1 lg:h-full lg:min-h-0">
+            <ScoreRenderer
+              score={score}
+              abcText={abcText}
+              setAbcText={handleAbcTextChange}
+              warnings={warnings}
+              currentTick={currentTick}
+              currentEighth={currentTick}
+              fontSize={fontSize}
+              setFontSize={setFontSize}
+              scale={scale}
+              setScale={setScale}
+              mutedVoices={mutedVoices}
+              toggleMute={toggleMute}
+              selectedNote={selectedNote}
+              onSelectNote={setSelectedNote}
+              onUpdateScore={handleUpdateScore}
+              studioMode={studioMode}
+              setStudioMode={setStudioMode}
+              playerRef={playerRef}
+              onSeekTick={handleSeek}
+              isExpanded={!settings.showSidebar || settings.zenMode}
+              onToggleExpand={() => handleUpdateSettings({ ...settings, showSidebar: !settings.showSidebar })}
+              settings={settings}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              onUpdateSettings={handleUpdateSettings}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={handleToggleFullscreen}
+            />
+          </div>
+        </main>
+      )}
 
       {/* Unified Floating Playback Dock ("Always Within Reach" - hideable in Settings & Zen Mode) */}
       {settings.showPlaybackDock && !settings.zenMode && (
@@ -695,6 +844,36 @@ export default function App() {
         onClose={() => setIsSettingsOpen(false)}
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
+      />
+
+      {/* Quick Actions Command Palette (Cmd+K) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        scores={SCORES}
+        selectedScoreId={SCORES.find(song => song.abcText === abcText)?.id}
+        onSelectScore={handleLoadScore}
+        workspaceMode={studioMode}
+        onSetWorkspaceMode={setStudioMode}
+        isPlaying={isPlaying}
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onStop={handleStop}
+        isLooping={isLooping}
+        toggleLoop={toggleLoop}
+        bpm={bpm}
+        onSetBpm={handleSetBpm}
+        transpose={transpose}
+        onSetTranspose={setTranspose}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={handleToggleFullscreen}
+        settings={settings}
+        onUpdateSettings={handleUpdateSettings}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onExportMidi={handleExportMidi}
+        onExportAbc={handleExportAbc}
+        onExportMusicXml={handleExportMusicXml}
+        onTriggerImportMusicXml={() => musicXmlInputRef.current?.click()}
       />
     </div>
   );

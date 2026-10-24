@@ -10,10 +10,33 @@ import { serializeScoreToSolfa } from '../engine/solfa_serializer';
 import { parseSolfaToAbc } from '../engine/solfa_parser';
 import { alignSolfaGrid } from '../engine/solfa_aligner';
 import { findActiveMeasureRange, getScoreMeasureRanges } from '../utils/playback_timeline';
-import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle, FileText, CheckSquare, Square, ChevronDown, ChevronUp, Settings } from 'lucide-react';
+import {
+  ZoomIn,
+  ZoomOut,
+  Type,
+  Music,
+  X,
+  HelpCircle,
+  Eye,
+  Edit2,
+  Code,
+  Sparkles,
+  AlertTriangle,
+  FileText,
+  CheckSquare,
+  Square,
+  ChevronDown,
+  ChevronUp,
+  Settings,
+  Maximize2,
+  Minimize2,
+  Columns,
+} from 'lucide-react';
 import { PianoRoll } from './PianoRoll';
 import { MidiPlayer } from '../audio/midi_player';
 import { AppSettings } from '../utils/settings';
+
+export type StudioWorkspaceMode = 'read' | 'lyrics' | 'interactive' | 'source' | 'pianoroll' | 'split';
 
 interface ScoreRendererProps {
   score: ParsedScore | null;
@@ -31,8 +54,8 @@ interface ScoreRendererProps {
   selectedNote: SelectedNoteLocation | null;
   onSelectNote: (location: SelectedNoteLocation | null) => void;
   onUpdateScore: (score: ParsedScore) => void;
-  studioMode: 'read' | 'lyrics' | 'interactive' | 'source';
-  setStudioMode: (val: 'read' | 'lyrics' | 'interactive' | 'source') => void;
+  studioMode: StudioWorkspaceMode;
+  setStudioMode: (val: StudioWorkspaceMode) => void;
   playerRef?: React.RefObject<MidiPlayer | null>;
   onSeekTick?: (tick: number) => void;
   isExpanded?: boolean;
@@ -40,6 +63,8 @@ interface ScoreRendererProps {
   settings?: AppSettings;
   onOpenSettings?: () => void;
   onUpdateSettings?: (newSettings: AppSettings) => void;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 /**
@@ -784,15 +809,50 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   settings,
   onOpenSettings,
   onUpdateSettings,
+  isFullscreen = false,
+  onToggleFullscreen,
 }) => {
   const [showHelp, setShowHelp] = useState<boolean>(false);
 
+  // Split View Resizer state (clamped between 20% and 80%, default 50%)
+  const [splitRatio, setSplitRatio] = useState<number>(50);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingSplitRef = useRef<boolean>(false);
+
+  const handleSplitDragStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingSplitRef.current = true;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isDraggingSplitRef.current || !splitContainerRef.current) return;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      const currentY = moveEvent.clientY - rect.top;
+      const percentage = (currentY / rect.height) * 100;
+      const clamped = Math.max(20, Math.min(80, percentage));
+      setSplitRatio(clamped);
+    };
+
+    const handleMouseUp = () => {
+      isDraggingSplitRef.current = false;
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
+
   // Piano Roll state (respects settings if provided)
   const [localShowPianoRoll, setLocalShowPianoRoll] = useState<boolean>(false);
-  const showPianoRoll = settings ? settings.showPianoRoll : localShowPianoRoll;
+  const showPianoRoll = studioMode === 'pianoroll' || (settings ? settings.showPianoRoll : localShowPianoRoll);
   const setShowPianoRoll = (val: boolean | ((prev: boolean) => boolean)) => {
     const nextVal = typeof val === 'function' ? val(showPianoRoll) : val;
     setLocalShowPianoRoll(nextVal);
+    if (nextVal) {
+      setStudioMode('pianoroll');
+    } else if (studioMode === 'pianoroll') {
+      setStudioMode('read');
+    }
     if (onUpdateSettings && settings) {
       onUpdateSettings({ ...settings, showPianoRoll: nextVal });
     }
@@ -1484,10 +1544,10 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
           </p>
         </div>
 
-        {/* Zoom and Size Controls */}
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Mode Toggle Segmented Control */}
-          <div className="flex items-center bg-black/40 p-1 rounded-full border border-white/10 shadow-inner">
+        {/* Workspace Switcher & Controls */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Unified Workspace Segmented Control */}
+          <div className="flex items-center bg-black/50 p-1 rounded-xl border border-white/10 shadow-inner overflow-x-auto max-w-full">
             <button
               onClick={() => {
                 if (solfaEditTimerRef.current) {
@@ -1499,16 +1559,101 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 setStudioMode('read');
                 onSelectNote(null);
               }}
-              className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                !showPianoRoll && studioMode === 'read'
-                  ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                studioMode === 'read' && !showPianoRoll
+                  ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400/30'
                   : 'text-stone-400 hover:text-white'
               }`}
-              title="Switch to Solfa sheet music mode"
+              title="Score View (Sheet Music performance mode)"
             >
               <Eye size={12} />
-              Solfa
+              <span>Score</span>
             </button>
+
+            <button
+              onClick={() => {
+                if (solfaEditTimerRef.current) {
+                  clearTimeout(solfaEditTimerRef.current);
+                  solfaEditTimerRef.current = null;
+                }
+                isEditingSolfaRef.current = false;
+                onSelectNote(null);
+                setStudioMode('pianoroll');
+                setShowPianoRoll(true);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                studioMode === 'pianoroll' || (showPianoRoll && studioMode !== 'split')
+                  ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400/30'
+                  : 'text-stone-400 hover:text-white'
+              }`}
+              title="Interactive Piano Roll View (SATB multi-channel sequencer)"
+            >
+              <span className="text-xs">🎹</span>
+              <span>Piano Roll</span>
+            </button>
+
+            <button
+              onClick={() => {
+                if (solfaEditTimerRef.current) {
+                  clearTimeout(solfaEditTimerRef.current);
+                  solfaEditTimerRef.current = null;
+                }
+                isEditingSolfaRef.current = false;
+                onSelectNote(null);
+                setStudioMode('split');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                studioMode === 'split'
+                  ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400/30'
+                  : 'text-stone-400 hover:text-white'
+              }`}
+              title="Split View (Synchronized Sheet Music on top, Piano Roll on bottom with resizer)"
+            >
+              <Columns size={12} />
+              <span>Split View</span>
+            </button>
+
+            <button
+              onClick={() => {
+                if (solfaEditTimerRef.current) {
+                  clearTimeout(solfaEditTimerRef.current);
+                  solfaEditTimerRef.current = null;
+                }
+                isEditingSolfaRef.current = false;
+                setShowPianoRoll(false);
+                setStudioMode('interactive');
+              }}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                studioMode === 'interactive' && !showPianoRoll
+                  ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400/30'
+                  : 'text-stone-400 hover:text-white'
+              }`}
+              title="Visual Note Editor (Click notes to inspect & edit scale degrees)"
+            >
+              <Edit2 size={12} />
+              <span>Visual Edit</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setShowPianoRoll(false);
+                setStudioMode('source');
+                onSelectNote(null);
+                if (score && !isEditingSolfaRef.current) {
+                  setSolfaText(serializeScoreToSolfa(score));
+                }
+              }}
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                studioMode === 'source'
+                  ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400/30'
+                  : 'text-stone-400 hover:text-white'
+              }`}
+              title="Source Code Editor (Tonic Sol-fa & ABC Code)"
+            >
+              <Code size={12} />
+              <span>Source</span>
+            </button>
+
             <button
               onClick={() => {
                 if (solfaEditTimerRef.current) {
@@ -1520,133 +1665,84 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 setStudioMode('lyrics');
                 onSelectNote(null);
               }}
-              className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                !showPianoRoll && studioMode === 'lyrics'
-                  ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
+              className={`px-3 py-1.5 rounded-lg text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                studioMode === 'lyrics'
+                  ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400/30'
                   : 'text-stone-400 hover:text-white'
               }`}
-              title="Switch to Hymn Lyrics View"
+              title="Hymn Lyrics View"
             >
               <FileText size={12} />
-              Hymn Lyrics
-            </button>
-            <button
-              onClick={() => {
-                if (solfaEditTimerRef.current) {
-                  clearTimeout(solfaEditTimerRef.current);
-                  solfaEditTimerRef.current = null;
-                }
-                isEditingSolfaRef.current = false;
-                setShowPianoRoll(false);
-                setStudioMode('interactive');
-              }}
-              className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                !showPianoRoll && studioMode === 'interactive'
-                  ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
-                  : 'text-stone-400 hover:text-indigo-400'
-              }`}
-              title="Switch to Visual Edit Mode"
-            >
-              <Edit2 size={12} />
-              Interactive Editor
-            </button>
-            <button
-              onClick={() => {
-                setShowPianoRoll(false);
-                setStudioMode('source');
-                onSelectNote(null);
-                if (score && !isEditingSolfaRef.current) {
-                  setSolfaText(serializeScoreToSolfa(score));
-                }
-              }}
-              className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                !showPianoRoll && studioMode === 'source'
-                  ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
-                  : 'text-stone-400 hover:text-indigo-400'
-              }`}
-              title="Switch to Source Code Editor (Tonic Sol-fa & ABC)"
-            >
-              <Code size={12} />
-              Source Editor
+              <span>Lyrics</span>
             </button>
           </div>
-
-          {/* Piano Roll Toggle Button (hidden by default) */}
-          <button
-            type="button"
-            onClick={() => {
-              setShowPianoRoll(prev => !prev);
-              onSelectNote(null);
-            }}
-            className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer shadow-sm ${
-              showPianoRoll
-                ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white ring-2 ring-indigo-400/50 shadow-indigo-500/20'
-                : 'bg-black/40 text-stone-300 hover:text-white border border-white/10 hover:border-white/20'
-            }`}
-            title="Toggle Interactive Piano Roll View (SATB Channels & Monophony)"
-          >
-            <span className="text-xs">🎹</span>
-            <span>Piano Roll</span>
-            <span
-              className={`px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
-                showPianoRoll
-                  ? 'bg-white/20 text-white'
-                  : 'bg-white/5 text-stone-400'
-              }`}
-            >
-              {showPianoRoll ? 'Active' : 'Off'}
-            </span>
-          </button>
           
           {/* Zoom Controls */}
-          <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-full border border-white/10 shadow-inner">
+          <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-xl border border-white/10 shadow-inner">
             <button
               onClick={() => setScale(Math.max(0.6, scale - 0.1))}
-              className="p-1.5 hover:bg-white/10 rounded-full text-stone-300 hover:text-white transition-colors cursor-pointer"
+              className="p-1 hover:bg-white/10 rounded-lg text-stone-300 hover:text-white transition-colors cursor-pointer"
               title="Zoom Out"
             >
-              <ZoomOut size={14} />
+              <ZoomOut size={13} />
             </button>
-            <span className="text-[11px] font-mono font-bold text-[#6366F1] w-10 text-center">
+            <span className="text-[11px] font-mono font-bold text-[#6366F1] w-9 text-center">
               {Math.round(scale * 100)}%
             </span>
             <button
               onClick={() => setScale(Math.min(1.8, scale + 0.1))}
-              className="p-1.5 hover:bg-white/10 rounded-full text-stone-300 hover:text-white transition-colors cursor-pointer"
+              className="p-1 hover:bg-white/10 rounded-lg text-stone-300 hover:text-white transition-colors cursor-pointer"
               title="Zoom In"
             >
-              <ZoomIn size={14} />
+              <ZoomIn size={13} />
             </button>
           </div>
 
           {/* Font Size Controls */}
-          <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-full border border-white/10 shadow-inner">
+          <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-xl border border-white/10 shadow-inner">
             <button
               onClick={() => setFontSize(Math.max(12, fontSize - 2))}
-              className="p-1.5 hover:bg-white/10 rounded-full text-stone-300 hover:text-white transition-colors cursor-pointer"
+              className="p-1 hover:bg-white/10 rounded-lg text-stone-300 hover:text-white transition-colors cursor-pointer"
               title="Decrease Font Size"
             >
-              <Type size={12} className="scale-75" />
+              <Type size={11} className="scale-75" />
             </button>
-            <span className="text-[11px] font-mono font-bold text-[#6366F1] w-12 text-center">
+            <span className="text-[11px] font-mono font-bold text-[#6366F1] w-10 text-center">
               {fontSize}px
             </span>
             <button
               onClick={() => setFontSize(Math.min(28, fontSize + 2))}
-              className="p-1.5 hover:bg-white/10 rounded-full text-stone-300 hover:text-white transition-colors cursor-pointer"
+              className="p-1 hover:bg-white/10 rounded-lg text-stone-300 hover:text-white transition-colors cursor-pointer"
               title="Increase Font Size"
             >
-              <Type size={14} />
+              <Type size={13} />
             </button>
           </div>
+
+          {/* Complete Full Screen Toggle */}
+          {onToggleFullscreen && (
+            <button
+              type="button"
+              onClick={onToggleFullscreen}
+              className={`p-2 rounded-xl cursor-pointer transition-all border shadow-sm ${
+                isFullscreen
+                  ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_0_12px_rgba(99,102,241,0.5)]'
+                  : 'bg-black/40 hover:bg-white/10 text-stone-300 hover:text-white border-white/10'
+              }`}
+              title={isFullscreen ? 'Exit Full Screen (Esc or F)' : 'Complete Full Screen (F)'}
+              aria-label="Toggle Full Screen"
+            >
+              {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            </button>
+          )}
 
           {/* Settings Menu Button */}
           {onOpenSettings && (
             <button
               type="button"
               onClick={onOpenSettings}
-              className="p-2 hover:bg-white/10 rounded-full text-stone-300 hover:text-white transition-colors cursor-pointer border border-white/10 bg-black/40 shadow-inner"
-              title="Open Workspace & View Settings"
+              className="p-2 hover:bg-white/10 rounded-xl text-stone-300 hover:text-white transition-colors cursor-pointer border border-white/10 bg-black/40 shadow-inner"
+              title="Open Workspace & View Settings (Cmd+,)"
             >
               <Settings size={14} />
             </button>
@@ -1654,7 +1750,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
         </div>
       </div>
 
-      {showPianoRoll && score ? (
+      {studioMode === 'pianoroll' && score ? (
         <div className="flex-1 overflow-hidden">
           <PianoRoll
             score={score}
@@ -1662,10 +1758,56 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             currentTick={currentTick}
             playerRef={playerRef}
             onSeekTick={onSeekTick}
-            onClose={() => setShowPianoRoll(false)}
+            onClose={() => setStudioMode('read')}
             isExpanded={isExpanded}
             onToggleExpand={onToggleExpand}
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={onToggleFullscreen}
           />
+        </div>
+      ) : studioMode === 'split' && score ? (
+        /* Split View: Sheet Music on top, Draggable Resizer, Piano Roll on bottom */
+        <div ref={splitContainerRef} className="flex-1 flex flex-col overflow-hidden bg-[#0A0A0B]">
+          {/* Top Pane: Sheet Music */}
+          <div
+            className="overflow-auto p-4 sm:p-6 pb-12 relative bg-[#0A0A0B]"
+            style={{ height: `${splitRatio}%`, minHeight: '140px' }}
+          >
+            {renderPaperSheet(false)}
+          </div>
+
+          {/* Draggable Resizer Handle */}
+          <div
+            onMouseDown={handleSplitDragStart}
+            className="h-3 bg-[#111319] hover:bg-indigo-600 active:bg-indigo-500 cursor-row-resize flex items-center justify-center transition-colors border-y border-white/10 group select-none shrink-0"
+            title="Drag vertically to resize split (Double-click to reset 50/50)"
+            onDoubleClick={() => setSplitRatio(50)}
+          >
+            <div className="flex items-center gap-2 opacity-60 group-hover:opacity-100">
+              <div className="w-10 h-1 rounded-full bg-white/40 group-hover:bg-white" />
+              <span className="text-[9px] font-mono text-stone-400 group-hover:text-white uppercase font-bold tracking-wider">
+                {Math.round(splitRatio)}% / {Math.round(100 - splitRatio)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Bottom Pane: Piano Roll */}
+          <div
+            className="flex-1 overflow-hidden"
+            style={{ height: `${100 - splitRatio}%`, minHeight: '180px' }}
+          >
+            <PianoRoll
+              score={score}
+              onUpdateScore={onUpdateScore}
+              currentTick={currentTick}
+              playerRef={playerRef}
+              onSeekTick={onSeekTick}
+              isExpanded={isExpanded}
+              onToggleExpand={onToggleExpand}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={onToggleFullscreen}
+            />
+          </div>
         </div>
       ) : studioMode === 'source' ? (
         <div className="flex-1 flex flex-col overflow-hidden bg-[#0F1115]">
@@ -1805,6 +1947,23 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 <HelpCircle size={12} />
                 Cheat Sheet
               </button>
+
+              {/* Complete Full Screen Toggle */}
+              {onToggleFullscreen && (
+                <button
+                  type="button"
+                  onClick={onToggleFullscreen}
+                  className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-sans font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                    isFullscreen
+                      ? 'bg-indigo-600 border-indigo-400 text-white shadow-md'
+                      : 'bg-white/5 border-white/5 text-stone-300 hover:bg-white/10 hover:text-white'
+                  }`}
+                  title={isFullscreen ? 'Exit Full Screen (Esc or F)' : 'Enter Complete Full Screen (F)'}
+                >
+                  {isFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
+                  <span className="hidden sm:inline">{isFullscreen ? 'Exit Full' : 'Full Screen'}</span>
+                </button>
+              )}
             </div>
           </div>
 

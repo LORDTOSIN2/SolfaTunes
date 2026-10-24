@@ -200,6 +200,31 @@ export function formatPitchLabel(midiPitch: number, keyStr: string = 'C'): strin
 }
 
 /**
+ * Returns full pitch semantics including Sol-fa syllable, scale degree, letter, accidental, and octave number.
+ */
+export function getPitchSemantics(
+  midiPitch: number,
+  keyStr: string = 'C'
+): {
+  rawLetter: string;
+  rawAccidental?: string;
+  octaveNum: number;
+  scaleDegree: number;
+  syllable: string;
+} {
+  const props = midiToNoteProperties(midiPitch, keyStr);
+  const keyInfo = getKeyInfo(keyStr);
+  const pc = ((midiPitch % 12) + 12) % 12;
+  const scaleDegree = calculateScaleDegree(pc, keyInfo.tonic);
+  const syllable = scaleDegreeToSyllable(scaleDegree);
+  return {
+    ...props,
+    scaleDegree,
+    syllable,
+  };
+}
+
+/**
  * Extracts all notes from ParsedScore into a flat array of PianoRollNotes.
  */
 export function flattenScoreToPianoRoll(score: ParsedScore): {

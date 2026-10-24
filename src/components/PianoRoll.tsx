@@ -14,6 +14,7 @@ import {
   formatPitchLabel,
   getMeterTicksPerMeasure,
   midiToNoteProperties,
+  getPitchSemantics,
 } from '../engine/piano_roll_adapter';
 import { MidiPlayer } from '../audio/midi_player';
 import {
@@ -47,6 +48,8 @@ interface PianoRollProps {
   onClose?: () => void;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
 }
 
 // Pitch range: C2 (MIDI 36) to C6 (MIDI 84) = 49 chromatic keys
@@ -66,6 +69,8 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   onClose,
   isExpanded = false,
   onToggleExpand,
+  isFullscreen = false,
+  onToggleFullscreen,
 }) => {
   // 1. Grid & Display Settings
   const [pixelsPerTick, setPixelsPerTick] = useState<number>(4.0); // 16 ticks = 64px
@@ -183,6 +188,86 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     if (autoFormatOnBlur && hasUncommittedChanges) {
       executeAutoFormat();
     }
+  };
+
+  // -------------------------------------------------------------
+  // Multi-Voice Note Inspector Handlers
+  // -------------------------------------------------------------
+  const handleReassignSelectedVoice = (targetVoiceId: string) => {
+    if (selectedNoteIds.size === 0) return;
+    setNotes((prevNotes) => {
+      const updated = prevNotes.map((note) => {
+        if (selectedNoteIds.has(note.id)) {
+          return { ...note, voiceId: targetVoiceId };
+        }
+        return note;
+      });
+      const voices = Array.from(new Set(updated.map((n) => n.voiceId)));
+      const cleanNotes: FlatPianoRollNote[] = [];
+      voices.forEach((vId) => {
+        const vNotes = updated.filter((n) => n.voiceId === vId);
+        cleanNotes.push(...enforceMonophony(vNotes));
+      });
+      return cleanNotes;
+    });
+    setHasUncommittedChanges(true);
+  };
+
+  const handleTransposeSelected = (deltaSemitones: number) => {
+    if (selectedNoteIds.size === 0) return;
+    setNotes((prevNotes) => {
+      return prevNotes.map((note) => {
+        if (selectedNoteIds.has(note.id)) {
+          const newPitch = Math.max(MIN_MIDI, Math.min(MAX_MIDI, note.midiPitch + deltaSemitones));
+          const props = getPitchSemantics(newPitch, score.key);
+          return {
+            ...note,
+            midiPitch: newPitch,
+            syllable: props.syllable,
+            scaleDegree: props.scaleDegree,
+            octaveNum: props.octaveNum,
+            rawLetter: props.rawLetter,
+            rawAccidental: props.rawAccidental,
+          };
+        }
+        return note;
+      });
+    });
+    const firstSelected = notes.find((n) => selectedNoteIds.has(n.id));
+    if (firstSelected) {
+      playPreview(Math.max(MIN_MIDI, Math.min(MAX_MIDI, firstSelected.midiPitch + deltaSemitones)));
+    }
+    setHasUncommittedChanges(true);
+  };
+
+  const handleSetDurationSelected = (newDurationTicks: number) => {
+    if (selectedNoteIds.size === 0) return;
+    setNotes((prevNotes) => {
+      const updated = prevNotes.map((note) => {
+        if (selectedNoteIds.has(note.id)) {
+          return { ...note, durationTicks: newDurationTicks };
+        }
+        return note;
+      });
+      const voices = Array.from(new Set(updated.map((n) => n.voiceId)));
+      const cleanNotes: FlatPianoRollNote[] = [];
+      voices.forEach((vId) => {
+        const vNotes = updated.filter((n) => n.voiceId === vId);
+        cleanNotes.push(...enforceMonophony(vNotes));
+      });
+      return cleanNotes;
+    });
+    setHasUncommittedChanges(true);
+  };
+
+  const handlePreviewSelected = () => {
+    const selectedList = notes.filter((n) => selectedNoteIds.has(n.id));
+    if (selectedList.length === 0) return;
+    selectedList.slice(0, 4).forEach((n, idx) => {
+      setTimeout(() => {
+        playPreview(n.midiPitch, 0.4);
+      }, idx * 50);
+    });
   };
 
   // -------------------------------------------------------------
@@ -632,7 +717,23 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
             </button>
           )}
 
-          {/* Optional Expand / Fullscreen Toggle */}
+          {/* Complete Full Screen Toggle */}
+          {onToggleFullscreen && (
+            <button
+              type="button"
+              onClick={onToggleFullscreen}
+              className={`p-1.5 rounded-lg border cursor-pointer transition-colors ${
+                isFullscreen
+                  ? 'bg-indigo-600 border-indigo-400 text-white'
+                  : 'bg-black/40 hover:bg-white/10 text-stone-300 hover:text-white border-white/10'
+              }`}
+              title={isFullscreen ? 'Exit Full Screen (Esc or F)' : 'Enter Complete Full Screen (F)'}
+            >
+              {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            </button>
+          )}
+
+          {/* Optional Expand Toggle */}
           {onToggleExpand && (
             <button
               type="button"
@@ -1047,6 +1148,144 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 When you click away from the piano roll, notes automatically quantize to measure subdivisions, fill rest gaps, and update Tonic Sol-fa syllables.
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4.5. Floating Multi-Voice Note Inspector Card */}
+      {selectedNoteIds.size > 0 && (
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-30 bg-[#161822]/95 border border-indigo-500/40 rounded-2xl shadow-2xl backdrop-blur-md px-4 py-2.5 flex flex-wrap items-center gap-3 text-xs text-stone-200 animate-in fade-in slide-in-from-bottom-2 duration-150 max-w-[95%]">
+          {/* Note count & badge */}
+          <div className="flex items-center gap-2 border-r border-white/10 pr-3">
+            <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+            <span className="font-bold text-white whitespace-nowrap">
+              {selectedNoteIds.size} note{selectedNoteIds.size > 1 ? 's' : ''}
+            </span>
+          </div>
+
+          {/* Voice Channel Assignment */}
+          <div className="flex items-center gap-1.5 border-r border-white/10 pr-3">
+            <span className="text-[10px] text-stone-400 uppercase font-black tracking-wider mr-1">
+              Voice:
+            </span>
+            {availableVoices.map((vId) => {
+              const theme = getVoiceTheme(vId);
+              return (
+                <button
+                  key={`inspector-reassign-${vId}`}
+                  type="button"
+                  onClick={() => handleReassignSelectedVoice(vId)}
+                  className="px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-transform active:scale-95 cursor-pointer border"
+                  style={{
+                    backgroundColor: `${theme.hex}25`,
+                    color: theme.hex,
+                    borderColor: `${theme.hex}50`,
+                  }}
+                  title={`Move selected note(s) to ${theme.name} channel (enforces monophony)`}
+                >
+                  {vId}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Pitch Shift */}
+          <div className="flex items-center gap-1 border-r border-white/10 pr-3">
+            <span className="text-[10px] text-stone-400 uppercase font-black tracking-wider mr-1">
+              Pitch:
+            </span>
+            <button
+              onClick={() => handleTransposeSelected(-1)}
+              className="px-1.5 py-0.5 bg-black/40 hover:bg-white/10 border border-white/10 rounded font-bold hover:text-white cursor-pointer"
+              title="Transpose down 1 semitone"
+            >
+              -1
+            </button>
+            <button
+              onClick={() => handleTransposeSelected(1)}
+              className="px-1.5 py-0.5 bg-black/40 hover:bg-white/10 border border-white/10 rounded font-bold hover:text-white cursor-pointer"
+              title="Transpose up 1 semitone"
+            >
+              +1
+            </button>
+            <button
+              onClick={() => handleTransposeSelected(-12)}
+              className="px-1.5 py-0.5 bg-black/40 hover:bg-white/10 border border-white/10 rounded text-[10px] font-bold hover:text-white cursor-pointer"
+              title="Lower 1 octave (-12 semitones)"
+            >
+              -8ve
+            </button>
+            <button
+              onClick={() => handleTransposeSelected(12)}
+              className="px-1.5 py-0.5 bg-black/40 hover:bg-white/10 border border-white/10 rounded text-[10px] font-bold hover:text-white cursor-pointer"
+              title="Raise 1 octave (+12 semitones)"
+            >
+              +8ve
+            </button>
+          </div>
+
+          {/* Duration */}
+          <div className="flex items-center gap-1 border-r border-white/10 pr-3">
+            <span className="text-[10px] text-stone-400 uppercase font-black tracking-wider mr-1">
+              Length:
+            </span>
+            <button
+              onClick={() => handleSetDurationSelected(4)}
+              className="px-1.5 py-0.5 bg-black/40 hover:bg-white/10 border border-white/10 rounded text-[10px] font-mono hover:text-white cursor-pointer"
+              title="16th note (4 ticks)"
+            >
+              1/16
+            </button>
+            <button
+              onClick={() => handleSetDurationSelected(8)}
+              className="px-1.5 py-0.5 bg-black/40 hover:bg-white/10 border border-white/10 rounded text-[10px] font-mono hover:text-white cursor-pointer"
+              title="Eighth note (8 ticks)"
+            >
+              1/8
+            </button>
+            <button
+              onClick={() => handleSetDurationSelected(16)}
+              className="px-1.5 py-0.5 bg-black/40 hover:bg-white/10 border border-white/10 rounded text-[10px] font-mono hover:text-white cursor-pointer"
+              title="Quarter note (16 ticks)"
+            >
+              1/4
+            </button>
+            <button
+              onClick={() => handleSetDurationSelected(32)}
+              className="px-1.5 py-0.5 bg-black/40 hover:bg-white/10 border border-white/10 rounded text-[10px] font-mono hover:text-white cursor-pointer"
+              title="Half note (32 ticks)"
+            >
+              1/2
+            </button>
+          </div>
+
+          {/* Actions: Preview, Delete, Deselect */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handlePreviewSelected}
+              className="p-1.5 bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white rounded-lg border border-indigo-500/40 cursor-pointer transition-colors"
+              title="Audition selected notes"
+            >
+              <Volume2 size={13} />
+            </button>
+            <button
+              onClick={() => {
+                setNotes((prev) => prev.filter((n) => !selectedNoteIds.has(n.id)));
+                setSelectedNoteIds(new Set());
+                setHasUncommittedChanges(true);
+              }}
+              className="p-1.5 bg-red-600/30 hover:bg-red-600 text-red-200 hover:text-white rounded-lg border border-red-500/40 cursor-pointer transition-colors"
+              title="Delete selected notes"
+            >
+              <Trash2 size={13} />
+            </button>
+            <button
+              onClick={() => setSelectedNoteIds(new Set())}
+              className="p-1 hover:bg-white/10 text-stone-400 hover:text-white rounded-full cursor-pointer ml-1"
+              title="Deselect all"
+            >
+              <X size={14} />
+            </button>
           </div>
         </div>
       )}
