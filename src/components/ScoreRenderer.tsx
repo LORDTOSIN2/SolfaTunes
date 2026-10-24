@@ -922,7 +922,14 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   const [localShowLivePreview, setLocalShowLivePreview] = useState<boolean>(false);
   const showLivePreview = settings ? settings.showLivePreview : localShowLivePreview;
   const [solfaText, setSolfaText] = useState<string>(() => score ? serializeScoreToSolfa(score) : '');
-  const [autoFormatOnBlur, setAutoFormatOnBlur] = useState<boolean>(false);
+  const [localAutoFormatOnBlur, setLocalAutoFormatOnBlur] = useState<boolean>(false);
+  const autoFormatOnBlur = settings ? settings.autoFormatOnBlur : localAutoFormatOnBlur;
+  const setAutoFormatOnBlur = (val: boolean) => {
+    setLocalAutoFormatOnBlur(val);
+    if (settings && onUpdateSettings) {
+      onUpdateSettings({ ...settings, autoFormatOnBlur: val });
+    }
+  };
   const isEditingSolfaRef = useRef<boolean>(false);
   const solfaEditTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1789,6 +1796,8 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             score={score}
             gridOpacity={settings?.pianoRollGridOpacity}
             onUpdateScore={onUpdateScore}
+            autoFormatOnBlur={autoFormatOnBlur}
+            onToggleAutoFormatOnBlur={setAutoFormatOnBlur}
             currentTick={currentTick}
             playerRef={playerRef}
             onSeekTick={onSeekTick}
@@ -1839,6 +1848,8 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               score={score}
               gridOpacity={settings?.pianoRollGridOpacity}
               onUpdateScore={onUpdateScore}
+              autoFormatOnBlur={autoFormatOnBlur}
+              onToggleAutoFormatOnBlur={setAutoFormatOnBlur}
               currentTick={currentTick}
               playerRef={playerRef}
               onSeekTick={onSeekTick}
