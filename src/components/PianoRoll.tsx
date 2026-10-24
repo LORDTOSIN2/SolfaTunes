@@ -144,15 +144,16 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     }
   }, [availableVoices, activeVoiceId]);
 
+  const flattenedScore = useMemo(() => flattenScoreToPianoRoll(score), [score]);
+
   // Synchronize local notes from score when score updates from outside
   useEffect(() => {
-    const { notes: flatNotes } = flattenScoreToPianoRoll(score);
-    setNotes(flatNotes);
+    setNotes(flattenedScore.notes);
     setHasUncommittedChanges(false);
     // Format rebuilds note ids, so a previous selection would point at nothing.
     setSelectedNoteIds(new Set());
     setHoveredNote(null);
-  }, [score]);
+  }, [flattenedScore]);
 
   // Containers and refs
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -541,8 +542,13 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
       notes.forEach((n) => {
         const noteX = n.startTick * pixelsPerTick;
+<<<<<<< Updated upstream
         const noteW = Math.max(12, n.durationTicks * pixelsPerTick);
         const noteY = (maxMidi - n.midiPitch) * rowHeight;
+=======
+        const noteW = Math.max(2, n.durationTicks * pixelsPerTick - 2);
+        const noteY = (MAX_MIDI - n.midiPitch) * rowHeight;
+>>>>>>> Stashed changes
         const noteH = rowHeight;
 
         // Check AABB intersection
@@ -708,17 +714,28 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
   // Generate Measure Barlines for the Timeline Header
   const measureColumns = useMemo(() => {
-    const cols = [];
-    const numMeasures = Math.ceil(totalTicks / meterTicks);
-    for (let m = 0; m < numMeasures; m++) {
+    const cols = flattenedScore.measures.map((measure) => ({
+      measureNumber: measure.measureNumber,
+      startTick: measure.startTick,
+      durationTicks: measure.durationTicks,
+      width: measure.durationTicks * pixelsPerTick,
+    }));
+    let nextStart = cols.length > 0
+      ? cols[cols.length - 1].startTick + cols[cols.length - 1].durationTicks
+      : 0;
+    let measureNumber = cols.length + 1;
+    while (nextStart < totalTicks) {
       cols.push({
-        measureNumber: m + 1,
-        startTick: m * meterTicks,
+        measureNumber,
+        startTick: nextStart,
+        durationTicks: meterTicks,
         width: meterTicks * pixelsPerTick,
       });
+      nextStart += meterTicks;
+      measureNumber++;
     }
     return cols;
-  }, [totalTicks, meterTicks, pixelsPerTick]);
+  }, [flattenedScore.measures, totalTicks, meterTicks, pixelsPerTick]);
 
   // Audio timeline measure ranges from score
   const audioRanges = useMemo(() => getScoreMeasureRanges(score), [score]);
@@ -810,12 +827,24 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
   }, [isRulerDragging]);
   const beatLines = useMemo(() => {
-    const lines: { tick: number; isMeasureStart: boolean }[] = [];
-    for (let tick = meterBeatTicks; tick < totalTicks; tick += meterBeatTicks) {
-      lines.push({ tick, isMeasureStart: tick % meterTicks === 0 });
+    const lines: number[] = [];
+    measureColumns.forEach((measure) => {
+      const measureEnd = Math.min(measure.startTick + measure.durationTicks, totalTicks);
+      for (
+        let tick = measure.startTick + meterBeatTicks;
+        tick < measureEnd;
+        tick += meterBeatTicks
+      ) {
+        lines.push(tick);
+      }
+    });
+    if (measureColumns.length === 0) {
+      for (let tick = meterBeatTicks; tick < totalTicks; tick += meterBeatTicks) {
+        lines.push(tick);
+      }
     }
     return lines;
-  }, [meterBeatTicks, meterTicks, totalTicks]);
+  }, [measureColumns, meterBeatTicks, totalTicks]);
   const gridAlpha = Math.max(0, Math.min(0.4, gridOpacity));
   const gridSubdivisionTicks = Math.max(1, Math.round(meterBeatTicks / 4));
   const gridSubdivisionPixels = gridSubdivisionTicks * pixelsPerTick;
@@ -1417,24 +1446,28 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               {/* Beat and measure lines follow the score's meter */}
               {beatLines.map((line) => (
                 <div
-                  key={`beat-line-${line.tick}`}
+                  key={`beat-line-${line}`}
                   className="absolute top-0 bottom-0 pointer-events-none z-[2]"
                   aria-hidden="true"
                   style={{
-                    left: `${line.tick * pixelsPerTick}px`,
+                    left: `${line * pixelsPerTick}px`,
                     height: `${totalGridHeight}px`,
-                    borderLeft: `1px solid rgba(129,140,248,${gridAlpha * (line.isMeasureStart ? 1 : 0.65)})`,
+                    borderLeft: `1px solid rgba(129,140,248,${gridAlpha * 0.65})`,
                   }}
                 />
               ))}
 
+<<<<<<< Updated upstream
               {/* Vertical Measure & Beat Grid Lines */}
+=======
+              {/* Measure boundaries follow the playback timeline. */}
+>>>>>>> Stashed changes
               {measureColumns.map((col) => (
                 <div
                   key={`m-line-${col.measureNumber}`}
                   className="absolute top-0 bottom-0 pointer-events-none z-[2]"
                   style={{
-                    left: `${col.startTick * pixelsPerTick - 1}px`,
+                    left: `${col.startTick * pixelsPerTick}px`,
                     height: `${totalGridHeight}px`,
                     borderLeft: `2px solid rgba(129,140,248,${gridAlpha})`,
                   }}
@@ -1464,8 +1497,13 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 const isSounding = activeSoundingNoteIds.has(note.id);
 
                 const left = note.startTick * pixelsPerTick;
+<<<<<<< Updated upstream
                 const width = Math.max(3, note.durationTicks * pixelsPerTick);
                 const top = (maxMidi - note.midiPitch) * rowHeight;
+=======
+                const width = Math.max(2, note.durationTicks * pixelsPerTick - 2);
+                const top = (MAX_MIDI - note.midiPitch) * rowHeight;
+>>>>>>> Stashed changes
                 const height = rowHeight - 2;
 
                 const solfaDisplay = formatSolfaOctaveLabel(note.syllable, note.octaveRelativeToVoice);
