@@ -21,7 +21,7 @@ import {
 } from './document_io';
 
 function loadFixture(name: string): string {
-  return readFileSync(new URL(`../../../scores/${name}`, import.meta.url), 'utf8');
+  return readFileSync(new URL(`../../../test/fixtures/scores/${name}`, import.meta.url), 'utf8');
 }
 
 function parseAbc(source: string): ParsedScore {

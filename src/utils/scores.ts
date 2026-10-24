@@ -20,20 +20,22 @@ function readField(text: string, pattern: RegExp): string | undefined {
   return text.match(pattern)?.[1]?.trim();
 }
 
-export const SCORES: ScoreLibraryItem[] = Object.entries(scoreFiles)
-  .map(([path, abcText]) => {
-    const fileName = path.split('/').pop() || path;
+export function createScoreLibraryItem(path: string, abcText: string): ScoreLibraryItem {
+  const fileName = path.split('/').pop() || path;
 
-    return {
-      id: fileName.replace(/\.(?:abc|txt)$/i, ''),
-      fileName,
-      title: readField(abcText, /^T:\s*(.+)$/im) || fileName.replace(/\.[^.]+$/, ''),
-      composer: readField(abcText, /^C:\s*(.+)$/im) || 'Composer unknown',
-      abcText,
-      hymnName: readField(abcText, /^%\s*hymn_name\s*=\s*(.+)$/im),
-      tuneName: readField(abcText, /^%\s*tune_name\s*=\s*(.+)$/im),
-    };
-  })
+  return {
+    id: fileName.replace(/\.(?:abc|txt)$/i, ''),
+    fileName,
+    title: readField(abcText, /^T:\s*(.+)$/im) || fileName.replace(/\.[^.]+$/, ''),
+    composer: readField(abcText, /^C:\s*(.+)$/im) || 'Composer unknown',
+    abcText,
+    hymnName: readField(abcText, /^%\s*hymn_name\s*=\s*(.+)$/im),
+    tuneName: readField(abcText, /^%\s*tune_name\s*=\s*(.+)$/im),
+  };
+}
+
+export const SCORES: ScoreLibraryItem[] = Object.entries(scoreFiles)
+  .map(([path, abcText]) => createScoreLibraryItem(path, abcText))
   .sort((a, b) => getScoreDisplayTitle(a, 'hymn').localeCompare(getScoreDisplayTitle(b, 'hymn')));
 
 export function getScoreDisplayTitle(

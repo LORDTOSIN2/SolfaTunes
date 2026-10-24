@@ -1,6 +1,9 @@
-# Score library
+# Score files
 
-Add `.abc` or `.txt` ABC-notation score files to this folder. The app discovers these files at build time and lists them in the score library.
+The `scores/` folder is reserved for `.xml` and `.musicxml` project files.
+ABC-notation `.abc` and `.txt` files can still be opened through the app's
+import controls. Reference ABC files used by the test suite are stored in
+`test/fixtures/scores/` and are not part of the app's bundled score list.
 
 Use standard ABC headers such as `T:` for the tune title and `C:` for the composer. To show the hymn title first in the library, add a metadata comment:
 
@@ -9,7 +12,7 @@ Use standard ABC headers such as `T:` for the tune title and `C:` for the compos
 % tune_name=The tune name
 ```
 
-The library defaults to hymn titles and falls back to the score's `T:` title when no `hymn_name` is present. Users can switch the list to tune names at any time.
+The score library defaults to hymn titles and falls back to the score's `T:` title when no `hymn_name` is present. Users can switch the list to tune names at any time.
 
 ## Project files
 

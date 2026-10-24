@@ -183,7 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ) : (
             <p className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-stone-400">
-              No scores found. Add ABC text files to the <code className="text-indigo-300">scores/</code> folder.
+              No bundled ABC scores. Import an ABC or TXT file below.
             </p>
           )}
         </div>

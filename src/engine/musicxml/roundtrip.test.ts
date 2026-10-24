@@ -45,7 +45,7 @@ function extractMidiEvents(score: ParsedScore): MidiNoteEvent[] {
 }
 
 function loadHymnAbc(fileName: string): string {
-  const filePath = path.resolve(__dirname, '../../../scores', fileName);
+  const filePath = path.resolve(__dirname, '../../../test/fixtures/scores', fileName);
   return fs.readFileSync(filePath, 'utf-8');
 }
 

@@ -1,18 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { getScoreDisplayTitle, SCORES } from '../utils/scores';
+import { createScoreLibraryItem, getScoreDisplayTitle } from '../utils/scores';
 import { AbcParser } from './abc_parser';
 import { SolfaTransformer } from './solfa_transformer';
 import { getScoreMeasureRanges } from '../utils/playback_timeline';
 
-describe('score library', () => {
-  it('discovers repository scores and displays hymn names by default', () => {
-    const franconia = SCORES.find(score => score.fileName === 'Franconia.txt');
-    const vienna = SCORES.find(score => score.fileName === 'Vienna.txt');
-    const winchester = SCORES.find(score => score.fileName === 'Winchester New.txt');
+const scoreFiles = import.meta.glob<string>('../../test/fixtures/scores/*.txt', {
+  eager: true,
+  query: '?raw',
+  import: 'default',
+});
 
-    if (!franconia || !vienna || !winchester) {
-      throw new Error('The Franconia, Vienna, and Winchester New scores must be present in the library.');
-    }
+const scoreFixtures = Object.entries(scoreFiles).map(([path, abcText]) =>
+  createScoreLibraryItem(path, abcText)
+);
+
+describe('score fixtures', () => {
+  it('loads test fixtures and displays hymn names by default', () => {
+    const franconia = scoreFixtures.find(score => score.fileName === 'Franconia.txt');
+    const vienna = scoreFixtures.find(score => score.fileName === 'Vienna.txt');
+    const winchester = scoreFixtures.find(score => score.fileName === 'Winchester New.txt');
+
+    expect(franconia).toBeDefined();
+    expect(vienna).toBeDefined();
+    expect(winchester).toBeDefined();
+    if (!franconia || !vienna || !winchester) return;
 
     expect(getScoreDisplayTitle(franconia, 'hymn')).toBe('The advent of our King');
     expect(getScoreDisplayTitle(vienna, 'hymn')).toBe('Lucis Creator optime');
@@ -35,11 +46,11 @@ describe('score library', () => {
     expect(getScoreDisplayTitle(score, 'tune')).toBe('Untitled score');
   });
 
-  it.each(SCORES)('parses and transforms $title', libraryItem => {
-    const { score, warnings } = new AbcParser().parse(libraryItem.abcText);
+  it.each(scoreFixtures)('parses and transforms $title', fixture => {
+    const { score, warnings } = new AbcParser().parse(fixture.abcText);
 
     expect(warnings).toEqual([]);
-    const titleHeader = libraryItem.abcText.match(/^T:(.*)$/m)?.[1];
+    const titleHeader = fixture.abcText.match(/^T:(.*)$/m)?.[1];
     expect(titleHeader).toBeDefined();
     expect(score.title).toBe(titleHeader);
     expect(score.systems.length).toBeGreaterThan(0);
@@ -64,8 +75,8 @@ describe('score library', () => {
     }
   });
 
-  it.each(SCORES)('keeps the visual measure timeline aligned with audio note timestamps for $title', libraryItem => {
-    const { score } = new AbcParser().parse(libraryItem.abcText);
+  it.each(scoreFixtures)('keeps the visual measure timeline aligned with audio note timestamps for $title', fixture => {
+    const { score } = new AbcParser().parse(fixture.abcText);
     new SolfaTransformer().transform(score);
 
     const ranges = getScoreMeasureRanges(score);
