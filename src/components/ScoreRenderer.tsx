@@ -10,7 +10,7 @@ import { serializeScoreToSolfa } from '../engine/solfa_serializer';
 import { parseSolfaToAbc } from '../engine/solfa_parser';
 import { alignSolfaGrid } from '../engine/solfa_aligner';
 import { findActiveMeasureRange, getScoreMeasureRanges } from '../utils/playback_timeline';
-import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle, FileText, CheckSquare, Square } from 'lucide-react';
+import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle, FileText, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
 import { PianoRoll } from './PianoRoll';
 import { MidiPlayer } from '../audio/midi_player';
 
@@ -34,6 +34,8 @@ interface ScoreRendererProps {
   setStudioMode: (val: 'read' | 'lyrics' | 'interactive' | 'source') => void;
   playerRef?: React.RefObject<MidiPlayer | null>;
   onSeekTick?: (tick: number) => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 /**
@@ -773,9 +775,12 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   setStudioMode,
   playerRef,
   onSeekTick,
+  isExpanded,
+  onToggleExpand,
 }) => {
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [showPianoRoll, setShowPianoRoll] = useState<boolean>(false);
+  const [showLegend, setShowLegend] = useState<boolean>(false);
 
   const layoutRows = useMemo<({ type: 'voice'; voice: any } | { type: 'divider' })[]>(() => {
     if (!score) return [];
@@ -1394,31 +1399,41 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             })}
           </div>
 
-          {/* Symbol Legend Box */}
-          <div className="mt-16 pt-8 border-t border-black/10">
-            <h3 className="text-center font-serif italic text-black/70 text-sm mb-4">
-              Tonic Sol-fa Reference Legend
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-black/5 p-5 rounded-xl border border-black/5 text-[11px] text-black/60 font-sans">
-              <div>
-                <span className="font-mono font-bold text-black">d r m f s l t</span>
-                <p className="mt-1">Movable-Do scale degrees. Tonic = d.</p>
-              </div>
-              <div>
-                <span className="font-mono font-bold text-black">di ri fi si li</span>
-                <p className="mt-1">Raised passing chromatic degrees.</p>
-              </div>
-              <div>
-                <span className="font-mono font-bold text-black">ḋ (d&#x307;) / ḍ (d&#x323;)</span>
-                <p className="mt-1">Octave marks: dot above = high, dot below = low.</p>
-              </div>
-              <div>
-                <span className="font-mono font-bold text-black">:  ·  -  |  ‖</span>
-                <p className="mt-1">
-                  : divides beats. · rest. - held beat. | bar. ‖ section end.
-                </p>
-              </div>
+          {/* Symbol Legend Box (Collapsible to keep interface clean and easy to scan) */}
+          <div className="mt-12 pt-6 border-t border-black/10 select-none">
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowLegend((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 px-3 py-1 bg-black/5 hover:bg-black/10 text-black/70 hover:text-black rounded-full text-xs font-serif italic transition-colors cursor-pointer"
+                title={showLegend ? 'Hide Sol-fa Reference Legend' : 'Show Sol-fa Reference Legend'}
+              >
+                <span>Tonic Sol-fa Reference Legend</span>
+                {showLegend ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+              </button>
             </div>
+            {showLegend && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 bg-black/5 p-5 rounded-xl border border-black/5 text-[11px] text-black/60 font-sans transition-all">
+                <div>
+                  <span className="font-mono font-bold text-black">d r m f s l t</span>
+                  <p className="mt-1">Movable-Do scale degrees. Tonic = d.</p>
+                </div>
+                <div>
+                  <span className="font-mono font-bold text-black">di ri fi si li</span>
+                  <p className="mt-1">Raised passing chromatic degrees.</p>
+                </div>
+                <div>
+                  <span className="font-mono font-bold text-black">ḋ (d&#x307;) / ḍ (d&#x323;)</span>
+                  <p className="mt-1">Octave marks: dot above = high, dot below = low.</p>
+                </div>
+                <div>
+                  <span className="font-mono font-bold text-black">:  ·  -  |  ‖</span>
+                  <p className="mt-1">
+                    : divides beats. · rest. - held beat. | bar. ‖ section end.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1607,6 +1622,8 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             playerRef={playerRef}
             onSeekTick={onSeekTick}
             onClose={() => setShowPianoRoll(false)}
+            isExpanded={isExpanded}
+            onToggleExpand={onToggleExpand}
           />
         </div>
       ) : studioMode === 'source' ? (

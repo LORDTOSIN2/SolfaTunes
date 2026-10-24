@@ -6,13 +6,14 @@
 import React, { useState, useRef } from 'react';
 import { getScoreDisplayTitle, SCORES, ScoreLibraryItem, ScoreTitleMode } from '../utils/scores';
 import { ParseWarning } from '../types';
-import { FileMusic, AlertTriangle, Upload, ChevronDown, ChevronUp, Music } from 'lucide-react';
+import { FileMusic, AlertTriangle, Upload, ChevronDown, ChevronUp, ChevronLeft, Music } from 'lucide-react';
 
 interface SidebarProps {
   onLoadAbcText: (text: string) => void;
   warnings: ParseWarning[];
   onLoadScore: (score: ScoreLibraryItem) => void;
   selectedScoreId?: string;
+  onCollapse?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -20,6 +21,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   warnings,
   onLoadScore,
   selectedScoreId,
+  onCollapse,
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [showWarnings, setShowWarnings] = useState(true);
@@ -72,9 +74,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="w-full lg:w-[380px] bg-[#0F1115] border-r border-white/5 flex flex-col h-full shadow-xl">
       {/* Sidebar Header */}
       <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-white/5 bg-[#13161C]">
-        <div className="flex items-center gap-2 text-white">
-          <FileMusic className="text-[#4F46E5] h-5 w-5" />
-          <h2 className="font-sans font-black text-sm uppercase tracking-wider">Score library</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-white">
+            <FileMusic className="text-[#4F46E5] h-5 w-5" />
+            <h2 className="font-sans font-black text-sm uppercase tracking-wider">Score library</h2>
+          </div>
+          {onCollapse && (
+            <button
+              type="button"
+              onClick={onCollapse}
+              className="p-1 hover:bg-white/10 rounded-md text-stone-400 hover:text-white transition-colors cursor-pointer"
+              title="Fold away score library panel"
+            >
+              <ChevronLeft size={16} />
+            </button>
+          )}
         </div>
         <p className="text-[11px] text-stone-400 mt-1">
           Choose a hymn to open its score, or import your own.

@@ -22,11 +22,19 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Minimize2,
   Trash2,
   Check,
-  ArrowRight,
   Info,
   Layers,
+  ChevronDown,
+  ChevronUp,
+  Sliders,
+  X,
+  HelpCircle,
+  Eye,
+  CheckSquare,
+  Square,
   Volume2,
 } from 'lucide-react';
 
@@ -37,14 +45,16 @@ interface PianoRollProps {
   playerRef?: React.RefObject<MidiPlayer | null>;
   onSeekTick?: (tick: number) => void;
   onClose?: () => void;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
-// Pitch range: C2 (MIDI 36) to C6 (MIDI 84) = 49 keys
+// Pitch range: C2 (MIDI 36) to C6 (MIDI 84) = 49 chromatic keys
 const MIN_MIDI = 36;
 const MAX_MIDI = 84;
-const KEY_COUNT = MAX_MIDI - MIN_MIDI + 1;
+const KEY_COUNT = MAX_MIDI - MIN_MIDI + 1; // 49 keys
 
-// Is a MIDI note a black key? (0=C, 1=C#, 2=D, 3=D#, 4=E, 5=F, 6=F#, 7=G, 8=G#, 9=A, 10=A#, 11=B)
+// Black key pitch classes (0=C, 1=C#, 2=D, 3=D#, 4=E, 5=F, 6=F#, 7=G, 8=G#, 9=A, 10=A#, 11=B)
 const BLACK_KEY_PCS = new Set([1, 3, 6, 8, 10]);
 
 export const PianoRoll: React.FC<PianoRollProps> = ({
@@ -54,19 +64,25 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   playerRef,
   onSeekTick,
   onClose,
+  isExpanded = false,
+  onToggleExpand,
 }) => {
   // 1. Grid & Display Settings
-  const [pixelsPerTick, setPixelsPerTick] = useState<number>(4.0); // 16 ticks (1 quarter) = 64px
-  const [rowHeight, setRowHeight] = useState<number>(20); // 20px per semitone
-  const [snapTicks, setSnapTicks] = useState<number>(8); // default: eighth note = 8 ticks (or 16 for quarter)
+  const [pixelsPerTick, setPixelsPerTick] = useState<number>(4.0); // 16 ticks = 64px
+  const [rowHeight, setRowHeight] = useState<number>(20); // 20px default row height
+  const [snapTicks, setSnapTicks] = useState<number>(8); // default 8 ticks = 1/8 note
   const [autoFormatOnBlur, setAutoFormatOnBlur] = useState<boolean>(true);
   const [hasUncommittedChanges, setHasUncommittedChanges] = useState<boolean>(false);
 
-  // 2. Local editable notes state
+  // 2. Collapsible UI Panels (Clean scanability, collapse away by default)
+  const [showToolsDrawer, setShowToolsDrawer] = useState<boolean>(false);
+  const [showHelpDrawer, setShowHelpDrawer] = useState<boolean>(false);
+
+  // 3. Local editable notes state
   const [notes, setNotes] = useState<FlatPianoRollNote[]>([]);
   const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set());
 
-  // 3. Active insertion voice channel (one channel at a time)
+  // 4. Active insertion voice channel (isolated single-channel insertion)
   const availableVoices = useMemo(() => {
     if (score.voices && score.voices.length > 0) {
       return score.voices.map((v) => v.id);
@@ -124,6 +140,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
   const totalGridWidth = totalTicks * pixelsPerTick;
   const totalGridHeight = KEY_COUNT * rowHeight;
+  const totalCanvasHeight = totalGridHeight + 28; // 28px timeline header
 
   // Sound preview helper
   const playPreview = useCallback(
@@ -139,7 +156,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   useEffect(() => {
     if (scrollContainerRef.current) {
       const c4Y = (MAX_MIDI - 60) * rowHeight;
-      const targetScroll = Math.max(0, c4Y - scrollContainerRef.current.clientHeight / 2 + 100);
+      const targetScroll = Math.max(0, c4Y - scrollContainerRef.current.clientHeight / 2 + 60);
       scrollContainerRef.current.scrollTop = targetScroll;
     }
   }, [rowHeight]);
@@ -396,6 +413,16 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   // -------------------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Close open drawers on Escape
+      if (e.key === 'Escape') {
+        if (showToolsDrawer) setShowToolsDrawer(false);
+        if (showHelpDrawer) setShowHelpDrawer(false);
+        if (selectedNoteIds.size > 0) {
+          setSelectedNoteIds(new Set());
+          return;
+        }
+      }
+
       if (selectedNoteIds.size === 0) return;
 
       // Delete or Backspace
@@ -463,12 +490,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNoteIds, notes, snapTicks, playPreview]);
-
-  // Synchronize horizontal scrolling between ruler and grid
-  const handleScroll = () => {
-    // Both header and grid are inside scrollContainerRef, automatically aligned
-  };
+  }, [selectedNoteIds, notes, snapTicks, playPreview, showToolsDrawer, showHelpDrawer]);
 
   // Seek timeline click
   const handleRulerClick = (e: React.MouseEvent) => {
@@ -498,6 +520,12 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   // Active voice theme
   const activeVoiceTheme = getVoiceTheme(activeVoiceId);
 
+  // Statistics for active vs other channels
+  const activeChannelNoteCount = useMemo(
+    () => notes.filter((n) => n.voiceId === activeVoiceId && !n.isRest).length,
+    [notes, activeVoiceId]
+  );
+
   return (
     <div
       ref={pianoRollWrapperRef}
@@ -507,23 +535,23 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
       onMouseMove={handleMouseMove}
       className="flex flex-col h-full bg-[#0D0E12] text-stone-200 select-none overflow-hidden outline-none"
     >
-      {/* 1. Piano Roll Top Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-[#14161D] border-b border-white/10 text-xs shadow-md">
-        {/* Left: Title & Active Channel Picker */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
+      {/* 1. Piano Roll Clean Header Toolbar */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-[#14161D] border-b border-white/10 text-xs shadow-md shrink-0">
+        {/* Left: Title & Active Channel Insertion Selector */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 shrink-0">
             <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
-            <h3 className="font-sans font-black text-xs uppercase tracking-wider text-white flex items-center gap-1.5">
+            <h3 className="font-sans font-black text-xs uppercase tracking-wider text-white hidden sm:flex items-center gap-1.5">
               <Music size={14} className="text-indigo-400" />
               Piano Roll
             </h3>
           </div>
 
-          <div className="h-4 w-px bg-white/10 mx-1 hidden sm:block" />
+          <div className="h-4 w-px bg-white/10 hidden sm:block shrink-0" />
 
           {/* Active Voice Channel Insertion Pill Selector */}
-          <div className="flex items-center gap-1.5 bg-black/50 p-1 rounded-lg border border-white/10">
-            <span className="text-[10px] uppercase font-bold text-stone-400 px-1.5 flex items-center gap-1">
+          <div className="flex items-center gap-1 bg-black/50 p-1 rounded-lg border border-white/10 overflow-x-auto max-w-[280px] sm:max-w-none">
+            <span className="text-[10px] uppercase font-bold text-stone-400 px-1 hidden md:flex items-center gap-1 shrink-0">
               <Layers size={11} />
               Channel:
             </span>
@@ -535,7 +563,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                   key={vId}
                   type="button"
                   onClick={() => setActiveVoiceId(vId)}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-sans font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md text-[10px] sm:text-[11px] font-sans font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                     isActive
                       ? `${theme.bgClass} text-white shadow-md ring-1 ring-white/30`
                       : 'text-stone-400 hover:text-white hover:bg-white/5'
@@ -543,7 +571,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                   title={`Insert notes into ${theme.name} channel (monophonic)`}
                 >
                   <span
-                    className="w-2 h-2 rounded-full inline-block"
+                    className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full inline-block shrink-0"
                     style={{ backgroundColor: theme.hex }}
                   />
                   <span>{theme.name}</span>
@@ -553,15 +581,16 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
           </div>
         </div>
 
-        {/* Right: Controls & Auto-Format */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Right: Quick Controls & Collapsible Drawer Toggles */}
+        <div className="flex items-center gap-2 shrink-0">
           {/* Snap / Grid Size */}
-          <div className="flex items-center gap-1.5 bg-black/40 px-2.5 py-1 rounded-lg border border-white/10 text-[11px]">
-            <span className="text-stone-400 font-medium">Snap:</span>
+          <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-lg border border-white/10 text-[11px]">
+            <span className="text-stone-400 font-medium hidden sm:inline">Snap:</span>
             <select
               value={snapTicks}
               onChange={(e) => setSnapTicks(Number(e.target.value))}
-              className="bg-transparent text-indigo-300 font-mono font-bold focus:outline-none cursor-pointer"
+              className="bg-transparent text-indigo-300 font-mono font-bold focus:outline-none cursor-pointer text-xs"
+              title="Grid snap subdivision"
             >
               <option value={4} className="bg-stone-900 text-white">1/16</option>
               <option value={8} className="bg-stone-900 text-white">1/8</option>
@@ -570,87 +599,221 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
             </select>
           </div>
 
-          {/* Zoom controls */}
-          <div className="flex items-center gap-1 bg-black/40 px-1.5 py-1 rounded-lg border border-white/10">
-            <button
-              onClick={() => setPixelsPerTick((p) => Math.max(1.5, p * 0.8))}
-              className="p-1 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer"
-              title="Zoom Out Horizontally"
-            >
-              <ZoomOut size={13} />
-            </button>
-            <span className="text-[10px] font-mono text-stone-400 w-8 text-center">
-              {Math.round(pixelsPerTick * 25)}%
-            </span>
-            <button
-              onClick={() => setPixelsPerTick((p) => Math.min(10.0, p * 1.25))}
-              className="p-1 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer"
-              title="Zoom In Horizontally"
-            >
-              <ZoomIn size={13} />
-            </button>
-          </div>
+          {/* Collapsible Options & Tools Drawer Toggle */}
+          <button
+            type="button"
+            onClick={() => setShowToolsDrawer((prev) => !prev)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all border ${
+              showToolsDrawer
+                ? 'bg-indigo-600 border-indigo-400 text-white shadow-md'
+                : hasUncommittedChanges
+                ? 'bg-indigo-500/10 border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/20'
+                : 'bg-black/40 border-white/10 text-stone-300 hover:text-white hover:bg-white/5'
+            }`}
+            title="Expand / collapse formatting tools, zoom, and selection controls"
+          >
+            <Sliders size={12} />
+            <span className="hidden sm:inline">Tools & Format</span>
+            {hasUncommittedChanges && !showToolsDrawer && (
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+            )}
+            {showToolsDrawer ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
 
-          {/* Delete Selection */}
-          {selectedNoteIds.size > 0 && (
+          {/* Quick Format Now Button (Directly reachable when unsaved) */}
+          {hasUncommittedChanges && !showToolsDrawer && (
             <button
-              onClick={() => {
-                setNotes((prev) => prev.filter((n) => !selectedNoteIds.has(n.id)));
-                setSelectedNoteIds(new Set());
-                setHasUncommittedChanges(true);
-              }}
-              className="flex items-center gap-1 px-2.5 py-1 bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 rounded-lg text-[11px] font-bold cursor-pointer transition-colors"
-              title="Delete selected notes (Delete or Backspace)"
+              onClick={executeAutoFormat}
+              className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-lg shadow cursor-pointer transition-all"
+              title="Sync & auto-format changes now"
             >
-              <Trash2 size={12} />
-              <span>Delete ({selectedNoteIds.size})</span>
+              <Sparkles size={11} />
+              <span className="hidden sm:inline">Format</span>
             </button>
           )}
 
-          {/* Auto-Format on Blur Toggle & Trigger Button */}
-          <div className="flex items-center gap-2">
-            <label
-              className="flex items-center gap-1.5 text-[11px] text-stone-300 hover:text-white cursor-pointer select-none"
-              title="Automatically quantize and format notes to app standards when leaving the piano roll"
-            >
-              <input
-                type="checkbox"
-                checked={autoFormatOnBlur}
-                onChange={(e) => setAutoFormatOnBlur(e.target.checked)}
-                className="rounded border-stone-600 text-indigo-600 focus:ring-0 focus:outline-none cursor-pointer"
-              />
-              <span className="font-medium text-[10px] sm:text-[11px]">Format on blur</span>
-            </label>
-
+          {/* Optional Expand / Fullscreen Toggle */}
+          {onToggleExpand && (
             <button
-              onClick={executeAutoFormat}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
-                hasUncommittedChanges
-                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg ring-1 ring-indigo-400/50'
-                  : 'bg-white/10 hover:bg-white/20 text-stone-300'
-              }`}
-              title="Instantly format and sync notes to the score and tonic sol-fa views"
+              type="button"
+              onClick={onToggleExpand}
+              className="p-1.5 bg-black/40 hover:bg-white/10 text-stone-300 hover:text-white rounded-lg border border-white/10 cursor-pointer transition-colors"
+              title={isExpanded ? 'Collapse to standard view' : 'Expand full canvas'}
             >
-              <Sparkles size={12} className={hasUncommittedChanges ? 'animate-spin' : ''} />
-              <span>Format Now</span>
+              {isExpanded ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
-          </div>
+          )}
+
+          {/* Close Piano Roll view */}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 bg-black/40 hover:bg-white/10 text-stone-300 hover:text-white rounded-lg border border-white/10 cursor-pointer transition-colors"
+              title="Close Piano Roll view"
+            >
+              <X size={13} />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 2. Main Piano Roll Work Area */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Scrollable Container for both Keyboard and Grid */}
+      {/* 2. Collapsible Tools & Format Drawer (Folds away cleanly) */}
+      {showToolsDrawer && (
+        <div className="bg-[#101218] border-b border-indigo-500/20 px-4 py-3 shadow-2xl transition-all duration-200 shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
+            {/* Group A: Format & Sync */}
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[10px] uppercase font-black text-indigo-400 tracking-wider">
+                Sync & Quantization:
+              </span>
+
+              <label
+                className="flex items-center gap-1.5 text-stone-300 hover:text-white cursor-pointer select-none bg-black/40 px-2.5 py-1 rounded-md border border-white/10"
+                title="Automatically snap notes to grid and update Tonic Sol-fa when leaving the piano roll"
+              >
+                <input
+                  type="checkbox"
+                  checked={autoFormatOnBlur}
+                  onChange={(e) => setAutoFormatOnBlur(e.target.checked)}
+                  className="rounded border-stone-600 text-indigo-600 focus:ring-0 cursor-pointer"
+                />
+                <span className="text-[11px] font-medium">Auto-format on blur</span>
+              </label>
+
+              <button
+                onClick={executeAutoFormat}
+                className="flex items-center gap-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md text-[11px] font-bold shadow-md cursor-pointer transition-all"
+                title="Instantly format, quantize, and rebuild the score"
+              >
+                <Sparkles size={12} />
+                <span>Format Now</span>
+              </button>
+            </div>
+
+            {/* Group B: Zoom & Row Sizing */}
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[10px] uppercase font-black text-indigo-400 tracking-wider">
+                Display:
+              </span>
+
+              {/* Horizontal Zoom */}
+              <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-md border border-white/10 text-[11px]">
+                <span className="text-stone-400 text-[10px] mr-1">Zoom:</span>
+                <button
+                  onClick={() => setPixelsPerTick((p) => Math.max(1.5, p * 0.8))}
+                  className="p-0.5 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer"
+                  title="Zoom Out Horizontally"
+                >
+                  <ZoomOut size={12} />
+                </button>
+                <span className="text-[10px] font-mono text-stone-300 w-8 text-center font-bold">
+                  {Math.round(pixelsPerTick * 25)}%
+                </span>
+                <button
+                  onClick={() => setPixelsPerTick((p) => Math.min(10.0, p * 1.25))}
+                  className="p-0.5 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer"
+                  title="Zoom In Horizontally"
+                >
+                  <ZoomIn size={12} />
+                </button>
+              </div>
+
+              {/* Row Height Selector */}
+              <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded-md border border-white/10 text-[10px]">
+                <button
+                  onClick={() => setRowHeight(16)}
+                  className={`px-2 py-0.5 rounded ${
+                    rowHeight === 16 ? 'bg-indigo-600 text-white font-bold' : 'text-stone-400 hover:text-white'
+                  }`}
+                  title="Compact key rows (16px)"
+                >
+                  Compact
+                </button>
+                <button
+                  onClick={() => setRowHeight(20)}
+                  className={`px-2 py-0.5 rounded ${
+                    rowHeight === 20 ? 'bg-indigo-600 text-white font-bold' : 'text-stone-400 hover:text-white'
+                  }`}
+                  title="Standard key rows (20px)"
+                >
+                  Standard
+                </button>
+                <button
+                  onClick={() => setRowHeight(26)}
+                  className={`px-2 py-0.5 rounded ${
+                    rowHeight === 26 ? 'bg-indigo-600 text-white font-bold' : 'text-stone-400 hover:text-white'
+                  }`}
+                  title="Spacious key rows (26px)"
+                >
+                  Large
+                </button>
+              </div>
+            </div>
+
+            {/* Group C: Selection Tools */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setSelectedNoteIds(new Set(notes.map((n) => n.id)))}
+                className="px-2 py-1 bg-black/40 hover:bg-white/10 text-stone-300 hover:text-white text-[10px] font-bold rounded border border-white/10 cursor-pointer"
+                title="Select all notes across all channels (Ctrl+A)"
+              >
+                Select All
+              </button>
+
+              {selectedNoteIds.size > 0 && (
+                <>
+                  <button
+                    onClick={() => setSelectedNoteIds(new Set())}
+                    className="px-2 py-1 bg-black/40 hover:bg-white/10 text-stone-400 hover:text-white text-[10px] font-bold rounded border border-white/10 cursor-pointer"
+                    title="Deselect all (Escape)"
+                  >
+                    Clear ({selectedNoteIds.size})
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setNotes((prev) => prev.filter((n) => !selectedNoteIds.has(n.id)));
+                      setSelectedNoteIds(new Set());
+                      setHasUncommittedChanges(true);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-red-600/30 hover:bg-red-600/40 text-red-200 border border-red-500/40 rounded text-[10px] font-bold cursor-pointer transition-colors"
+                    title="Delete selected notes"
+                  >
+                    <Trash2 size={11} />
+                    <span>Delete</span>
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowToolsDrawer(false)}
+                className="p-1 hover:bg-white/10 rounded text-stone-400 hover:text-white cursor-pointer ml-1"
+                title="Fold away tools drawer"
+              >
+                <ChevronUp size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Main Work Area: Synchronized Keyboard & Full-Height Grid */}
+      <div className="flex-1 flex overflow-hidden relative min-h-0">
         <div
           ref={scrollContainerRef}
-          onScroll={handleScroll}
           className="flex-1 flex overflow-auto relative"
         >
-          {/* Left Piano Keys Column (Sticky on Horizontal Scroll) */}
+          {/* Left Piano Keyboard Column (Sticky on horizontal scroll, fully sized) */}
           <div
             ref={keyboardRef}
-            className="sticky left-0 z-20 flex-shrink-0 w-24 bg-[#111217] border-r border-white/15 select-none shadow-xl"
-            style={{ paddingTop: '28px' /* timeline header height */ }}
+            className="sticky left-0 z-20 flex-shrink-0 w-24 bg-[#111217] border-r border-white/15 select-none shadow-2xl"
+            style={{
+              paddingTop: '28px', // offset for the sticky 28px timeline header
+              height: `${totalCanvasHeight}px`,
+              minHeight: `${totalCanvasHeight}px`,
+            }}
           >
             {Array.from({ length: KEY_COUNT }).map((_, i) => {
               const pitch = MAX_MIDI - i;
@@ -663,12 +826,15 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 <div
                   key={pitch}
                   onClick={() => playPreview(pitch)}
-                  className={`flex items-center justify-between px-2 text-[10px] font-mono font-bold border-b transition-colors cursor-pointer ${
+                  className={`flex items-center justify-between px-2 text-[10px] font-mono font-bold border-b transition-colors cursor-pointer flex-shrink-0 ${
                     isBlack
-                      ? 'bg-[#181920] hover:bg-[#252835] text-stone-400 border-black/40 h-[20px]'
-                      : 'bg-[#F8F9FA] hover:bg-[#E2E8F0] text-stone-900 border-stone-300 h-[20px]'
+                      ? 'bg-[#181920] hover:bg-[#252835] text-stone-400 border-black/40'
+                      : 'bg-[#F8F9FA] hover:bg-[#E2E8F0] text-stone-900 border-stone-300'
                   } ${isC ? 'ring-1 ring-indigo-500/60 font-black' : ''}`}
-                  style={{ height: `${rowHeight}px` }}
+                  style={{
+                    height: `${rowHeight}px`,
+                    minHeight: `${rowHeight}px`,
+                  }}
                   title={`Play ${label} (MIDI ${pitch})`}
                 >
                   <span className={`${isC ? 'text-indigo-600 font-extrabold' : ''}`}>
@@ -684,22 +850,31 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
             })}
           </div>
 
-          {/* Right Timeline Header & Note Matrix Grid */}
+          {/* Right Timeline Header & Note Matrix Grid (Ensures full totalGridHeight without flex collapse!) */}
           <div
-            className="flex-1 flex flex-col relative"
-            style={{ width: `${totalGridWidth}px`, minWidth: `${totalGridWidth}px` }}
+            className="flex-shrink-0 flex flex-col relative"
+            style={{
+              width: `${totalGridWidth}px`,
+              minWidth: `${totalGridWidth}px`,
+              height: `${totalCanvasHeight}px`,
+              minHeight: `${totalCanvasHeight}px`,
+            }}
           >
             {/* Timeline Ruler Header (Sticky on Vertical Scroll) */}
             <div
               onClick={handleRulerClick}
-              className="sticky top-0 z-10 h-7 bg-[#161822] border-b border-white/15 flex flex-row cursor-pointer"
-              style={{ width: `${totalGridWidth}px` }}
+              className="sticky top-0 z-10 h-7 bg-[#161822] border-b border-white/15 flex flex-row cursor-pointer flex-shrink-0 shadow-sm"
+              style={{
+                width: `${totalGridWidth}px`,
+                minWidth: `${totalGridWidth}px`,
+                height: '28px',
+              }}
               title="Click anywhere on the ruler to jump playback position"
             >
               {measureColumns.map((col) => (
                 <div
                   key={col.measureNumber}
-                  className="flex items-center px-2 text-[10px] font-mono font-bold text-stone-400 border-r border-white/20 select-none hover:bg-white/5 transition-colors"
+                  className="flex items-center px-2 text-[10px] font-mono font-bold text-stone-400 border-r border-white/20 select-none hover:bg-white/5 transition-colors shrink-0"
                   style={{ width: `${col.width}px` }}
                 >
                   <span className="text-indigo-300">M{col.measureNumber}</span>
@@ -710,19 +885,21 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               ))}
             </div>
 
-            {/* Note Grid Canvas */}
+            {/* Note Grid Canvas - Guaranteed to render all 49 semitone rows completely */}
             <div
               ref={gridContainerRef}
               onMouseDown={handleGridMouseDown}
               onDoubleClick={handleGridDoubleClick}
-              className="relative flex-1 cursor-crosshair overflow-hidden"
+              className="relative flex-shrink-0 cursor-crosshair overflow-hidden"
               style={{
                 width: `${totalGridWidth}px`,
+                minWidth: `${totalGridWidth}px`,
                 height: `${totalGridHeight}px`,
+                minHeight: `${totalGridHeight}px`,
                 backgroundSize: `${16 * pixelsPerTick}px ${rowHeight}px`,
               }}
             >
-              {/* Horizontal Row Striping (Black vs White keys) */}
+              {/* Horizontal Row Striping (Black vs White keys, all 49 rows rendered!) */}
               {Array.from({ length: KEY_COUNT }).map((_, i) => {
                 const pitch = MAX_MIDI - i;
                 const pc = ((pitch % 12) + 12) % 12;
@@ -742,12 +919,13 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                     style={{
                       top: `${i * rowHeight}px`,
                       height: `${rowHeight}px`,
+                      minHeight: `${rowHeight}px`,
                     }}
                   />
                 );
               })}
 
-              {/* Vertical Measure & Beat Grid Lines */}
+              {/* Vertical Measure & Beat Grid Lines across entire grid height */}
               {measureColumns.map((col) => (
                 <div
                   key={`m-line-${col.measureNumber}`}
@@ -808,9 +986,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                       {note.syllable}
                     </span>
 
-                    {/* Scientific Pitch (if note is wide enough) */}
-                    {width > 36 && (
-                      <span className="text-[9px] font-mono text-white/80 drop-shadow-sm ml-1 truncate">
+                    {/* Scientific Pitch (if note block is wide enough) */}
+                    {width > 34 && (
+                      <span className="text-[9px] font-mono text-white/85 drop-shadow-sm ml-1 truncate">
                         {formatPitchLabel(note.midiPitch, score.key)}
                       </span>
                     )}
@@ -835,33 +1013,75 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
         </div>
       </div>
 
-      {/* 3. Bottom Information & Help Footer */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-[#12131A] border-t border-white/10 text-[11px] text-stone-400">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-stone-300">Insertion Channel:</span>
-            <span
-              className="px-2 py-0.5 rounded text-[10px] font-bold text-white shadow-sm"
-              style={{ backgroundColor: activeVoiceTheme.hex }}
+      {/* 4. Collapsible Help & Cheatsheet Panel (Folds away cleanly) */}
+      {showHelpDrawer && (
+        <div className="bg-[#12141C] border-t border-white/10 p-4 text-xs text-stone-300 shadow-inner shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="font-bold text-white flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+              <HelpCircle size={13} className="text-indigo-400" />
+              Piano Roll Quick Guide & Monophony Standards
+            </h4>
+            <button
+              onClick={() => setShowHelpDrawer(false)}
+              className="text-stone-400 hover:text-white p-1 rounded cursor-pointer"
             >
-              {activeVoiceTheme.name}
-            </span>
+              <X size={14} />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[11px] leading-relaxed">
+            <div className="bg-black/30 p-2.5 rounded-lg border border-white/5">
+              <span className="font-bold text-indigo-300 block mb-1">Inserting Notes</span>
+              <p className="text-stone-400">
+                Double-click on the grid to create a note in the active channel (<span className="text-white font-bold">{activeVoiceTheme.name}</span>). New notes conform strictly to vocal monophony.
+              </p>
+            </div>
+            <div className="bg-black/30 p-2.5 rounded-lg border border-white/5">
+              <span className="font-bold text-indigo-300 block mb-1">Multi-Channel Movement</span>
+              <p className="text-stone-400">
+                Drag a box to select notes from different voices at once. Drag horizontally to shift time or vertically to transpose pitches together.
+              </p>
+            </div>
+            <div className="bg-black/30 p-2.5 rounded-lg border border-white/5">
+              <span className="font-bold text-indigo-300 block mb-1">Auto-Format on Blur</span>
+              <p className="text-stone-400">
+                When you click away from the piano roll, notes automatically quantize to measure subdivisions, fill rest gaps, and update Tonic Sol-fa syllables.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Minimalist Bottom Status Bar */}
+      <div className="flex items-center justify-between px-4 py-2 bg-[#12131A] border-t border-white/10 text-[11px] text-stone-400 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: activeVoiceTheme.hex }} />
+            <span className="text-stone-300 font-bold">{activeVoiceTheme.name} Channel</span>
+            <span className="text-stone-500 text-[10px]">({activeChannelNoteCount} notes)</span>
           </div>
 
-          <div className="hidden md:flex items-center gap-1 text-stone-500 text-[10px]">
-            <Info size={12} />
-            <span>Double-click grid to insert. Drag to move/transpose. Box drag to select multiple channels.</span>
-          </div>
+          {selectedNoteIds.size > 0 && (
+            <span className="text-indigo-400 text-[10px] font-bold">
+              • {selectedNoteIds.size} notes selected
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
-          <span className="text-stone-400 text-[10px]">
-            Selected: <span className="font-bold text-indigo-400">{selectedNoteIds.size}</span> notes
-          </span>
-
-          <span className="text-stone-500 font-mono text-[10px]">
+          <span className="text-stone-500 font-mono text-[10px] hidden sm:inline">
             Key: {score.key} | Meter: {score.meter}
           </span>
+
+          <button
+            type="button"
+            onClick={() => setShowHelpDrawer((prev) => !prev)}
+            className="flex items-center gap-1 text-[10px] text-stone-400 hover:text-white cursor-pointer px-1.5 py-0.5 rounded hover:bg-white/5 transition-colors"
+            title="Toggle Quick Guide & Keyboard Shortcuts"
+          >
+            <HelpCircle size={11} />
+            <span>Shortcuts</span>
+            {showHelpDrawer ? <ChevronDown size={11} /> : <ChevronUp size={11} />}
+          </button>
         </div>
       </div>
     </div>

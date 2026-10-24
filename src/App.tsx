@@ -21,7 +21,7 @@ import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
 import { serializeScoreToAbc } from './engine/abc_serializer';
-import { Music, Download, FileDown, FileUp } from 'lucide-react';
+import { Music, Download, FileDown, FileUp, ChevronRight } from 'lucide-react';
 import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
 
 export default function App() {
@@ -31,6 +31,7 @@ export default function App() {
   const [musicalDocument, setMusicalDocument] = useState<MusicalDocument | null>(null);
   const score = musicalDocument?.score ?? null;
   const [warnings, setWarnings] = useState<ParseWarning[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [musicXmlStatus, setMusicXmlStatus] = useState<{
     type: 'success' | 'warning' | 'error' | 'info';
     message: string;
@@ -527,15 +528,30 @@ export default function App() {
 
       {/* Main Work Area Dashboard */}
       <main className="flex-1 min-h-0 flex flex-col lg:flex-row p-3 sm:p-5 lg:p-6 xl:p-8 pb-36 lg:pb-8 gap-4 lg:gap-6 xl:gap-8 lg:overflow-hidden">
-        {/* Editor panel on Left */}
-        <div className="order-2 min-w-0 lg:order-1 lg:w-[320px] xl:w-[340px] 2xl:w-[380px] lg:shrink-0 lg:h-full lg:min-h-0">
-          <Sidebar
-            onLoadAbcText={handleLoadAbcText}
-            warnings={warnings}
-            onLoadScore={handleLoadScore}
-            selectedScoreId={SCORES.find(song => song.abcText === abcText)?.id}
-          />
-        </div>
+        {/* Collapsible Sidebar on Left */}
+        {isSidebarOpen ? (
+          <div className="order-2 min-w-0 lg:order-1 lg:w-[320px] xl:w-[340px] 2xl:w-[380px] lg:shrink-0 lg:h-full lg:min-h-0 transition-all duration-200">
+            <Sidebar
+              onLoadAbcText={handleLoadAbcText}
+              warnings={warnings}
+              onLoadScore={handleLoadScore}
+              selectedScoreId={SCORES.find(song => song.abcText === abcText)?.id}
+              onCollapse={() => setIsSidebarOpen(false)}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(true)}
+            className="order-2 lg:order-1 self-start lg:self-stretch flex items-center justify-center gap-2 bg-[#13161C] border border-white/10 rounded-lg px-2.5 py-1.5 lg:w-9 text-stone-300 hover:text-white hover:bg-white/10 shadow-lg cursor-pointer transition-colors"
+            title="Expand score library"
+          >
+            <ChevronRight size={16} />
+            <span className="text-[11px] font-bold uppercase tracking-wider lg:[writing-mode:vertical-rl] lg:rotate-180">
+              Library
+            </span>
+          </button>
+        )}
 
         {/* Put the score first on phones so it is visible without scrolling past the library. */}
         <div ref={scoreContainerRef} className="order-1 min-w-0 h-[70vh] min-h-[32rem] scroll-mt-3 lg:order-2 lg:flex-1 lg:h-full lg:min-h-0">
@@ -559,6 +575,8 @@ export default function App() {
             setStudioMode={setStudioMode}
             playerRef={playerRef}
             onSeekTick={handleSeek}
+            isExpanded={!isSidebarOpen}
+            onToggleExpand={() => setIsSidebarOpen((prev) => !prev)}
           />
         </div>
       </main>
