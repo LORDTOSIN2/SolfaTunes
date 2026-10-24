@@ -94,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
         <p className="text-[11px] text-stone-400 mt-1">
-          Choose a hymn to open its score, or import your own.
+          Choose a score to open it, or import your own.
         </p>
       </div>
 
@@ -138,15 +138,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="grid grid-cols-1 gap-2">
               {SCORES.map(song => {
                 const isSelected = song.id === selectedScoreId;
-                const secondaryTitle = titleMode === 'hymn'
-                  ? (song.hymnName ? song.tuneName || song.title : undefined)
-                  : (song.tuneName ? song.hymnName : undefined);
+                const secondaryTitle = song.format === 'abc'
+                  ? titleMode === 'hymn'
+                    ? (song.hymnName ? song.tuneName || song.title : undefined)
+                    : (song.tuneName ? song.hymnName : undefined)
+                  : undefined;
+                const scoreFileDescription = song.format === 'musicxml'
+                  ? `MusicXML • ${song.fileName}`
+                  : `ABC • ${song.composer} • ${song.fileName}`;
 
                 return (
                   <Tooltip
                     key={song.id}
                     content={isSelected ? 'Currently Active Score' : `Load ${getScoreDisplayTitle(song, titleMode)}`}
-                    description={`${song.composer} • ${song.fileName}`}
+                    description={scoreFileDescription}
                     side="right"
                   >
                     <button
@@ -170,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           </span>
                         )}
                         <span className="mt-1 block truncate text-[10px] text-stone-500">
-                          {song.composer} · {song.fileName}
+                          {scoreFileDescription.replace(/ • /g, ' · ')}
                         </span>
                       </span>
                       <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${isSelected ? 'bg-indigo-500/20 text-indigo-200' : 'bg-white/5 text-stone-400'}`}>
@@ -183,7 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ) : (
             <p className="rounded-xl border border-white/10 bg-white/[0.02] p-4 text-sm text-stone-400">
-              No bundled ABC scores. Import an ABC or TXT file below.
+              No bundled scores found. Import an ABC or TXT file below, or open a MusicXML project.
             </p>
           )}
         </div>

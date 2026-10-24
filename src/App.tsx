@@ -16,7 +16,7 @@ import {
   importMusicXmlDocument,
 } from './engine/musicxml/document_io';
 import { formatLossinessReport } from './engine/musicxml/lossiness_report';
-import { SCORES, ScoreLibraryItem } from './utils/scores';
+import { ABC_SCORES, SCORES, ScoreLibraryItem } from './utils/scores';
 import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
@@ -60,10 +60,14 @@ export default function App() {
     });
   };
 
-  const [abcText, setAbcText] = useState<string>(SCORES[0]?.abcText || '');
+  const [abcText, setAbcText] = useState<string>(ABC_SCORES[0]?.abcText || '');
   const [abcLoadVersion, setAbcLoadVersion] = useState(0);
   const [musicalDocument, setMusicalDocument] = useState<MusicalDocument | null>(null);
+  const [selectedBundledScoreId, setSelectedBundledScoreId] = useState<string | undefined>(
+    ABC_SCORES[0]?.id
+  );
   const score = musicalDocument?.score ?? null;
+  const selectedScoreId = selectedBundledScoreId;
   const [warnings, setWarnings] = useState<ParseWarning[]>([]);
   const [musicXmlStatus, setMusicXmlStatus] = useState<{
     type: 'success' | 'warning' | 'error' | 'info';
@@ -325,10 +329,23 @@ export default function App() {
     });
   };
 
-  const handleLoadScore = (song: ScoreLibraryItem) => {
+  const handleLoadScore = async (song: ScoreLibraryItem) => {
+    if (song.format === 'musicxml') {
+      try {
+        handleLoadMusicXmlText(await song.loadXml(), song.id);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        setMusicXmlStatus({
+          type: 'error',
+          message: `Bundled MusicXML score could not be loaded. The current score was not changed. ${message}`,
+        });
+      }
+      return;
+    }
     if (!confirmCurrentMusicXmlReplacement('open another score')) return;
     musicXmlProvenanceRef.current = null;
     setMusicXmlStatus(null);
+    setSelectedBundledScoreId(song.id);
     setAbcText(song.abcText);
     setAbcLoadVersion(version => version + 1);
     setSelectedNote(null);
@@ -341,17 +358,20 @@ export default function App() {
     if (!confirmCurrentMusicXmlReplacement('open an ABC score')) return;
     musicXmlProvenanceRef.current = null;
     setMusicXmlStatus(null);
+    setSelectedBundledScoreId(undefined);
     setAbcText(text);
     setAbcLoadVersion(version => version + 1);
   };
 
   const handleAbcTextChange = (text: string) => {
     musicXmlProvenanceRef.current = null;
+    setSelectedBundledScoreId(undefined);
     setAbcText(text);
   };
 
   const handleUpdateScore = (newScore: ParsedScore) => {
     musicXmlProvenanceRef.current = null;
+    setSelectedBundledScoreId(undefined);
     const newAbc = serializeScoreToAbc(newScore);
     setAbcText(newAbc);
   };
@@ -393,13 +413,8 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const handleImportMusicXml = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = '';
-    if (!file) return;
-
+  const handleLoadMusicXmlText = (xml: string, bundledScoreId?: string) => {
     try {
-      const xml = await file.text();
       const imported = importMusicXmlDocument(xml, (summary) => window.confirm(
         `This MusicXML import is partial or lossy. Continue and replace the current score?\n\n${summary}\n\nThe original MusicXML will be retained in the document for recovery.`
       ));
@@ -414,6 +429,7 @@ export default function App() {
       if (!confirmCurrentMusicXmlReplacement('open the selected MusicXML project')) return;
 
       musicXmlProvenanceRef.current = imported;
+      setSelectedBundledScoreId(bundledScoreId);
       const importedBpm = imported.score.tempoBpm ?? bpm;
       setBpm(importedBpm);
       const importedAbc = serializeScoreToAbc(imported.score);
@@ -439,6 +455,21 @@ export default function App() {
       setMusicXmlStatus({
         type: 'error',
         message: `MusicXML import failed. The current score was not changed. ${message}`,
+      });
+    }
+  };
+
+  const handleImportMusicXml = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    try {
+      handleLoadMusicXmlText(await file.text());
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setMusicXmlStatus({
+        type: 'error',
+        message: `MusicXML file could not be read. The current score was not changed. ${message}`,
       });
     }
   };
@@ -779,7 +810,7 @@ export default function App() {
                 onLoadAbcText={handleLoadAbcText}
                 warnings={warnings}
                 onLoadScore={handleLoadScore}
-                selectedScoreId={SCORES.find(song => song.abcText === abcText)?.id}
+                selectedScoreId={selectedScoreId}
                 onCollapse={() => handleUpdateSettings({ ...settings, showSidebar: false })}
               />
             </div>
@@ -873,7 +904,7 @@ export default function App() {
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
         scores={SCORES}
-        selectedScoreId={SCORES.find(song => song.abcText === abcText)?.id}
+        selectedScoreId={selectedScoreId}
         onSelectScore={handleLoadScore}
         workspaceMode={studioMode}
         onSetWorkspaceMode={setStudioMode}

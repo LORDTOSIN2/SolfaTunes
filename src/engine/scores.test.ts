@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createScoreLibraryItem, getScoreDisplayTitle } from '../utils/scores';
+import {
+  createAbcScoreLibraryItem,
+  getScoreDisplayTitle,
+  SCORES,
+} from '../utils/scores';
 import { AbcParser } from './abc_parser';
 import { SolfaTransformer } from './solfa_transformer';
+import { MusicXmlParser } from './musicxml/musicxml_parser';
 import { getScoreMeasureRanges } from '../utils/playback_timeline';
 
 const scoreFiles = import.meta.glob<string>('../../test/fixtures/scores/*.txt', {
@@ -11,10 +16,29 @@ const scoreFiles = import.meta.glob<string>('../../test/fixtures/scores/*.txt', 
 });
 
 const scoreFixtures = Object.entries(scoreFiles).map(([path, abcText]) =>
-  createScoreLibraryItem(path, abcText)
+  createAbcScoreLibraryItem(path, abcText)
 );
 
 describe('score fixtures', () => {
+  it('bundles repository MusicXML projects into the unified score library', async () => {
+    const musicXmlScores = SCORES.filter(score => score.format === 'musicxml');
+
+    expect(musicXmlScores.map(score => score.fileName).sort()).toEqual([
+      '1 - illsley_second_tune.musicxml',
+      '2 - winchester_new .musicxml',
+      'external MuseScore SATB 1.xml',
+      'external Stuttgart-Come_Thou Key G.xml',
+      'franconia .musicxml',
+      'morning .musicxml',
+      'vienna .musicxml',
+    ]);
+    for (const score of musicXmlScores) {
+      const xmlText = await score.loadXml();
+      expect(xmlText).toContain('<score-partwise');
+      expect(() => MusicXmlParser.parse(xmlText)).not.toThrow();
+    }
+  });
+
   it('loads test fixtures and displays hymn names by default', () => {
     const franconia = scoreFixtures.find(score => score.fileName === 'Franconia.txt');
     const vienna = scoreFixtures.find(score => score.fileName === 'Vienna.txt');
@@ -37,6 +61,7 @@ describe('score fixtures', () => {
     const score = {
       id: 'untitled',
       fileName: 'untitled.abc',
+      format: 'abc' as const,
       title: 'Untitled score',
       composer: 'Composer unknown',
       abcText: '',

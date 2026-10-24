@@ -1,8 +1,11 @@
 # Score files
 
-The `scores/` folder is reserved for `.xml` and `.musicxml` project files.
-ABC-notation `.abc` and `.txt` files can still be opened through the app's
-import controls. Reference ABC files used by the test suite are stored in
+The app automatically bundles `.abc`, `.txt`, `.xml`, and `.musicxml` files in
+this folder into the score library at build time. ABC files open in the ABC
+editor; XML and MusicXML files open through the MusicXML importer, including
+its existing confirmation for unsupported or lossy content.
+
+Reference ABC files used by the test suite are stored in
 `test/fixtures/scores/` and are not part of the app's bundled score list.
 
 Use standard ABC headers such as `T:` for the tune title and `C:` for the composer. To show the hymn title first in the library, add a metadata comment:
