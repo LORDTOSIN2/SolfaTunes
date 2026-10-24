@@ -212,14 +212,16 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     [playerRef]
   );
 
-  // Center vertical scroll to middle vocal range (e.g. C4 = 60) on initial render
+  // Center on middle C once, when the roll first has notes. Later row-height
+  // changes must not yank the viewport back.
+  const didCenterRef = useRef(false);
   useEffect(() => {
-    if (scrollContainerRef.current) {
-      const c4Y = (maxMidi - 60) * rowHeight;
-      const targetScroll = Math.max(0, c4Y - scrollContainerRef.current.clientHeight / 2 + 60);
-      scrollContainerRef.current.scrollTop = targetScroll;
-    }
-  }, [rowHeight, maxMidi]);
+    const el = scrollContainerRef.current;
+    if (didCenterRef.current || !el || notes.length === 0 || el.clientHeight < 40) return;
+    const c4Y = (maxMidi - 60) * rowHeight;
+    el.scrollTop = Math.max(0, c4Y - el.clientHeight / 2 + rowHeight);
+    didCenterRef.current = true;
+  }, [notes.length, rowHeight, maxMidi]);
 
   // -------------------------------------------------------------
   // Auto-Format on Blur Handler
