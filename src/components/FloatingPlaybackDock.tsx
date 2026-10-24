@@ -61,9 +61,7 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
   toggleLoop,
   getTranspositionLabel,
 }) => {
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
-  );
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(true);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [hoverPosition, setHoverPosition] = useState<{ xPercent: number; tick: number } | null>(null);
 

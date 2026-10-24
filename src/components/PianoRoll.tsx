@@ -13,6 +13,7 @@ import {
   getVoiceTheme,
   formatPitchLabel,
   getMeterTicksPerMeasure,
+  getMeterBeatTicks,
   midiToNoteProperties,
   getPitchSemantics,
 } from '../engine/piano_roll_adapter';
@@ -50,6 +51,7 @@ interface PianoRollProps {
   onToggleExpand?: () => void;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  gridOpacity?: number;
 }
 
 // Pitch range: C2 (MIDI 36) to C6 (MIDI 84) = 49 chromatic keys
@@ -71,6 +73,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   onToggleExpand,
   isFullscreen = false,
   onToggleFullscreen,
+  gridOpacity = 0.14,
 }) => {
   // 1. Grid & Display Settings
   const [pixelsPerTick, setPixelsPerTick] = useState<number>(4.0); // 16 ticks = 64px
@@ -134,6 +137,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
   // Meter calculations
   const meterTicks = useMemo(() => getMeterTicksPerMeasure(score.meter), [score.meter]);
+  const meterBeatTicks = useMemo(() => getMeterBeatTicks(score.meter), [score.meter]);
   const totalTicks = useMemo(() => {
     let maxT = 0;
     notes.forEach((n) => {
@@ -602,6 +606,17 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     return cols;
   }, [totalTicks, meterTicks, pixelsPerTick]);
 
+  const beatLines = useMemo(() => {
+    const lines: { tick: number; isMeasureStart: boolean }[] = [];
+    for (let tick = meterBeatTicks; tick < totalTicks; tick += meterBeatTicks) {
+      lines.push({ tick, isMeasureStart: tick % meterTicks === 0 });
+    }
+    return lines;
+  }, [meterBeatTicks, meterTicks, totalTicks]);
+  const gridAlpha = Math.max(0, Math.min(0.4, gridOpacity));
+  const gridSubdivisionTicks = Math.max(1, Math.round(meterBeatTicks / 4));
+  const gridSubdivisionPixels = gridSubdivisionTicks * pixelsPerTick;
+
   // Active voice theme
   const activeVoiceTheme = getVoiceTheme(activeVoiceId);
 
@@ -820,7 +835,33 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 </button>
               </div>
 
-              {/* Row Height Selector */}
+              {/* Vertical Zoom */}
+              <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-md border border-white/10 text-[11px]">
+                <span className="text-stone-400 text-[10px] mr-1">Vertical:</span>
+                <button
+                  type="button"
+                  onClick={() => setRowHeight((height) => Math.max(10, Math.round(height / 1.2)))}
+                  className="p-0.5 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer"
+                  title="Zoom out vertically"
+                  aria-label="Zoom out vertically"
+                >
+                  <ZoomOut size={12} />
+                </button>
+                <span className="text-[10px] font-mono text-stone-300 w-8 text-center font-bold">
+                  {Math.round((rowHeight / 20) * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRowHeight((height) => Math.min(40, Math.round(height * 1.2)))}
+                  className="p-0.5 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer"
+                  title="Zoom in vertically"
+                  aria-label="Zoom in vertically"
+                >
+                  <ZoomIn size={12} />
+                </button>
+              </div>
+
+              {/* Row Height Presets */}
               <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded-md border border-white/10 text-[10px]">
                 <button
                   onClick={() => setRowHeight(16)}
@@ -997,7 +1038,6 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 minWidth: `${totalGridWidth}px`,
                 height: `${totalGridHeight}px`,
                 minHeight: `${totalGridHeight}px`,
-                backgroundSize: `${16 * pixelsPerTick}px ${rowHeight}px`,
               }}
             >
               {/* Horizontal Row Striping (Black vs White keys, all 49 rows rendered!) */}
@@ -1026,14 +1066,39 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 );
               })}
 
+              {gridAlpha > 0 && (
+                <div
+                  className="absolute inset-0 pointer-events-none z-[1]"
+                  aria-hidden="true"
+                  style={{
+                    backgroundImage: `repeating-linear-gradient(to right, rgba(148,163,184,${gridAlpha * 0.35}) 0 1px, transparent 1px ${gridSubdivisionPixels}px)`,
+                  }}
+                />
+              )}
+
+              {/* Beat and measure lines follow the score's meter, regardless of note density. */}
+              {beatLines.map((line) => (
+                <div
+                  key={`beat-line-${line.tick}`}
+                  className="absolute top-0 bottom-0 pointer-events-none z-[2]"
+                  aria-hidden="true"
+                  style={{
+                    left: `${line.tick * pixelsPerTick}px`,
+                    height: `${totalGridHeight}px`,
+                    borderLeft: `1px solid rgba(129,140,248,${gridAlpha * (line.isMeasureStart ? 1 : 0.65)})`,
+                  }}
+                />
+              ))}
+
               {/* Vertical Measure & Beat Grid Lines across entire grid height */}
               {measureColumns.map((col) => (
                 <div
                   key={`m-line-${col.measureNumber}`}
-                  className="absolute top-0 bottom-0 border-r-2 border-indigo-500/30 pointer-events-none"
+                  className="absolute top-0 bottom-0 pointer-events-none z-[2]"
                   style={{
-                    left: `${col.startTick * pixelsPerTick}px`,
+                    left: `${col.startTick * pixelsPerTick - 1}px`,
                     height: `${totalGridHeight}px`,
+                    borderLeft: `2px solid rgba(129,140,248,${gridAlpha})`,
                   }}
                 />
               ))}

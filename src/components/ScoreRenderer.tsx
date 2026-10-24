@@ -1754,6 +1754,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
         <div className="flex-1 overflow-hidden">
           <PianoRoll
             score={score}
+            gridOpacity={settings?.pianoRollGridOpacity}
             onUpdateScore={onUpdateScore}
             currentTick={currentTick}
             playerRef={playerRef}
@@ -1798,6 +1799,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
           >
             <PianoRoll
               score={score}
+              gridOpacity={settings?.pianoRollGridOpacity}
               onUpdateScore={onUpdateScore}
               currentTick={currentTick}
               playerRef={playerRef}

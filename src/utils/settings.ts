@@ -11,6 +11,7 @@ export interface AppSettings {
   showPlaybackDock: boolean;         // Default: true
   showReferenceLegend: boolean;      // Default: false
   zenMode: boolean;                  // Default: false (distraction-free view)
+  pianoRollGridOpacity: number;      // Default: 0.08 (faint grid)
 
   // Editor & Display Preferences
   autoFormatOnBlur: boolean;         // Default: true
@@ -26,6 +27,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   showPlaybackDock: true,
   showReferenceLegend: false,
   zenMode: false,
+  pianoRollGridOpacity: 0.08,
   autoFormatOnBlur: true,
   soundPreviewOnClick: true,
   colorCodedVoices: true,
@@ -39,11 +41,16 @@ export function loadAppSettings(): AppSettings {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (!raw) return { ...DEFAULT_APP_SETTINGS };
     const parsed = JSON.parse(raw);
+    const gridOpacity = parsed.pianoRollGridOpacity;
     return {
       ...DEFAULT_APP_SETTINGS,
       ...parsed,
       // Ensure live preview stays off by default if unconfigured or requested
       showLivePreview: parsed.showLivePreview ?? false,
+      pianoRollGridOpacity:
+        typeof gridOpacity === 'number' && Number.isFinite(gridOpacity)
+          ? Math.min(0.4, Math.max(0, gridOpacity))
+          : DEFAULT_APP_SETTINGS.pianoRollGridOpacity,
     };
   } catch (e) {
     return { ...DEFAULT_APP_SETTINGS };

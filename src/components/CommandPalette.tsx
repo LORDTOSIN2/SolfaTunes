@@ -66,7 +66,7 @@ export interface CommandPaletteProps {
 interface PaletteCommand {
   id: string;
   title: string;
-  category: 'Workspace' | 'Score Library' | 'Playback' | 'Transposition & Tempo' | 'View & Focus' | 'File & Export';
+  category: 'Workspace' | 'Score Library' | 'Playback' | 'Transposition & Tempo' | 'View & Focus' | 'Piano Roll' | 'File & Export';
   subtitle?: string;
   icon: React.ReactNode;
   shortcut?: string;
@@ -291,6 +291,23 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           onClose();
         },
       },
+      ...[
+        { label: 'Off', value: 0 },
+        { label: 'Faint', value: 0.08 },
+        { label: 'Standard', value: 0.16 },
+        { label: 'Strong', value: 0.3 },
+      ].map(({ label, value }) => ({
+        id: `piano-roll-grid-${label.toLowerCase()}`,
+        title: `Piano Roll Grid: ${label}`,
+        category: 'Piano Roll' as const,
+        subtitle: `Set piano roll beat-grid visibility to ${label.toLowerCase()}`,
+        icon: <Sliders size={16} className="text-indigo-400" />,
+        badge: settings.pianoRollGridOpacity === value ? 'Active' : undefined,
+        action: () => {
+          onUpdateSettings({ ...settings, pianoRollGridOpacity: value });
+          onClose();
+        },
+      })),
       {
         id: 'view-settings',
         title: 'Open Workspace Settings',

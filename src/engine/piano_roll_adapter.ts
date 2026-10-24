@@ -138,6 +138,31 @@ export function getMeterTicksPerMeasure(meterStr: string | undefined): number {
 }
 
 /**
+ * Gets the primary beat length in sixteenth-note ticks, grouping compound
+ * eighth-note meters into dotted-quarter beats.
+ */
+export function getMeterBeatTicks(meterStr: string | undefined): number {
+  const meter = meterStr?.trim();
+  if (meter === 'C|') return 32;
+  if (meter === 'C') return 16;
+  if (!meter) return 16;
+
+  const parts = meter.split('/');
+  if (parts.length !== 2) return 16;
+
+  const numerator = Number.parseInt(parts[0], 10);
+  const denominator = Number.parseInt(parts[1], 10);
+  if (!Number.isInteger(numerator) || !Number.isInteger(denominator) || numerator <= 0 || denominator <= 0) {
+    return 16;
+  }
+
+  const denominatorBeatTicks = Math.max(1, Math.round(64 / denominator));
+  return denominator === 8 && numerator > 3 && numerator % 3 === 0
+    ? denominatorBeatTicks * 3
+    : denominatorBeatTicks;
+}
+
+/**
  * Converts a MIDI note number into letter, accidental, and octave,
  * picking appropriate enharmonics according to the score's key signature.
  */
@@ -252,22 +277,11 @@ export function flattenScoreToPianoRoll(score: ParsedScore): {
 
     for (let mIdx = 0; mIdx < systemMeasures; mIdx++) {
       // Find duration of this measure across voices
-      let measureDur = 0;
-      score.voices.forEach((v) => {
-        const vl = system.voices[v.id];
-        if (vl && vl.measures[mIdx]) {
-          const m = vl.measures[mIdx];
-          const dur = m.notes.reduce((sum, n) => sum + (n.durationTicks || 0), 0);
-          if (dur > measureDur) measureDur = dur;
-        }
-      });
-      if (measureDur <= 0) measureDur = meterTicks;
-
       measureInfos.push({
         measureIndex: globalMeasureIdx,
         measureNumber: globalMeasureIdx + 1,
         startTick: currentMeasureStart,
-        durationTicks: measureDur,
+        durationTicks: meterTicks,
       });
 
       // Extract notes for each voice
@@ -277,8 +291,8 @@ export function flattenScoreToPianoRoll(score: ParsedScore): {
           const m = vl.measures[mIdx];
           let noteOffset = 0;
           m.notes.forEach((n, nIdx) => {
-            const start = n.timestamp !== undefined ? n.timestamp : currentMeasureStart + noteOffset;
             const dur = Math.max(1, n.durationTicks || 16);
+            const start = currentMeasureStart + noteOffset;
             noteOffset += dur;
             const end = start + dur;
             if (end > maxTick) maxTick = end;
@@ -300,7 +314,7 @@ export function flattenScoreToPianoRoll(score: ParsedScore): {
         }
       });
 
-      currentMeasureStart += measureDur;
+      currentMeasureStart += meterTicks;
       globalMeasureIdx++;
     }
   });

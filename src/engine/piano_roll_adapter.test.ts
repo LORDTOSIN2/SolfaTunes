@@ -12,6 +12,8 @@ import {
   flattenScoreToPianoRoll,
   midiToNoteProperties,
   formatPitchLabel,
+  getMeterBeatTicks,
+  getMeterTicksPerMeasure,
   FlatPianoRollNote,
 } from './piano_roll_adapter';
 import { AbcParser } from './abc_parser';
@@ -46,6 +48,31 @@ describe('Piano Roll Adapter & Monophony Engine', () => {
     expect(formatPitchLabel(61, 'G')).toBe('C♯4');
     expect(formatPitchLabel(70, 'F')).toBe('B♭4');
     expect(formatPitchLabel(71, 'C')).toBe('B4');
+  });
+
+  it('uses score meter for bar and beat spacing, including compound meters', () => {
+    expect(getMeterTicksPerMeasure('2/4')).toBe(32);
+    expect(getMeterTicksPerMeasure('3/4')).toBe(48);
+    expect(getMeterTicksPerMeasure('4/4')).toBe(64);
+    expect(getMeterBeatTicks('2/4')).toBe(16);
+    expect(getMeterBeatTicks('3/4')).toBe(16);
+    expect(getMeterBeatTicks('4/4')).toBe(16);
+    expect(getMeterBeatTicks('6/8')).toBe(24);
+  });
+
+  it('keeps piano-roll measures aligned to meter when source measures are underfilled', () => {
+    const parser = new AbcParser();
+    const { score: rawScore } = parser.parse(
+      `X:1\nT:Underfilled Measures\nM:3/4\nL:1/4\nK:C\nV:S\n[V:S] C | D |`
+    );
+    const score = new SolfaTransformer().transform(rawScore);
+    const { notes, measures } = flattenScoreToPianoRoll(score);
+
+    expect(measures.map(({ startTick, durationTicks }) => [startTick, durationTicks])).toEqual([
+      [0, 48],
+      [48, 48],
+    ]);
+    expect(notes.find((note) => note.startTick >= 48)?.startTick).toBe(48);
   });
 
   it('strictly enforces monophony within each channel', () => {
