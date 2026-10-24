@@ -763,6 +763,10 @@ export default function App() {
               onUpdateSettings={handleUpdateSettings}
               isFullscreen={isFullscreen}
               onToggleFullscreen={handleToggleFullscreen}
+              isPlaying={isPlaying}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onStop={handleStop}
             />
           </div>
         </div>
@@ -822,6 +826,10 @@ export default function App() {
               onUpdateSettings={handleUpdateSettings}
               isFullscreen={isFullscreen}
               onToggleFullscreen={handleToggleFullscreen}
+              isPlaying={isPlaying}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onStop={handleStop}
             />
           </div>
         </main>

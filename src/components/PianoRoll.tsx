@@ -23,6 +23,11 @@ import {
 import { Tooltip } from './Tooltip';
 import { MidiPlayer } from '../audio/midi_player';
 import {
+  getScoreMeasureRanges,
+  audioTickToPianoRollTick,
+  pianoRollTickToAudioTick,
+} from '../utils/playback_timeline';
+import {
   Sparkles,
   Music,
   ZoomIn,
@@ -42,6 +47,9 @@ import {
   CheckSquare,
   Square,
   Volume2,
+  Play,
+  Pause,
+  Radio,
 } from 'lucide-react';
 
 interface PianoRollProps {
@@ -56,6 +64,11 @@ interface PianoRollProps {
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
   gridOpacity?: number;
+  isPlaying?: boolean;
+  onPlay?: () => void;
+  onPause?: () => void;
+  onStop?: () => void;
+  mutedVoices?: { [voiceId: string]: boolean };
 }
 
 // Black key pitch classes (0=C, 1=C#, 2=D, 3=D#, 4=E, 5=F, 6=F#, 7=G, 8=G#, 9=A, 10=A#, 11=B)
@@ -73,6 +86,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   isFullscreen = false,
   onToggleFullscreen,
   gridOpacity = 0.14,
+  isPlaying = false,
+  onPlay,
+  onPause,
+  onStop,
+  mutedVoices = {},
 }) => {
   // 1. Grid & Display Settings
   const [pixelsPerTick, setPixelsPerTick] = useState<number>(4.0); // 16 ticks = 64px
@@ -444,6 +462,12 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   // Window / Grid Mouse Move: Note Dragging, Resizing, or Marquee
   // -------------------------------------------------------------
   const handleMouseMove = (e: React.MouseEvent) => {
+    // Ruler Scrubbing
+    if (isRulerDragging) {
+      handleRulerSeekAtClientX(e.clientX);
+      return;
+    }
+
     // 0. Note Resizing (Drag Right Edge)
     if (resizingNoteId && resizeOrigin) {
       const deltaX = e.clientX - resizeOrigin.startX;
@@ -570,13 +594,31 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
       setMarqueeStart(null);
       setMarqueeCurrent(null);
     }
+
+    if (isRulerDragging) {
+      setIsRulerDragging(false);
+    }
   };
 
   // -------------------------------------------------------------
-  // Keyboard Shortcuts (Delete, Transpose with Arrows)
+  // Keyboard Shortcuts (Play/Pause, Delete, Transpose with Arrows)
   // -------------------------------------------------------------
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Space key: Play / Pause toggle
+      if (e.code === 'Space' && !e.repeat) {
+        const activeTag = document.activeElement?.tagName?.toLowerCase();
+        if (activeTag !== 'input' && activeTag !== 'select' && activeTag !== 'textarea') {
+          e.preventDefault();
+          if (isPlaying) {
+            onPause?.();
+          } else {
+            onPlay?.();
+          }
+          return;
+        }
+      }
+
       // Close open drawers on Escape
       if (e.key === 'Escape') {
         if (showToolsDrawer) setShowToolsDrawer(false);
@@ -654,18 +696,10 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNoteIds, notes, snapTicks, playPreview, showToolsDrawer, showHelpDrawer]);
+  }, [selectedNoteIds, notes, snapTicks, playPreview, showToolsDrawer, showHelpDrawer, isPlaying, onPlay, onPause]);
 
-  // Seek timeline click
-  const handleRulerClick = (e: React.MouseEvent) => {
-    if (!gridContainerRef.current) return;
-    const rect = gridContainerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const clickedTick = Math.max(0, Math.round(x / pixelsPerTick));
-    if (onSeekTick) {
-      onSeekTick(clickedTick);
-    }
-  };
+  const [followPlayhead, setFollowPlayhead] = useState<boolean>(true);
+  const [isRulerDragging, setIsRulerDragging] = useState<boolean>(false);
 
   // Generate Measure Barlines for the Timeline Header
   const measureColumns = useMemo(() => {
@@ -681,6 +715,95 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     return cols;
   }, [totalTicks, meterTicks, pixelsPerTick]);
 
+  // Audio timeline measure ranges from score
+  const audioRanges = useMemo(() => getScoreMeasureRanges(score), [score]);
+
+  // Visual piano roll measure bounds
+  const pianoMeasureBounds = useMemo(() => {
+    return measureColumns.map((col, idx) => ({
+      measureIndex: idx,
+      startTick: col.startTick,
+      durationTicks: meterTicks,
+    }));
+  }, [measureColumns, meterTicks]);
+
+  // Dynamic mapping: converts audio playback tick to visual piano roll grid tick
+  // Aligns pickup measures (anacrusis) and regular measures with 100% precision!
+  const activePianoRollTick = useMemo(() => {
+    return audioTickToPianoRollTick(currentTick, audioRanges, pianoMeasureBounds);
+  }, [currentTick, audioRanges, pianoMeasureBounds]);
+
+  // Active sounding note IDs and pitches during audio playback
+  const { activeSoundingNoteIds, activeSoundingPitches, activePitchVoices } = useMemo(() => {
+    const soundingIds = new Set<string>();
+    const soundingPitches = new Set<number>();
+    const pitchVoices: { [pitch: number]: string } = {};
+
+    if (!isPlaying) {
+      return { activeSoundingNoteIds: soundingIds, activeSoundingPitches: soundingPitches, activePitchVoices: pitchVoices };
+    }
+
+    notes.forEach((n) => {
+      if (n.isRest || n.midiPitch <= 0) return;
+      if (mutedVoices && mutedVoices[n.voiceId]) return;
+      if (activePianoRollTick >= n.startTick && activePianoRollTick < n.startTick + n.durationTicks) {
+        soundingIds.add(n.id);
+        soundingPitches.add(n.midiPitch);
+        pitchVoices[n.midiPitch] = n.voiceId;
+      }
+    });
+
+    return { activeSoundingNoteIds: soundingIds, activeSoundingPitches: soundingPitches, activePitchVoices: pitchVoices };
+  }, [notes, activePianoRollTick, isPlaying, mutedVoices]);
+
+  // Auto-scroll piano roll horizontally to follow playback cursor smoothly
+  useEffect(() => {
+    if (!isPlaying || !followPlayhead || !scrollContainerRef.current) return;
+
+    const container = scrollContainerRef.current;
+    const playheadPx = activePianoRollTick * pixelsPerTick;
+    const viewportLeft = container.scrollLeft;
+    const viewportWidth = container.clientWidth;
+    const visibleGridWidth = Math.max(200, viewportWidth - 96); // Account for 96px keyboard
+
+    const thresholdRight = viewportLeft + visibleGridWidth * 0.75;
+    const thresholdLeft = viewportLeft + 20;
+
+    if (playheadPx > thresholdRight || playheadPx < thresholdLeft) {
+      container.scrollTo({
+        left: Math.max(0, playheadPx - visibleGridWidth * 0.25),
+        behavior: 'smooth',
+      });
+    }
+  }, [activePianoRollTick, isPlaying, followPlayhead, pixelsPerTick]);
+
+  // Ruler Seeking & Drag-to-Scrubbing
+  const handleRulerSeekAtClientX = useCallback(
+    (clientX: number) => {
+      if (!gridContainerRef.current || !onSeekTick) return;
+      const rect = gridContainerRef.current.getBoundingClientRect();
+      const x = clientX - rect.left;
+      const clickedPianoTick = Math.max(0, Math.round(x / pixelsPerTick));
+      const targetAudioTick = pianoRollTickToAudioTick(clickedPianoTick, audioRanges, pianoMeasureBounds);
+      onSeekTick(targetAudioTick);
+    },
+    [pixelsPerTick, audioRanges, pianoMeasureBounds, onSeekTick]
+  );
+
+  const handleRulerMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    setIsRulerDragging(true);
+    handleRulerSeekAtClientX(e.clientX);
+  };
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isRulerDragging) setIsRulerDragging(false);
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [isRulerDragging]);
   const beatLines = useMemo(() => {
     const lines: { tick: number; isMeasureStart: boolean }[] = [];
     for (let tick = meterBeatTicks; tick < totalTicks; tick += meterBeatTicks) {
@@ -721,6 +844,71 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               Piano Roll
             </h3>
           </div>
+
+          <div className="h-4 w-px bg-white/10 hidden sm:block shrink-0" />
+
+          {/* Playback Transport Controls */}
+          {(onPlay || onPause) && (
+            <div className="flex items-center gap-1 bg-black/60 p-1 rounded-lg border border-white/10 shrink-0">
+              {isPlaying ? (
+                <Tooltip content="Pause" description="Pause playback" shortcut="Space" side="bottom">
+                  <button
+                    type="button"
+                    onClick={onPause}
+                    className="p-1 sm:px-2.5 sm:py-1 rounded-md text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-stone-950 flex items-center gap-1.5 cursor-pointer transition-all shadow-md active:scale-95"
+                  >
+                    <Pause size={12} className="fill-current" />
+                    <span className="hidden sm:inline">Pause</span>
+                  </button>
+                </Tooltip>
+              ) : (
+                <Tooltip content="Play" description="Start audio playback" shortcut="Space" side="bottom">
+                  <button
+                    type="button"
+                    onClick={onPlay}
+                    className="p-1 sm:px-2.5 sm:py-1 rounded-md text-[11px] font-bold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-1.5 cursor-pointer transition-all shadow-md active:scale-95"
+                  >
+                    <Play size={12} className="fill-current" />
+                    <span className="hidden sm:inline">Play</span>
+                  </button>
+                </Tooltip>
+              )}
+
+              {onStop && (
+                <Tooltip content="Stop" description="Stop playback and rewind to start" side="bottom">
+                  <button
+                    type="button"
+                    onClick={onStop}
+                    className="p-1 sm:p-1.5 rounded-md text-stone-400 hover:text-white hover:bg-white/10 cursor-pointer transition-all active:scale-95"
+                  >
+                    <Square size={12} className="fill-current" />
+                  </button>
+                </Tooltip>
+              )}
+
+              <div className="h-3 w-px bg-white/15 mx-0.5" />
+
+              {/* Follow Playhead Toggle */}
+              <Tooltip
+                content={followPlayhead ? 'Follow Playhead: ON' : 'Follow Playhead: OFF'}
+                description="Automatically scroll view to follow audio playback cursor"
+                side="bottom"
+              >
+                <button
+                  type="button"
+                  onClick={() => setFollowPlayhead((prev) => !prev)}
+                  className={`px-1.5 py-1 rounded-md text-[10px] sm:text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all ${
+                    followPlayhead
+                      ? 'bg-indigo-500/25 text-indigo-300 border border-indigo-400/40 shadow-sm'
+                      : 'text-stone-500 hover:text-stone-300 hover:bg-white/5 border border-transparent'
+                  }`}
+                >
+                  <Radio size={11} className={followPlayhead && isPlaying ? 'animate-pulse text-indigo-400' : ''} />
+                  <span className="hidden md:inline">Follow</span>
+                </button>
+              </Tooltip>
+            </div>
+          )}
 
           <div className="h-4 w-px bg-white/10 hidden sm:block shrink-0" />
 
@@ -1074,30 +1262,38 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               const isBlack = BLACK_KEY_PCS.has(pc);
               const isC = pc === 0;
               const label = formatPitchLabel(pitch, score.key);
+              const isSounding = activeSoundingPitches.has(pitch);
+              const soundingVoice = isSounding ? activePitchVoices[pitch] : undefined;
+              const soundingTheme = soundingVoice ? getVoiceTheme(soundingVoice) : null;
 
               return (
                 <div
                   key={pitch}
                   onClick={() => playPreview(pitch)}
-                  className={`flex items-center justify-between px-2 text-[10px] font-mono font-bold border-b transition-colors cursor-pointer flex-shrink-0 ${
-                    isBlack
+                  className={`flex items-center justify-between px-2 text-[10px] font-mono font-bold border-b transition-all duration-75 cursor-pointer flex-shrink-0 ${
+                    isSounding
+                      ? 'text-white shadow-[0_0_12px_rgba(99,102,241,0.9)] z-10 scale-[1.02]'
+                      : isBlack
                       ? 'bg-[#181920] hover:bg-[#252835] text-stone-400 border-black/40'
                       : 'bg-[#F8F9FA] hover:bg-[#E2E8F0] text-stone-900 border-stone-300'
-                  } ${isC ? 'ring-1 ring-indigo-500/60 font-black' : ''}`}
+                  } ${isC && !isSounding ? 'ring-1 ring-indigo-500/60 font-black' : ''}`}
                   style={{
                     height: `${rowHeight}px`,
                     minHeight: `${rowHeight}px`,
+                    backgroundColor: isSounding ? (soundingTheme ? soundingTheme.hex : '#6366f1') : undefined,
                   }}
-                  title={`Play ${label} (MIDI ${pitch})`}
+                  title={`Play ${label} (MIDI ${pitch})${isSounding && soundingVoice ? ` • Playing in ${soundingVoice}` : ''}`}
                 >
-                  <span className={`${isC ? 'text-indigo-600 font-extrabold' : ''}`}>
+                  <span className={`${isC && !isSounding ? 'text-indigo-600 font-extrabold' : ''}`}>
                     {label}
                   </span>
-                  {isC && (
+                  {isSounding ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-white shadow-sm animate-pulse" />
+                  ) : isC ? (
                     <span className="text-[8px] bg-indigo-600 text-white px-1 rounded-sm">
                       Do
                     </span>
-                  )}
+                  ) : null}
                 </div>
               );
             })}
@@ -1115,27 +1311,53 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
           >
             {/* Timeline Ruler Header (Sticky on Vertical Scroll) */}
             <div
-              onClick={handleRulerClick}
-              className="sticky top-0 z-10 h-7 bg-[#161822] border-b border-white/15 flex flex-row cursor-pointer flex-shrink-0 shadow-sm"
+              onMouseDown={handleRulerMouseDown}
+              className="sticky top-0 z-20 h-7 bg-[#161822] border-b border-white/15 flex flex-row cursor-ew-resize flex-shrink-0 shadow-sm relative overflow-hidden"
               style={{
                 width: `${totalGridWidth}px`,
                 minWidth: `${totalGridWidth}px`,
                 height: '28px',
               }}
-              title="Click anywhere on the ruler to jump playback position"
+              title="Click or drag anywhere on ruler to scrub/seek playback position"
             >
-              {measureColumns.map((col) => (
+              {measureColumns.map((col) => {
+                const isCurrentMeasure =
+                  activePianoRollTick >= col.startTick &&
+                  activePianoRollTick < col.startTick + meterTicks;
+                return (
+                  <div
+                    key={col.measureNumber}
+                    className={`flex items-center px-2 text-[10px] font-mono font-bold border-r border-white/20 select-none transition-colors shrink-0 ${
+                      isCurrentMeasure
+                        ? 'bg-indigo-600/20 text-indigo-200 border-indigo-400/40'
+                        : 'text-stone-400 hover:bg-white/5'
+                    }`}
+                    style={{ width: `${col.width}px` }}
+                  >
+                    <span className={isCurrentMeasure ? 'text-indigo-300 font-extrabold' : 'text-indigo-400'}>
+                      M{col.measureNumber}
+                    </span>
+                    <span className="text-stone-500 text-[9px] ml-2">
+                      {col.startTick}t
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* Ruler Scrubber Thumb */}
+              {activePianoRollTick !== undefined && (
                 <div
-                  key={col.measureNumber}
-                  className="flex items-center px-2 text-[10px] font-mono font-bold text-stone-400 border-r border-white/20 select-none hover:bg-white/5 transition-colors shrink-0"
-                  style={{ width: `${col.width}px` }}
+                  className="absolute top-0 bottom-0 pointer-events-none z-30 flex flex-col items-center"
+                  style={{
+                    left: `${activePianoRollTick * pixelsPerTick}px`,
+                    transform: 'translateX(-50%)',
+                  }}
                 >
-                  <span className="text-indigo-300">M{col.measureNumber}</span>
-                  <span className="text-stone-600 text-[9px] ml-2">
-                    {col.startTick}t
-                  </span>
+                  <div className="w-3 h-3 bg-rose-500 rounded-sm shadow-md flex items-center justify-center text-[7px] font-black text-white">
+                    ▼
+                  </div>
                 </div>
-              ))}
+              )}
             </div>
 
             {/* Note Grid Canvas */}
@@ -1215,11 +1437,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               ))}
 
               {/* Playhead Marker */}
-              {currentTick !== undefined && (
+              {activePianoRollTick !== undefined && (
                 <div
-                  className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-30 pointer-events-none shadow-[0_0_8px_rgba(244,63,94,0.8)]"
+                  className="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-30 pointer-events-none shadow-[0_0_10px_rgba(244,63,94,0.9)]"
                   style={{
-                    left: `${currentTick * pixelsPerTick}px`,
+                    left: `${activePianoRollTick * pixelsPerTick}px`,
                     height: `${totalGridHeight}px`,
                   }}
                 >
@@ -1233,6 +1455,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
                 const theme = getVoiceTheme(note.voiceId);
                 const isSelected = selectedNoteIds.has(note.id);
+                const isSounding = activeSoundingNoteIds.has(note.id);
 
                 const left = note.startTick * pixelsPerTick;
                 const width = Math.max(16, note.durationTicks * pixelsPerTick);
@@ -1261,7 +1484,9 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                     className={`group absolute rounded-md border cursor-move transition-all flex items-center justify-between px-1.5 overflow-hidden text-[10px] font-sans font-bold select-none ${
                       theme.bgClass
                     } ${
-                      isSelected
+                      isSounding
+                        ? 'ring-2 ring-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.9)] brightness-125 z-20'
+                        : isSelected
                         ? 'ring-2 ring-white border-white shadow-2xl z-20 brightness-110'
                         : `${theme.borderClass} opacity-95 shadow-md hover:brightness-105 z-10`
                     }`}

@@ -66,6 +66,10 @@ interface ScoreRendererProps {
   onUpdateSettings?: (newSettings: AppSettings) => void;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  isPlaying?: boolean;
+  onPlay?: () => void;
+  onPause?: () => void;
+  onStop?: () => void;
 }
 
 /**
@@ -812,6 +816,10 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   onUpdateSettings,
   isFullscreen = false,
   onToggleFullscreen,
+  isPlaying = false,
+  onPlay,
+  onPause,
+  onStop,
 }) => {
   const [showHelp, setShowHelp] = useState<boolean>(false);
 
@@ -1788,6 +1796,11 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             onToggleExpand={onToggleExpand}
             isFullscreen={isFullscreen}
             onToggleFullscreen={onToggleFullscreen}
+            isPlaying={isPlaying}
+            onPlay={onPlay}
+            onPause={onPause}
+            onStop={onStop}
+            mutedVoices={mutedVoices}
           />
         </div>
       ) : studioMode === 'split' && score ? (
@@ -1832,6 +1845,11 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               onToggleExpand={onToggleExpand}
               isFullscreen={isFullscreen}
               onToggleFullscreen={onToggleFullscreen}
+              isPlaying={isPlaying}
+              onPlay={onPlay}
+              onPause={onPause}
+              onStop={onStop}
+              mutedVoices={mutedVoices}
             />
           </div>
         </div>
