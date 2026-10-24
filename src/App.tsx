@@ -23,6 +23,7 @@ import { MidiWriter } from './audio/midi_writer';
 import { serializeScoreToAbc } from './engine/abc_serializer';
 import { Music, Download, FileDown, FileUp, ChevronRight, Settings, Command, Maximize2, Minimize2 } from 'lucide-react';
 import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
+import { MiniFloatingPlaybackButton } from './components/MiniFloatingPlaybackButton';
 import { SettingsModal } from './components/SettingsModal';
 import { CommandPalette, WorkspaceMode } from './components/CommandPalette';
 import { loadAppSettings, saveAppSettings, AppSettings } from './utils/settings';
@@ -866,8 +867,8 @@ export default function App() {
         </main>
       )}
 
-      {/* Unified Floating Playback Dock ("Always Within Reach" - hideable in Settings & Zen Mode) */}
-      {settings.showPlaybackDock && !settings.zenMode && (
+      {/* Unified Floating Playback Dock ("Always Within Reach" - hideable in Settings & Zen Mode, hidden in Fullscreen) */}
+      {settings.showPlaybackDock && !settings.zenMode && !isFullscreen ? (
         <FloatingPlaybackDock
           score={score}
           isPlaying={isPlaying}
@@ -889,7 +890,17 @@ export default function App() {
           toggleLoop={toggleLoop}
           getTranspositionLabel={getTranspositionLabel}
         />
-      )}
+      ) : score ? (
+        /* Tiny Floating Circular Playback Toggle (visible in Fullscreen, Zen Mode, or when main dock is hidden) */
+        <MiniFloatingPlaybackButton
+          isPlaying={isPlaying}
+          onPlay={handlePlay}
+          onStop={handleStop}
+          currentTick={currentTick}
+          totalTicks={totalTicks}
+          scoreTitle={score.title}
+        />
+      ) : null}
 
       {/* Workspace & View Settings Modal */}
       <SettingsModal

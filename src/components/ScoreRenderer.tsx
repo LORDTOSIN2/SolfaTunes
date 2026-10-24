@@ -517,9 +517,10 @@ interface InteractiveRhythmLineProps {
   isPlaying: boolean;
   isMuted: boolean;
   isEditorMode: boolean;
+  currentTick?: number;
 }
 
-const InteractiveRhythmLine: React.FC<InteractiveRhythmLineProps> = ({
+const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
   measure,
   meter,
   meterDenominator,
@@ -530,10 +531,11 @@ const InteractiveRhythmLine: React.FC<InteractiveRhythmLineProps> = ({
   onSelectNote,
   isPlaying,
   isMuted,
-  isEditorMode
+  isEditorMode,
+  currentTick,
 }) => {
   const meterStr = meter || (meterDenominator ? `4/${meterDenominator}` : '4/4');
-  const cellsData = analyzeMeasureCells(measure, meterStr);
+  const cellsData = useMemo(() => analyzeMeasureCells(measure, meterStr), [measure, meterStr]);
   if (cellsData.length === 0) return <>{"\u00A0"}</>;
 
   const renderedElements: React.ReactNode[] = [];
@@ -554,6 +556,16 @@ const InteractiveRhythmLine: React.FC<InteractiveRhythmLineProps> = ({
           selectedNote.noteIndex === item.noteIndex;
 
         if (item.noteIndex !== undefined) {
+          const noteObj = measure.notes[item.noteIndex];
+          const isNoteSounding =
+            isPlaying &&
+            !isMuted &&
+            noteObj &&
+            !noteObj.isRest &&
+            currentTick !== undefined &&
+            currentTick >= noteObj.timestamp &&
+            currentTick < noteObj.timestamp + noteObj.durationTicks;
+
           itemElements.push(
             <button
               key={`item-${cellIdx}-${partIdx}-${itemIdx}`}
@@ -567,15 +579,17 @@ const InteractiveRhythmLine: React.FC<InteractiveRhythmLineProps> = ({
                 });
               } : undefined}
               disabled={!isEditorMode}
-              className={`inline-block px-1 rounded font-serif font-black transition-all duration-150 text-center ${
+              className={`inline-block px-1 rounded font-serif font-black text-center ${
                 isMuted ? 'pointer-events-none' : ''
               } ${
                 isEditorMode && !isMuted ? 'cursor-pointer hover:bg-indigo-100' : ''
               } ${
                 isSelected
-                  ? 'bg-[#6366F1] text-white ring-2 ring-[#818CF8]/80 scale-[1.12] shadow-md font-extrabold z-10'
+                  ? 'bg-[#6366F1] text-white ring-2 ring-[#818CF8]/80 font-extrabold z-10 shadow-md'
+                  : isNoteSounding
+                  ? 'bg-indigo-600 text-white font-extrabold shadow-sm rounded-sm z-10'
                   : isPlaying
-                  ? 'text-[#6366F1]'
+                  ? 'text-indigo-900 font-black'
                   : 'text-black'
               }`}
               style={{ minWidth: item.type === 'note' ? undefined : '1.25rem' }}
@@ -653,6 +667,8 @@ const InteractiveRhythmLine: React.FC<InteractiveRhythmLineProps> = ({
 
   return <div className="inline-flex items-center select-none">{renderedElements}</div>;
 };
+
+const InteractiveRhythmLine = React.memo(InteractiveRhythmLineComponent);
 
 /**
  * Custom visual representation of a barline.
@@ -1437,9 +1453,9 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                         return (
                           <div
                             key={`measure-${system.systemIndex}-${mIndex}`}
-                            className={`flex items-stretch transition-all duration-250 rounded-lg border ${
+                            className={`flex items-stretch rounded-lg border transition-colors duration-150 ${
                               isPlaying
-                                ? 'bg-indigo-50/70 border-indigo-200 ring-4 ring-indigo-500/10 scale-[1.01] shadow-md'
+                                ? 'bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-500/20 shadow-sm'
                                 : 'border-transparent'
                             }`}
                           >
@@ -1464,7 +1480,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                                 return (
                                   <div
                                     key={`notes-${system.systemIndex}-${mIndex}-${voice.id}`}
-                                    className="font-serif font-black text-center whitespace-nowrap px-4 transition-all duration-200"
+                                    className="font-serif font-black text-center whitespace-nowrap px-4"
                                     style={{
                                       fontSize: `${fontSize}px`,
                                       height: `${rowHeight}px`,
@@ -1485,6 +1501,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                                         isPlaying={isPlaying}
                                         isMuted={isMuted}
                                         isEditorMode={isInteractive}
+                                        currentTick={currentTick}
                                       />
                                     ) : (
                                       '\u00A0'
