@@ -132,7 +132,12 @@ export default function App() {
   // Global keyboard shortcuts: Cmd+K (Palette), Cmd+, (Settings), Z (Zen), F (Fullscreen), Esc (Exit fullscreen)
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      const isInput = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        Boolean(target?.isContentEditable);
 
       // Cmd+K or Ctrl+K opens Command Palette
       if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
@@ -155,19 +160,22 @@ export default function App() {
         return;
       }
 
-      // Keys when not typing inside an input/textarea
-      if (!isInput) {
-        if (e.key === 'z' || e.key === 'Z') {
-          e.preventDefault();
-          setSettings((prev) => {
-            const next = { ...prev, zenMode: !prev.zenMode };
-            saveAppSettings(next);
-            return next;
-          });
-        } else if (e.key === 'f' || e.key === 'F') {
-          e.preventDefault();
-          handleToggleFullscreen();
-        }
+      // Avoid hijacking browser/OS shortcuts (e.g. Ctrl+Z undo, Ctrl+F find, Alt shortcuts)
+      // or single-key navigation when typing inside input/textarea/select/contentEditable
+      if (isInput || e.ctrlKey || e.metaKey || e.altKey) {
+        return;
+      }
+
+      if (e.key === 'z' || e.key === 'Z') {
+        e.preventDefault();
+        setSettings((prev) => {
+          const next = { ...prev, zenMode: !prev.zenMode };
+          saveAppSettings(next);
+          return next;
+        });
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        handleToggleFullscreen();
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
@@ -313,21 +321,6 @@ export default function App() {
 
   const handleSetBpm = (nextBpm: number) => {
     setBpm(nextBpm);
-    setMusicalDocument(current => {
-      if (!current) return current;
-      const nextDocument = createMusicalDocument(
-        { ...current.score, tempoBpm: nextBpm },
-        {
-          metadata: current.metadata,
-          conversionReport: current.conversionReport,
-          source: current.source,
-        }
-      );
-      if (musicXmlProvenanceRef.current) {
-        musicXmlProvenanceRef.current = nextDocument;
-      }
-      return nextDocument;
-    });
   };
 
   const handleLoadScore = async (song: ScoreLibraryItem) => {
