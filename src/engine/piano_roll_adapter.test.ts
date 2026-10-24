@@ -211,4 +211,58 @@ describe('Piano Roll Adapter & Monophony Engine', () => {
     expect(midiToFrequency(69)).toBe(440); // A4
     expect(midiToFrequency(60)).toBeCloseTo(261.6, 1); // C4
   });
+
+  it('correctly executes piano roll edits and synchronizes across ABC and Solfa views upon formatting', async () => {
+    const { serializeScoreToAbc } = await import('./abc_serializer');
+    const { serializeScoreToSolfa } = await import('./solfa_serializer');
+
+    // 1. Initial 4/4 score in Key of C with Soprano: C D E F (d r m f)
+    const initialAbc = `X:1\nT:Sync Test\nM:4/4\nL:1/4\nK:C\nV:S\n[V:S] C D E F |`;
+    const parser = new AbcParser();
+    const { score: rawScore } = parser.parse(initialAbc);
+    const initialScore = new SolfaTransformer().transform(rawScore);
+
+    // Initial Solfa string check
+    const initialSolfa = serializeScoreToSolfa(initialScore);
+    expect(initialSolfa).toContain('d');
+    expect(initialSolfa).toContain('r');
+    expect(initialSolfa).toContain('m');
+    expect(initialSolfa).toContain('f');
+
+    // 2. Flatten to Piano Roll notes
+    const { notes } = flattenScoreToPianoRoll(initialScore);
+    expect(notes.length).toBe(4);
+
+    // 3. User makes changes in Piano Roll:
+    // Change note 0 from C4 (60, d) to G4 (67, s)
+    // Change note 1 from D4 (62, r) to E4 (64, m)
+    notes[0].midiPitch = 67; // G4
+    notes[1].midiPitch = 64; // E4
+
+    // Simulated auto-format on blur DISABLED:
+    // The parent initialScore remains unchanged while changes are only held in `notes`
+    expect(initialScore.systems[0].voices['S'].measures[0].notes[0].midiPitch).toBe(60);
+    expect(initialScore.systems[0].voices['S'].measures[0].notes[0].syllable).toBe('d');
+
+    // 4. User explicitly triggers Format (or auto-format on blur executes):
+    const updatedScore = formatAndReconstructScore(initialScore, notes, 8);
+    expect(updatedScore).toBeDefined();
+
+    // Verify visual score system has new pitches and syllables
+    const sNotes = updatedScore.systems[0].voices['S'].measures[0].notes;
+    expect(sNotes[0].midiPitch).toBe(67);
+    expect(sNotes[0].syllable).toBe('s'); // Sol (G in Key C)
+    expect(sNotes[1].midiPitch).toBe(64);
+    expect(sNotes[1].syllable).toBe('m'); // Mi (E in Key C)
+
+    // 5. Verify synchronization across ABC representation
+    const updatedAbc = serializeScoreToAbc(updatedScore);
+    expect(updatedAbc).toContain('G'); // First note is now G
+    expect(updatedAbc).toContain('E'); // Second note is now E
+
+    // 6. Verify synchronization across Tonic Sol-fa view
+    const updatedSolfa = serializeScoreToSolfa(updatedScore);
+    expect(updatedSolfa).toContain('s'); // 's' is now in the Solfa notation
+    expect(updatedSolfa).toContain('m');
+  });
 });

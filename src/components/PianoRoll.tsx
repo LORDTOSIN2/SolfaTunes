@@ -69,6 +69,8 @@ interface PianoRollProps {
   onPause?: () => void;
   onStop?: () => void;
   mutedVoices?: { [voiceId: string]: boolean };
+  autoFormatOnBlur?: boolean;
+  onToggleAutoFormatOnBlur?: (enabled: boolean) => void;
 }
 
 // Black key pitch classes (0=C, 1=C#, 2=D, 3=D#, 4=E, 5=F, 6=F#, 7=G, 8=G#, 9=A, 10=A#, 11=B)
@@ -91,12 +93,19 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   onPause,
   onStop,
   mutedVoices = {},
+  autoFormatOnBlur: autoFormatOnBlurProp,
+  onToggleAutoFormatOnBlur,
 }) => {
   // 1. Grid & Display Settings
   const [pixelsPerTick, setPixelsPerTick] = useState<number>(4.0); // 16 ticks = 64px
   const [rowHeight, setRowHeight] = useState<number>(20); // 20px default row height
   const [snapTicks, setSnapTicks] = useState<number>(8); // default 8 ticks = 1/8 note
-  const [autoFormatOnBlur, setAutoFormatOnBlur] = useState<boolean>(true);
+  const [localAutoFormatOnBlur, setLocalAutoFormatOnBlur] = useState<boolean>(true);
+  const autoFormatOnBlur = autoFormatOnBlurProp !== undefined ? autoFormatOnBlurProp : localAutoFormatOnBlur;
+  const setAutoFormatOnBlur = (val: boolean) => {
+    setLocalAutoFormatOnBlur(val);
+    onToggleAutoFormatOnBlur?.(val);
+  };
   const [hasUncommittedChanges, setHasUncommittedChanges] = useState<boolean>(false);
 
   // 2. Collapsible UI Panels (Clean scanability, collapse away by default)
