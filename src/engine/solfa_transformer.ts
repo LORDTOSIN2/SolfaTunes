@@ -31,8 +31,8 @@ export {
 /**
  * Parses default note length, e.g., "1/4" -> 0.25, "1/8" -> 0.125
  */
-function parseDefaultLength(lengthStr: string): number {
-  if (!lengthStr.includes('/')) return 0.25;
+function parseDefaultLength(lengthStr: string | undefined): number {
+  if (!lengthStr || !lengthStr.includes('/')) return 0.25;
   const parts = lengthStr.split('/');
   const num = parseFloat(parts[0]);
   const den = parseFloat(parts[1]);

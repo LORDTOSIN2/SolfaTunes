@@ -409,6 +409,23 @@ export class MidiPlayer {
   }
 
   /**
+   * Previews a single note pitch with the synth engine.
+   */
+  public previewNote(midiPitch: number, durationSec: number = 0.35) {
+    if (midiPitch <= 0) return;
+    try {
+      this.initAudio();
+      if (!this.ctx || !this.masterGain) return;
+      if (this.ctx.state === 'suspended') {
+        this.ctx.resume();
+      }
+      new SynthVoice(this.ctx, this.masterGain, midiPitch, this.ctx.currentTime, durationSec);
+    } catch (e) {
+      // Audio preview error suppressed
+    }
+  }
+
+  /**
    * Returns whether the Web Audio context is initialized and active.
    */
   public getAudioStatus(): 'ready' | 'active' | 'suspended' {

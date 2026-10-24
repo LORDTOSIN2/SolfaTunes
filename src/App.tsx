@@ -557,6 +557,8 @@ export default function App() {
             onUpdateScore={handleUpdateScore}
             studioMode={studioMode}
             setStudioMode={setStudioMode}
+            playerRef={playerRef}
+            onSeekTick={handleSeek}
           />
         </div>
       </main>

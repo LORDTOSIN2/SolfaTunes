@@ -11,6 +11,8 @@ import { parseSolfaToAbc } from '../engine/solfa_parser';
 import { alignSolfaGrid } from '../engine/solfa_aligner';
 import { findActiveMeasureRange, getScoreMeasureRanges } from '../utils/playback_timeline';
 import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle, FileText, CheckSquare, Square } from 'lucide-react';
+import { PianoRoll } from './PianoRoll';
+import { MidiPlayer } from '../audio/midi_player';
 
 interface ScoreRendererProps {
   score: ParsedScore | null;
@@ -30,6 +32,8 @@ interface ScoreRendererProps {
   onUpdateScore: (score: ParsedScore) => void;
   studioMode: 'read' | 'lyrics' | 'interactive' | 'source';
   setStudioMode: (val: 'read' | 'lyrics' | 'interactive' | 'source') => void;
+  playerRef?: React.RefObject<MidiPlayer | null>;
+  onSeekTick?: (tick: number) => void;
 }
 
 /**
@@ -766,9 +770,12 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   onSelectNote,
   onUpdateScore,
   studioMode,
-  setStudioMode
+  setStudioMode,
+  playerRef,
+  onSeekTick,
 }) => {
   const [showHelp, setShowHelp] = useState<boolean>(false);
+  const [showPianoRoll, setShowPianoRoll] = useState<boolean>(false);
 
   const layoutRows = useMemo<({ type: 'voice'; voice: any } | { type: 'divider' })[]>(() => {
     if (!score) return [];
@@ -1444,11 +1451,12 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                   solfaEditTimerRef.current = null;
                 }
                 isEditingSolfaRef.current = false;
+                setShowPianoRoll(false);
                 setStudioMode('read');
                 onSelectNote(null);
               }}
               className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                studioMode === 'read'
+                !showPianoRoll && studioMode === 'read'
                   ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
                   : 'text-stone-400 hover:text-white'
               }`}
@@ -1464,11 +1472,12 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                   solfaEditTimerRef.current = null;
                 }
                 isEditingSolfaRef.current = false;
+                setShowPianoRoll(false);
                 setStudioMode('lyrics');
                 onSelectNote(null);
               }}
               className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                studioMode === 'lyrics'
+                !showPianoRoll && studioMode === 'lyrics'
                   ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
                   : 'text-stone-400 hover:text-white'
               }`}
@@ -1484,10 +1493,11 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                   solfaEditTimerRef.current = null;
                 }
                 isEditingSolfaRef.current = false;
+                setShowPianoRoll(false);
                 setStudioMode('interactive');
               }}
               className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                studioMode === 'interactive'
+                !showPianoRoll && studioMode === 'interactive'
                   ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
                   : 'text-stone-400 hover:text-indigo-400'
               }`}
@@ -1498,6 +1508,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             </button>
             <button
               onClick={() => {
+                setShowPianoRoll(false);
                 setStudioMode('source');
                 onSelectNote(null);
                 if (score && !isEditingSolfaRef.current) {
@@ -1505,7 +1516,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 }
               }}
               className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1 cursor-pointer ${
-                studioMode === 'source'
+                !showPianoRoll && studioMode === 'source'
                   ? 'bg-indigo-600 text-white shadow ring-1 ring-indigo-400/30'
                   : 'text-stone-400 hover:text-indigo-400'
               }`}
@@ -1515,6 +1526,33 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               Source Editor
             </button>
           </div>
+
+          {/* Piano Roll Toggle Button (hidden by default) */}
+          <button
+            type="button"
+            onClick={() => {
+              setShowPianoRoll(prev => !prev);
+              onSelectNote(null);
+            }}
+            className={`px-3 py-1.5 rounded-full text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer shadow-sm ${
+              showPianoRoll
+                ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white ring-2 ring-indigo-400/50 shadow-indigo-500/20'
+                : 'bg-black/40 text-stone-300 hover:text-white border border-white/10 hover:border-white/20'
+            }`}
+            title="Toggle Interactive Piano Roll View (SATB Channels & Monophony)"
+          >
+            <span className="text-xs">🎹</span>
+            <span>Piano Roll</span>
+            <span
+              className={`px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider ${
+                showPianoRoll
+                  ? 'bg-white/20 text-white'
+                  : 'bg-white/5 text-stone-400'
+              }`}
+            >
+              {showPianoRoll ? 'Active' : 'Off'}
+            </span>
+          </button>
           
           {/* Zoom Controls */}
           <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-full border border-white/10 shadow-inner">
@@ -1560,7 +1598,18 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
         </div>
       </div>
 
-      {studioMode === 'source' ? (
+      {showPianoRoll && score ? (
+        <div className="flex-1 overflow-hidden">
+          <PianoRoll
+            score={score}
+            onUpdateScore={onUpdateScore}
+            currentTick={currentTick}
+            playerRef={playerRef}
+            onSeekTick={onSeekTick}
+            onClose={() => setShowPianoRoll(false)}
+          />
+        </div>
+      ) : studioMode === 'source' ? (
         <div className="flex-1 flex flex-col overflow-hidden bg-[#0F1115]">
           {/* Editor Header Toolbar */}
           <div className="flex items-center justify-between px-6 py-2.5 bg-[#161920] border-b border-white/5 text-xs text-stone-400 select-none">
