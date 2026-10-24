@@ -21,17 +21,26 @@ import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
 import { serializeScoreToAbc } from './engine/abc_serializer';
-import { Music, Download, FileDown, FileUp, ChevronRight } from 'lucide-react';
+import { Music, Download, FileDown, FileUp, ChevronRight, Settings } from 'lucide-react';
 import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
+import { SettingsModal } from './components/SettingsModal';
+import { loadAppSettings, saveAppSettings, AppSettings } from './utils/settings';
 
 export default function App() {
-  // 1. App States
+  // 1. App States & Persistent User Settings
+  const [settings, setSettings] = useState<AppSettings>(loadAppSettings);
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+
+  const handleUpdateSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    saveAppSettings(newSettings);
+  };
+
   const [abcText, setAbcText] = useState<string>(SCORES[0]?.abcText || '');
   const [abcLoadVersion, setAbcLoadVersion] = useState(0);
   const [musicalDocument, setMusicalDocument] = useState<MusicalDocument | null>(null);
   const score = musicalDocument?.score ?? null;
   const [warnings, setWarnings] = useState<ParseWarning[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [musicXmlStatus, setMusicXmlStatus] = useState<{
     type: 'success' | 'warning' | 'error' | 'info';
     message: string;
@@ -89,6 +98,29 @@ export default function App() {
     return () => {
       playerRef.current?.dispose();
     };
+  }, []);
+
+  // Keyboard shortcut listener: Cmd+, or Ctrl+, opens Settings, 'z' toggles Zen mode
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ',') {
+        e.preventDefault();
+        setIsSettingsOpen((prev) => !prev);
+        return;
+      }
+      if (
+        (e.key === 'z' || e.key === 'Z') &&
+        !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)
+      ) {
+        setSettings((prev) => {
+          const next = { ...prev, zenMode: !prev.zenMode };
+          saveAppSettings(next);
+          return next;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, []);
 
   // 3. Compile/Parse ABC text whenever it changes
@@ -443,72 +475,120 @@ export default function App() {
 
   return (
     <div className="min-h-screen lg:h-screen overflow-x-clip bg-[#0A0A0B] text-stone-200 flex flex-col antialiased font-sans">
-      {/* Editorial Page Header */}
-      <header className="px-4 py-3 sm:px-6 sm:py-4 lg:px-8 lg:py-5 border-b border-white/5 bg-[#0F1115] flex items-center justify-between gap-3 shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="bg-indigo-600 p-2 sm:p-2.5 rounded-xl text-white shadow-lg border border-indigo-500">
-            <Music className="h-5 w-5 sm:h-6 sm:w-6" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="font-sans font-black text-lg sm:text-xl uppercase tracking-widest text-white flex items-center gap-2">
-              SolfaTunes
+      {/* Zen Mode Minimalist Banner OR Editorial Page Header */}
+      {settings.zenMode ? (
+        <header className="px-6 py-2.5 bg-[#0F1115]/95 border-b border-indigo-500/20 backdrop-blur-md flex items-center justify-between gap-3 shadow-md z-30">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <h1 className="font-sans font-bold text-xs uppercase tracking-wider text-white">
+              {score?.title || 'SolfaTunes'}
             </h1>
-            <p className="text-[9px] sm:text-[10px] font-mono tracking-wide text-stone-500 font-bold mt-0.5">
-              ABC & Tonic Sol-fa music studio
-            </p>
+            <span className="text-[10px] text-stone-400 font-mono hidden sm:inline">
+              Key: {score?.key} • Meter: {score?.meter}
+            </span>
+            <span className="text-[9px] font-black uppercase px-2 py-0.5 bg-indigo-600/30 text-indigo-300 rounded-full border border-indigo-500/30">
+              Zen Mode
+            </span>
           </div>
-        </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <input
-            ref={musicXmlInputRef}
-            type="file"
-            accept=".xml,.musicxml,application/xml,text/xml,application/vnd.recordare.musicxml+xml"
-            onChange={handleImportMusicXml}
-            className="hidden"
-            aria-label="Import MusicXML file"
-          />
-          <button
-            type="button"
-            onClick={() => musicXmlInputRef.current?.click()}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-            title="Open MusicXML project"
-            aria-label="Open MusicXML project"
-          >
-            <FileUp size={16} />
-            <span className="hidden sm:inline text-xs font-semibold">Open XML</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleExportMusicXml}
-            disabled={!musicalDocument}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
-            title="Save project as MusicXML"
-            aria-label="Save project as MusicXML"
-          >
-            <FileDown size={16} />
-            <span className="hidden sm:inline text-xs font-semibold">Save project</span>
-          </button>
-          <button
-            onClick={handleExportAbc}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-            title="Download ABC notation"
-            aria-label="Download ABC notation"
-          >
-            <FileDown size={16} />
-            <span className="hidden sm:inline text-xs font-semibold">ABC</span>
-          </button>
-          <button
-            onClick={handleExportMidi}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-indigo-500/60 bg-indigo-600 px-3 text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-            title="Export MIDI"
-            aria-label="Export MIDI"
-          >
-            <Download size={16} />
-            <span className="hidden sm:inline text-xs font-semibold">MIDI</span>
-          </button>
-        </div>
-      </header>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleUpdateSettings({ ...settings, zenMode: false })}
+              className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-stone-200 text-xs font-bold transition-colors cursor-pointer"
+              title="Exit Zen / Focus Mode (Z)"
+            >
+              Exit Zen Mode (Z)
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-1.5 rounded-lg border border-white/10 hover:bg-white/10 text-stone-300 hover:text-white transition-colors cursor-pointer"
+              title="Settings (Cmd+,)"
+            >
+              <Settings size={14} />
+            </button>
+          </div>
+        </header>
+      ) : (
+        <header className="px-4 py-3 sm:px-6 sm:py-4 lg:px-8 lg:py-5 border-b border-white/5 bg-[#0F1115] flex items-center justify-between gap-3 shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="bg-indigo-600 p-2 sm:p-2.5 rounded-xl text-white shadow-lg border border-indigo-500">
+              <Music className="h-5 w-5 sm:h-6 sm:w-6" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-sans font-black text-lg sm:text-xl uppercase tracking-widest text-white flex items-center gap-2">
+                SolfaTunes
+              </h1>
+              <p className="text-[9px] sm:text-[10px] font-mono tracking-wide text-stone-500 font-bold mt-0.5">
+                ABC & Tonic Sol-fa music studio
+              </p>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-2">
+            <input
+              ref={musicXmlInputRef}
+              type="file"
+              accept=".xml,.musicxml,application/xml,text/xml,application/vnd.recordare.musicxml+xml"
+              onChange={handleImportMusicXml}
+              className="hidden"
+              aria-label="Import MusicXML file"
+            />
+            <button
+              type="button"
+              onClick={() => musicXmlInputRef.current?.click()}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              title="Open MusicXML project"
+              aria-label="Open MusicXML project"
+            >
+              <FileUp size={16} />
+              <span className="hidden sm:inline text-xs font-semibold">Open XML</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleExportMusicXml}
+              disabled={!musicalDocument}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
+              title="Save project as MusicXML"
+              aria-label="Save project as MusicXML"
+            >
+              <FileDown size={16} />
+              <span className="hidden sm:inline text-xs font-semibold">Save project</span>
+            </button>
+            <button
+              onClick={handleExportAbc}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              title="Download ABC notation"
+              aria-label="Download ABC notation"
+            >
+              <FileDown size={16} />
+              <span className="hidden sm:inline text-xs font-semibold">ABC</span>
+            </button>
+            <button
+              onClick={handleExportMidi}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-indigo-500/60 bg-indigo-600 px-3 text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+              title="Export MIDI"
+              aria-label="Export MIDI"
+            >
+              <Download size={16} />
+              <span className="hidden sm:inline text-xs font-semibold">MIDI</span>
+            </button>
+
+            {/* Global Settings Menu Button */}
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 cursor-pointer shadow-sm"
+              title="Open Workspace Settings (Cmd+,)"
+              aria-label="Settings"
+            >
+              <Settings size={16} />
+              <span className="hidden sm:inline text-xs font-semibold">Settings</span>
+            </button>
+          </div>
+        </header>
+      )}
 
       {musicXmlStatus && (
         <div
@@ -528,21 +608,21 @@ export default function App() {
 
       {/* Main Work Area Dashboard */}
       <main className="flex-1 min-h-0 flex flex-col lg:flex-row p-3 sm:p-5 lg:p-6 xl:p-8 pb-36 lg:pb-8 gap-4 lg:gap-6 xl:gap-8 lg:overflow-hidden">
-        {/* Collapsible Sidebar on Left */}
-        {isSidebarOpen ? (
+        {/* Collapsible Sidebar on Left (controlled by settings.showSidebar) */}
+        {settings.showSidebar && !settings.zenMode ? (
           <div className="order-2 min-w-0 lg:order-1 lg:w-[320px] xl:w-[340px] 2xl:w-[380px] lg:shrink-0 lg:h-full lg:min-h-0 transition-all duration-200">
             <Sidebar
               onLoadAbcText={handleLoadAbcText}
               warnings={warnings}
               onLoadScore={handleLoadScore}
               selectedScoreId={SCORES.find(song => song.abcText === abcText)?.id}
-              onCollapse={() => setIsSidebarOpen(false)}
+              onCollapse={() => handleUpdateSettings({ ...settings, showSidebar: false })}
             />
           </div>
-        ) : (
+        ) : !settings.zenMode ? (
           <button
             type="button"
-            onClick={() => setIsSidebarOpen(true)}
+            onClick={() => handleUpdateSettings({ ...settings, showSidebar: true })}
             className="order-2 lg:order-1 self-start lg:self-stretch flex items-center justify-center gap-2 bg-[#13161C] border border-white/10 rounded-lg px-2.5 py-1.5 lg:w-9 text-stone-300 hover:text-white hover:bg-white/10 shadow-lg cursor-pointer transition-colors"
             title="Expand score library"
           >
@@ -551,9 +631,9 @@ export default function App() {
               Library
             </span>
           </button>
-        )}
+        ) : null}
 
-        {/* Put the score first on phones so it is visible without scrolling past the library. */}
+        {/* Score Area */}
         <div ref={scoreContainerRef} className="order-1 min-w-0 h-[70vh] min-h-[32rem] scroll-mt-3 lg:order-2 lg:flex-1 lg:h-full lg:min-h-0">
           <ScoreRenderer
             score={score}
@@ -575,33 +655,46 @@ export default function App() {
             setStudioMode={setStudioMode}
             playerRef={playerRef}
             onSeekTick={handleSeek}
-            isExpanded={!isSidebarOpen}
-            onToggleExpand={() => setIsSidebarOpen((prev) => !prev)}
+            isExpanded={!settings.showSidebar || settings.zenMode}
+            onToggleExpand={() => handleUpdateSettings({ ...settings, showSidebar: !settings.showSidebar })}
+            settings={settings}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onUpdateSettings={handleUpdateSettings}
           />
         </div>
       </main>
 
-      {/* Unified Floating Playback Dock ("Always Within Reach") */}
-      <FloatingPlaybackDock
-        score={score}
-        isPlaying={isPlaying}
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onStop={handleStop}
-        currentTick={currentTick}
-        totalTicks={totalTicks}
-        bpm={bpm}
-        setBpm={handleSetBpm}
-        transpose={transpose}
-        setTranspose={setTranspose}
-        masterVolume={masterVolume}
-        setMasterVolume={setMasterVolume}
-        onSeek={handleSeek}
-        mutedVoices={mutedVoices}
-        toggleMute={toggleMute}
-        isLooping={isLooping}
-        toggleLoop={toggleLoop}
-        getTranspositionLabel={getTranspositionLabel}
+      {/* Unified Floating Playback Dock ("Always Within Reach" - hideable in Settings & Zen Mode) */}
+      {settings.showPlaybackDock && !settings.zenMode && (
+        <FloatingPlaybackDock
+          score={score}
+          isPlaying={isPlaying}
+          onPlay={handlePlay}
+          onPause={handlePause}
+          onStop={handleStop}
+          currentTick={currentTick}
+          totalTicks={totalTicks}
+          bpm={bpm}
+          setBpm={handleSetBpm}
+          transpose={transpose}
+          setTranspose={setTranspose}
+          masterVolume={masterVolume}
+          setMasterVolume={setMasterVolume}
+          onSeek={handleSeek}
+          mutedVoices={mutedVoices}
+          toggleMute={toggleMute}
+          isLooping={isLooping}
+          toggleLoop={toggleLoop}
+          getTranspositionLabel={getTranspositionLabel}
+        />
+      )}
+
+      {/* Workspace & View Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={settings}
+        onUpdateSettings={handleUpdateSettings}
       />
     </div>
   );

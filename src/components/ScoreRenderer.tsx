@@ -10,9 +10,10 @@ import { serializeScoreToSolfa } from '../engine/solfa_serializer';
 import { parseSolfaToAbc } from '../engine/solfa_parser';
 import { alignSolfaGrid } from '../engine/solfa_aligner';
 import { findActiveMeasureRange, getScoreMeasureRanges } from '../utils/playback_timeline';
-import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle, FileText, CheckSquare, Square, ChevronDown, ChevronUp } from 'lucide-react';
+import { ZoomIn, ZoomOut, Type, Music, X, HelpCircle, Eye, Edit2, Code, Sparkles, AlertTriangle, FileText, CheckSquare, Square, ChevronDown, ChevronUp, Settings } from 'lucide-react';
 import { PianoRoll } from './PianoRoll';
 import { MidiPlayer } from '../audio/midi_player';
+import { AppSettings } from '../utils/settings';
 
 interface ScoreRendererProps {
   score: ParsedScore | null;
@@ -36,6 +37,9 @@ interface ScoreRendererProps {
   onSeekTick?: (tick: number) => void;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  settings?: AppSettings;
+  onOpenSettings?: () => void;
+  onUpdateSettings?: (newSettings: AppSettings) => void;
 }
 
 /**
@@ -777,10 +781,33 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   onSeekTick,
   isExpanded,
   onToggleExpand,
+  settings,
+  onOpenSettings,
+  onUpdateSettings,
 }) => {
   const [showHelp, setShowHelp] = useState<boolean>(false);
-  const [showPianoRoll, setShowPianoRoll] = useState<boolean>(false);
-  const [showLegend, setShowLegend] = useState<boolean>(false);
+
+  // Piano Roll state (respects settings if provided)
+  const [localShowPianoRoll, setLocalShowPianoRoll] = useState<boolean>(false);
+  const showPianoRoll = settings ? settings.showPianoRoll : localShowPianoRoll;
+  const setShowPianoRoll = (val: boolean | ((prev: boolean) => boolean)) => {
+    const nextVal = typeof val === 'function' ? val(showPianoRoll) : val;
+    setLocalShowPianoRoll(nextVal);
+    if (onUpdateSettings && settings) {
+      onUpdateSettings({ ...settings, showPianoRoll: nextVal });
+    }
+  };
+
+  // Tonic Sol-fa Legend state (respects settings if provided)
+  const [localShowLegend, setLocalShowLegend] = useState<boolean>(false);
+  const showLegend = settings ? settings.showReferenceLegend : localShowLegend;
+  const setShowLegend = (val: boolean | ((prev: boolean) => boolean)) => {
+    const nextVal = typeof val === 'function' ? val(showLegend) : val;
+    setLocalShowLegend(nextVal);
+    if (onUpdateSettings && settings) {
+      onUpdateSettings({ ...settings, showReferenceLegend: nextVal });
+    }
+  };
 
   const layoutRows = useMemo<({ type: 'voice'; voice: any } | { type: 'divider' })[]>(() => {
     if (!score) return [];
@@ -821,7 +848,9 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
 
   // Source Editor Tab: 'solfa' or 'abc'
   const [sourceTab, setSourceTab] = useState<'solfa' | 'abc'>('solfa');
-  const [showLivePreview, setShowLivePreview] = useState<boolean>(true);
+  // Live Preview is OFF by default (as requested) and can be toggled via Settings menu
+  const [localShowLivePreview, setLocalShowLivePreview] = useState<boolean>(false);
+  const showLivePreview = settings ? settings.showLivePreview : localShowLivePreview;
   const [solfaText, setSolfaText] = useState<string>(() => score ? serializeScoreToSolfa(score) : '');
   const [autoFormatOnBlur, setAutoFormatOnBlur] = useState<boolean>(false);
   const isEditingSolfaRef = useRef<boolean>(false);
@@ -1610,6 +1639,18 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               <Type size={14} />
             </button>
           </div>
+
+          {/* Settings Menu Button */}
+          {onOpenSettings && (
+            <button
+              type="button"
+              onClick={onOpenSettings}
+              className="p-2 hover:bg-white/10 rounded-full text-stone-300 hover:text-white transition-colors cursor-pointer border border-white/10 bg-black/40 shadow-inner"
+              title="Open Workspace & View Settings"
+            >
+              <Settings size={14} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -1717,19 +1758,39 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 </button>
               )}
 
-              {/* Live Preview Toggle */}
-              <button
-                onClick={() => setShowLivePreview(!showLivePreview)}
-                className={`px-3 py-1.5 rounded-lg border text-[10px] font-sans font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
-                  showLivePreview
-                    ? 'bg-indigo-600/30 border-indigo-500/50 text-indigo-200 shadow-sm'
-                    : 'bg-white/5 border-white/5 text-stone-300 hover:bg-white/10'
-                }`}
-                title="Toggle Live Interactive Score Preview side-by-side"
-              >
-                <Eye size={12} />
-                {showLivePreview ? 'Live Preview: On' : 'Live Preview: Off'}
-              </button>
+              {/* Split Preview Active Indicator (if enabled in settings) */}
+              {showLivePreview && (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 rounded-lg text-[10px] font-sans font-bold">
+                  <Eye size={12} />
+                  <span>Split Preview</span>
+                  <button
+                    onClick={() => {
+                      if (onUpdateSettings && settings) {
+                        onUpdateSettings({ ...settings, showLivePreview: false });
+                      } else {
+                        setLocalShowLivePreview(false);
+                      }
+                    }}
+                    className="ml-1 text-indigo-400 hover:text-white p-0.5 rounded cursor-pointer"
+                    title="Hide Split Preview (or toggle in Settings)"
+                  >
+                    <X size={11} />
+                  </button>
+                </div>
+              )}
+
+              {/* Settings shortcut button */}
+              {onOpenSettings && (
+                <button
+                  type="button"
+                  onClick={onOpenSettings}
+                  className="px-2.5 py-1.5 rounded-lg border border-white/5 bg-white/5 hover:bg-white/10 text-stone-300 hover:text-white text-[10px] font-sans font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5"
+                  title="Open Workspace Settings (live preview, panels, editor preferences)"
+                >
+                  <Settings size={12} />
+                  <span className="hidden sm:inline">Settings</span>
+                </button>
+              )}
 
               {/* Cheat Sheet Toggle */}
               <button
@@ -1918,7 +1979,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               </div>
 
               {/* Problems/Warnings Panel at the bottom */}
-              {warnings && warnings.length > 0 && (
+              {warnings && warnings.length > 0 && (settings?.showCompilationWarnings ?? true) && (
                 <div className="border-t border-red-500/20 bg-red-500/5 max-h-[140px] overflow-auto select-none">
                   <div className="flex items-center gap-2 px-6 py-2 bg-red-500/10 border-b border-red-500/10 text-red-200 text-[10px] font-sans font-black uppercase tracking-wider">
                     <AlertTriangle size={12} className="text-red-400" />
