@@ -1,4 +1,5 @@
 import { ParsedScore } from '../types';
+import { getTicksPerMeasure } from '../engine/timing';
 
 export interface ScoreMeasureRange {
   systemIndex: number;
@@ -33,7 +34,7 @@ export function getScoreMeasureRanges(score: ParsedScore | null): ScoreMeasureRa
         measureDuration = Math.max(measureDuration, voiceDuration);
       });
 
-      if (measureDuration === 0) measureDuration = 16;
+      if (measureDuration === 0) measureDuration = getTicksPerMeasure(score.meter);
 
       ranges.push({
         systemIndex: system.systemIndex,
@@ -154,4 +155,3 @@ export function pianoRollTickToAudioTick(
   const ratio = Math.min(1, Math.max(0, offsetInPiano / pianoDuration));
   return Math.round(audioRange.start + ratio * audioDuration);
 }
-

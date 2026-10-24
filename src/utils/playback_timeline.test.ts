@@ -84,13 +84,14 @@ describe('score playback measure timeline', () => {
 
   it('reserves a fallback measure duration for empty measures, matching the audio timeline', () => {
     const score = makeScore();
+    score.systems[0].voices['1'].measures[0].notes = [];
     score.systems[0].voices['2'].measures[0].notes = [];
 
     expect(getScoreMeasureRanges(score)[0]).toEqual({
       systemIndex: 0,
       measureIndex: 0,
       start: 0,
-      end: 4,
+      end: 64,
     });
   });
 

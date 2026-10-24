@@ -4,6 +4,7 @@
  */
 
 import { ParsedScore, SolfaNote } from '../types';
+import { TICKS_PER_WHOLE_NOTE } from './timing';
 
 /**
  * Parses default note length, e.g., "1/4" -> 0.25, "1/8" -> 0.125
@@ -22,8 +23,8 @@ function parseDefaultLength(lengthStr: string): number {
 export function serializeNoteToAbc(note: SolfaNote, defaultLengthVal: number): string {
   if (note.isRest) {
     const restChar = note.rawLetter || 'z';
-    // Calculate multiplier relative to default length: durationTicks / (L_val * 16)
-    const mult = note.durationTicks / (defaultLengthVal * 16);
+    // Calculate multiplier relative to default length.
+    const mult = note.durationTicks / (defaultLengthVal * TICKS_PER_WHOLE_NOTE);
     const durStr = serializeDuration(mult);
     return `${restChar}${durStr}`;
   }
@@ -53,7 +54,7 @@ export function serializeNoteToAbc(note: SolfaNote, defaultLengthVal: number): s
   }
 
   // 3. Duration
-  const mult = note.durationTicks / (defaultLengthVal * 16);
+  const mult = note.durationTicks / (defaultLengthVal * TICKS_PER_WHOLE_NOTE);
   const durStr = serializeDuration(mult);
 
   return `${acc}${abcLetter}${octaveMarks}${durStr}`;

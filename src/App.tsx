@@ -91,7 +91,7 @@ export default function App() {
   const musicXmlProvenanceRef = useRef<MusicalDocument | null>(null);
   const skipNextAbcParseRef = useRef(false);
 
-  // Compute total duration of score in sixteenth ticks
+  // Compute total duration in piano-roll ticks.
   const totalTicks = useMemo(() => {
     if (!score) return 0;
     let maxTick = 0;

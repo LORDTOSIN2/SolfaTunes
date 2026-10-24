@@ -47,7 +47,7 @@ describe('MusicalDocument', () => {
     expect(document.score.key).toBe('C');
     expect(document.score.meter).toBe('3/4');
     expect(document.score.voices[0].id).toBe('S');
-    expect(measure.notes.map(note => note.durationTicks)).toEqual([8, 4, 4]);
+    expect(measure.notes.map(note => note.durationTicks)).toEqual([32, 16, 16]);
     expect(measure.notes[0].timestamp).toBe(0);
     expect(document.score.lyrics).toEqual(['first verse']);
   });

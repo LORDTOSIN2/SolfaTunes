@@ -4,6 +4,7 @@
  */
 
 import { ParsedScore, SolfaNote } from '../types';
+import { TICKS_PER_QUARTER_NOTE } from '../engine/timing';
 
 /**
  * Encodes a numeric value as a variable-length quantity (VLQ) for MIDI.
@@ -60,8 +61,8 @@ export class MidiWriter {
    * Generates a complete Standard MIDI File (Type 1) as a Uint8Array.
    */
   public static generateMidiBytes(score: ParsedScore, bpm: number, transposeOffset: number = 0): Uint8Array {
-    const ticksPerQuarter = 120; // 1 quarter note = 120 ticks, 1 sixteenth note = 30 ticks
-    const ticksPerSixteenth = 30;
+    const midiTicksPerPianoRollTick = 30;
+    const ticksPerQuarter = TICKS_PER_QUARTER_NOTE * midiTicksPerPianoRollTick;
 
     // Track 0: Tempo and Time Signature
     const track0Bytes: number[] = [];
@@ -141,8 +142,8 @@ export class MidiWriter {
           measure.notes.forEach(note => {
             if (note.isRest) return;
 
-            const startTick = note.timestamp * ticksPerSixteenth;
-            const endTick = (note.timestamp + note.durationTicks) * ticksPerSixteenth;
+            const startTick = note.timestamp * midiTicksPerPianoRollTick;
+            const endTick = (note.timestamp + note.durationTicks) * midiTicksPerPianoRollTick;
 
             events.push({
               tick: startTick,

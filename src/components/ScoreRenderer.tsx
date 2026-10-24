@@ -36,6 +36,7 @@ import { PianoRoll } from './PianoRoll';
 import { MidiPlayer } from '../audio/midi_player';
 import { AppSettings } from '../utils/settings';
 import { Tooltip } from './Tooltip';
+import { TICKS_PER_WHOLE_NOTE } from '../engine/timing';
 
 export type StudioWorkspaceMode = 'read' | 'lyrics' | 'interactive' | 'source' | 'pianoroll' | 'split';
 
@@ -1116,7 +1117,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
       .notes[selectedNote.noteIndex];
       
     const defaultLengthVal = parseDefaultLength(score.defaultLength);
-    note.durationTicks = Math.round(mult * defaultLengthVal * 16);
+    note.durationTicks = Math.round(mult * defaultLengthVal * TICKS_PER_WHOLE_NOTE);
     if (note.durationTicks <= 0) note.durationTicks = 1;
     
     onUpdateScore(newScore);
@@ -1264,7 +1265,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 Note Duration (Beats)
               </label>
               <select
-                value={selectedNoteObj ? (selectedNoteObj.durationTicks / (parseDefaultLength(score.defaultLength) * 16)) : 1.0}
+                value={selectedNoteObj ? (selectedNoteObj.durationTicks / (parseDefaultLength(score.defaultLength) * TICKS_PER_WHOLE_NOTE)) : 1.0}
                 onChange={(e) => handleUpdateNoteDuration(parseFloat(e.target.value))}
                 className="w-full max-w-[200px] bg-black/40 border border-white/10 text-stone-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none cursor-pointer font-sans"
               >

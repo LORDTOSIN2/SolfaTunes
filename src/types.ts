@@ -8,7 +8,7 @@ export interface SolfaNote {
   scaleDegree: number;        // 0-11 scale degree
   midiPitch: number;          // MIDI note number (e.g., 60 for C4)
   octaveRelativeToVoice: number; // Signed int (relative to the voice's home register)
-  durationTicks: number;      // Duration normalized in sixteenth-note ticks
+  durationTicks: number;      // Duration in piano-roll ticks (16 per quarter note)
   isRest: boolean;            // True if this is a rest
   timestamp: number;          // Playback offset in ticks from start of piece
   

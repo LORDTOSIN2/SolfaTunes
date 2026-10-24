@@ -407,23 +407,23 @@ describe('MusicXML document import/export workflow', () => {
       note.isRest,
       note.durationTicks,
       note.midiPitch,
-    ])).toEqual([[false, 12, 79]]);
+    ])).toEqual([[false, 48, 79]]);
     expect(imported.score.systems[0].voices.P1.measures[0].notes.map(note => [
       note.isRest,
       note.durationTicks,
       note.midiPitch,
     ])).toEqual([
-      [false, 2, 72],
-      [false, 2, 72],
-      [true, 4, 0],
-      [false, 4, 74],
+      [false, 8, 72],
+      [false, 8, 72],
+      [true, 16, 0],
+      [false, 16, 74],
     ]);
     expect(imported.score.systems[0].voices.P2.measures[0].notes.map(note => [
       note.isRest,
       note.durationTicks,
       note.midiPitch,
-    ])).toEqual([[false, 12, 55]]);
-    expect(imported.score.systems[0].voices.P1.measures[1].notes[0].durationTicks).toBe(8);
+    ])).toEqual([[false, 48, 55]]);
+    expect(imported.score.systems[0].voices.P1.measures[1].notes[0].durationTicks).toBe(32);
 
     const exported = exportMusicXmlDocument(imported);
     expect(exported.report.isLossless).toBe(false);

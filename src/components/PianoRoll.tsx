@@ -542,13 +542,8 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
       notes.forEach((n) => {
         const noteX = n.startTick * pixelsPerTick;
-<<<<<<< Updated upstream
         const noteW = Math.max(12, n.durationTicks * pixelsPerTick);
         const noteY = (maxMidi - n.midiPitch) * rowHeight;
-=======
-        const noteW = Math.max(2, n.durationTicks * pixelsPerTick - 2);
-        const noteY = (MAX_MIDI - n.midiPitch) * rowHeight;
->>>>>>> Stashed changes
         const noteH = rowHeight;
 
         // Check AABB intersection
@@ -1457,11 +1452,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 />
               ))}
 
-<<<<<<< Updated upstream
-              {/* Vertical Measure & Beat Grid Lines */}
-=======
               {/* Measure boundaries follow the playback timeline. */}
->>>>>>> Stashed changes
               {measureColumns.map((col) => (
                 <div
                   key={`m-line-${col.measureNumber}`}
@@ -1497,13 +1488,8 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 const isSounding = activeSoundingNoteIds.has(note.id);
 
                 const left = note.startTick * pixelsPerTick;
-<<<<<<< Updated upstream
                 const width = Math.max(3, note.durationTicks * pixelsPerTick);
                 const top = (maxMidi - note.midiPitch) * rowHeight;
-=======
-                const width = Math.max(2, note.durationTicks * pixelsPerTick - 2);
-                const top = (MAX_MIDI - note.midiPitch) * rowHeight;
->>>>>>> Stashed changes
                 const height = rowHeight - 2;
 
                 const solfaDisplay = formatSolfaOctaveLabel(note.syllable, note.octaveRelativeToVoice);

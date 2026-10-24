@@ -76,7 +76,7 @@ function makeScore(): ParsedScore {
     scaleDegree: 0,
     midiPitch: 60,
     octaveRelativeToVoice: 0,
-    durationTicks: 16,
+    durationTicks: 64,
     isRest: false,
     timestamp: 0,
   };
@@ -135,9 +135,9 @@ describe('MidiPlayer playback clock', () => {
     player.play(onProgress);
     audioClock += 0.5;
 
-    expect(player.getCurrentTick()).toBe(4);
+    expect(player.getCurrentTick()).toBe(16);
     intervals.values().next().value?.();
-    expect(onProgress).toHaveBeenLastCalledWith(4);
+    expect(onProgress).toHaveBeenLastCalledWith(16);
   });
 
   it('plays an imported 72 BPM score at its source tempo', () => {
@@ -155,7 +155,7 @@ describe('MidiPlayer playback clock', () => {
     audioClock += 0.5;
 
     expect(score.tempoBpm).toBe(72);
-    expect(player.getCurrentTick()).toBeCloseTo(2.4);
+    expect(player.getCurrentTick()).toBeCloseTo(9.6);
   });
 
   it('does not signal playback completion for the initial tick-zero progress update', () => {
@@ -190,19 +190,19 @@ describe('MidiPlayer playback clock', () => {
     expect(player.getCurrentTick()).toBe(0);
 
     audioClock += 0.25;
-    expect(player.getCurrentTick()).toBe(2);
+    expect(player.getCurrentTick()).toBe(8);
   });
 
   it('preserves the exact current tick when tempo changes during playback', () => {
     player.play(vi.fn());
     audioClock += 0.75;
-    expect(player.getCurrentTick()).toBe(6);
+    expect(player.getCurrentTick()).toBe(24);
 
     player.setBpm(60);
 
-    expect(player.getCurrentTick()).toBe(6);
+    expect(player.getCurrentTick()).toBe(24);
     audioClock += 0.5;
-    expect(player.getCurrentTick()).toBe(8);
+    expect(player.getCurrentTick()).toBe(32);
   });
 
   it('freezes the audio-clock position on pause and resumes without a jump', () => {
@@ -210,14 +210,14 @@ describe('MidiPlayer playback clock', () => {
     audioClock += 0.5;
     player.pause();
 
-    expect(player.getCurrentTick()).toBe(4);
+    expect(player.getCurrentTick()).toBe(16);
     audioClock += 2;
-    expect(player.getCurrentTick()).toBe(4);
+    expect(player.getCurrentTick()).toBe(16);
 
     player.play(vi.fn());
-    expect(player.getCurrentTick()).toBe(4);
+    expect(player.getCurrentTick()).toBe(16);
     audioClock += 0.25;
-    expect(player.getCurrentTick()).toBe(6);
+    expect(player.getCurrentTick()).toBe(24);
   });
 
   it('seeks to the requested tick while playing and keeps advancing from there', () => {
@@ -227,6 +227,6 @@ describe('MidiPlayer playback clock', () => {
 
     expect(player.getCurrentTick()).toBe(10);
     audioClock += 0.25;
-    expect(player.getCurrentTick()).toBe(12);
+    expect(player.getCurrentTick()).toBe(18);
   });
 });

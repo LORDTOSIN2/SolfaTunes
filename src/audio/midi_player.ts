@@ -4,6 +4,7 @@
  */
 
 import { ParsedScore, SolfaNote } from '../types';
+import { TICKS_PER_QUARTER_NOTE } from '../engine/timing';
 
 /**
  * Maps MIDI note numbers to standard frequencies.
@@ -170,7 +171,7 @@ export class MidiPlayer {
   }
 
   /**
-   * Loads a score and computes its total tick length (in sixteenths).
+   * Loads a score and computes its total length in piano-roll ticks.
    */
   public loadScore(score: ParsedScore, bpm: number, activeVoices: { [voiceId: string]: boolean }) {
     this.stop();
@@ -273,7 +274,7 @@ export class MidiPlayer {
     if (onEnded) this.onPlaybackEndedCallback = onEnded;
     const ctx = this.ctx!;
 
-    const secondsPerTick = 15 / this.bpm; // 1 sixteenth note = 15 / bpm seconds
+    const secondsPerTick = 60 / (this.bpm * TICKS_PER_QUARTER_NOTE);
     this.startCtxTime = ctx.currentTime;
     this.isPlaying = true;
 
@@ -282,7 +283,7 @@ export class MidiPlayer {
 
     const scheduleNextNotes = () => {
       const current = this.getCurrentTick();
-      const lookAheadEnd = current + 8.0; // 8 sixteenth notes in advance (about 1 second at 120bpm)
+      const lookAheadEnd = current + (this.bpm * TICKS_PER_QUARTER_NOTE) / 60;
 
       if (this.nextScheduleWindowStartTick < lookAheadEnd) {
         const startWindow = this.nextScheduleWindowStartTick;
@@ -472,14 +473,14 @@ export class MidiPlayer {
   }
 
   /**
-   * Computes the current playhead position in sixteenth-note units.
+   * Computes the current playhead position in piano-roll ticks.
    */
   public getCurrentTick(): number {
     if (!this.isPlaying) return this.pausedTick;
     if (!this.ctx) return 0;
 
     const elapsedSecs = this.ctx.currentTime - this.startCtxTime;
-    const secondsPerTick = 15 / this.bpm;
+    const secondsPerTick = 60 / (this.bpm * TICKS_PER_QUARTER_NOTE);
     const elapsedTicks = elapsedSecs / secondsPerTick;
     
     return Math.min(this.pausedTick + elapsedTicks, this.totalTicks);

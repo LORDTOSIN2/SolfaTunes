@@ -75,6 +75,21 @@ describe('Piano Roll Adapter & Monophony Engine', () => {
     expect(notes.find((note) => note.startTick >= 48)?.startTick).toBe(48);
   });
 
+  it('maps ABC quarter notes to 16 piano-roll ticks and 64 pixels at the default zoom', () => {
+    const { score: rawScore } = new AbcParser().parse(
+      `X:1\nT:Quarter note timing\nM:2/4\nL:1/4\nK:C\nV:S\n[V:S] C D |`
+    );
+    const score = new SolfaTransformer().transform(rawScore);
+    const { notes } = flattenScoreToPianoRoll(score);
+    const sopranoNotes = notes.filter(note => note.voiceId === 'S' && !note.isRest);
+
+    expect(sopranoNotes.map(({ startTick, durationTicks }) => [startTick, durationTicks])).toEqual([
+      [0, 16],
+      [16, 16],
+    ]);
+    expect(sopranoNotes[0].durationTicks * 4).toBe(64);
+  });
+
   it('strictly enforces monophony within each channel', () => {
     const overlappingNotes: FlatPianoRollNote[] = [
       {

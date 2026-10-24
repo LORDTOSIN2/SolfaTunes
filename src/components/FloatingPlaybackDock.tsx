@@ -18,6 +18,7 @@ import {
 import { ParsedScore } from '../types';
 import { findActiveMeasureRange, getScoreMeasureRanges } from '../utils/playback_timeline';
 import { Tooltip } from './Tooltip';
+import { TICKS_PER_QUARTER_NOTE } from '../engine/timing';
 
 export interface FloatingPlaybackDockProps {
   score: ParsedScore | null;
@@ -68,9 +69,9 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
 
   const progressBarRef = useRef<HTMLDivElement | null>(null);
 
-  // Convert sixteenth ticks to seconds: 1 sixteenth tick = (15 / bpm) seconds
+  // Convert piano-roll ticks to seconds using quarter-note BPM.
   const ticksToSeconds = (ticks: number) => {
-    return ticks * (15 / Math.max(20, bpm));
+    return ticks * (60 / (Math.max(20, bpm) * TICKS_PER_QUARTER_NOTE));
   };
 
   const formatTime = (ticks: number) => {

@@ -4,14 +4,15 @@
  */
 
 import { ParsedScore, SolfaNote, Measure, VoiceLine, System } from '../types';
+import { getTicksPerMeasure } from './timing';
 import { getKeyInfo, basePitchClass, resolveNoteSemantics, scaleDegreeToSyllable, calculateScaleDegree } from './solfa_semantics';
 import { SolfaTransformer } from './solfa_transformer';
 
 export interface FlatPianoRollNote {
   id: string;
   voiceId: string;
-  startTick: number;       // Global offset in sixteenth-note ticks
-  durationTicks: number;   // Duration in sixteenth-note ticks
+  startTick: number;       // Global offset in piano-roll ticks (16 per quarter note)
+  durationTicks: number;   // Duration in piano-roll ticks (16 per quarter note)
   midiPitch: number;       // Standard MIDI note number (e.g. 60 = C4)
   isRest: boolean;
   syllable: string;        // Sol-fa syllable: 'd', 'r', 'm', etc.
@@ -124,24 +125,11 @@ export function getVoiceTheme(voiceId: string): VoiceTheme {
  * 6/8 = 48 ticks (8 ticks per eighth note)
  */
 export function getMeterTicksPerMeasure(meterStr: string | undefined): number {
-  if (!meterStr) return 64;
-  const m = meterStr.trim();
-  if (m === 'C') return 64;
-  if (m === 'C|') return 64;
-  const parts = m.split('/');
-  if (parts.length === 2) {
-    const num = parseInt(parts[0], 10);
-    const den = parseInt(parts[1], 10);
-    if (!isNaN(num) && !isNaN(den) && den > 0) {
-      // 16 ticks per quarter note = (16 * 4) / den ticks per beat
-      return Math.round((num * 64) / den);
-    }
-  }
-  return 64;
+  return getTicksPerMeasure(meterStr);
 }
 
 /**
- * Gets the primary beat length in sixteenth-note ticks, grouping compound
+ * Gets the primary beat length in piano-roll ticks, grouping compound
  * eighth-note meters into dotted-quarter beats.
  */
 export function getMeterBeatTicks(meterStr: string | undefined): number {
@@ -253,7 +241,7 @@ export function getPitchSemantics(
 }
 
 /**
- * Returns a human-friendly duration name for sixteenth ticks.
+ * Returns a human-friendly duration name for piano-roll ticks.
  */
 export function getNoteDurationLabel(ticks: number): string {
   switch (ticks) {

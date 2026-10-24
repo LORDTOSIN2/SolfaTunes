@@ -15,6 +15,7 @@ import {
   SOLFA_SYLLABLES,
   resolveNoteSemantics,
 } from './solfa_semantics';
+import { getTicksPerMeasure, TICKS_PER_WHOLE_NOTE } from './timing';
 
 // Re-export for complete backward compatibility across the codebase
 export type { KeyInfo };
@@ -69,9 +70,9 @@ export class SolfaTransformer {
           const activeOverrides: { [letter: string]: number } = {};
 
           measure.notes.forEach(note => {
-            // Scale duration by the default note length: durationTicks = mult * L_val * 16
+            // Scale duration by the default note length into piano-roll ticks.
             const durationMult = note.durationTicks;
-            note.durationTicks = Math.round(durationMult * defaultLengthVal * 16);
+            note.durationTicks = Math.round(durationMult * defaultLengthVal * TICKS_PER_WHOLE_NOTE);
             if (note.durationTicks <= 0) note.durationTicks = 1; // Safeguard
 
             if (note.isRest) {
@@ -200,7 +201,7 @@ export class SolfaTransformer {
 
         // Fallback if measure is completely empty
         if (measureDuration === 0) {
-          measureDuration = 16;
+          measureDuration = getTicksPerMeasure(score.meter);
         }
 
         // Assign note timestamps relative to the measure start
@@ -260,18 +261,18 @@ export function formatSolfaSyllable(syllable: string, octaveRelativeToVoice: num
 }
 
 /**
- * Calculates pulse ticks in sixteenth notes:
- * simple = 16/den; 6/8, 9/8, 12/8 = 6.
+ * Calculates pulse ticks:
+ * simple = 64/den; compound eighth-note meters use a dotted-quarter pulse.
  */
 export function pulseTicks(meter: string | undefined): number {
-  if (!meter) return 4;
+  if (!meter) return 16;
   const clean = meter.trim();
   if (clean === '6/8' || clean === '9/8' || clean === '12/8') {
-    return 6;
+    return 24;
   }
   const parts = clean.split('/');
   const den = parseInt(parts[1], 10) || 4;
-  return Math.max(1, Math.round(16 / den));
+  return Math.max(1, Math.round(64 / den));
 }
 
 export interface FormattedCellItem {

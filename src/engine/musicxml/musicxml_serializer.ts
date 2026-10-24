@@ -15,6 +15,7 @@ import {
 import { KEYS, getKeyInfo, getKeyDefaultAccidentals } from '../solfa_semantics';
 import { LossinessReport, createEmptyLossinessReport } from './lossiness_report';
 import { serializeScoreToAbc } from '../abc_serializer';
+import { TICKS_PER_QUARTER_NOTE } from '../timing';
 
 export interface MusicXmlExportResult {
   xml: string;
@@ -22,7 +23,7 @@ export interface MusicXmlExportResult {
 }
 
 /**
- * Standard duration mapping for divisions = 4 (1 quarter note = 4 divisions = 4 sixteenth ticks).
+ * Standard duration mapping for MusicXML divisions = 4.
  */
 function durationToNoteType(durationDivisions: number): { type: string; isDotted: boolean } {
   switch (durationDivisions) {
@@ -80,7 +81,7 @@ export class MusicXmlSerializer {
     const beats = parseInt(meterParts[0], 10) || 4;
     const beatType = parseInt(meterParts[1], 10) || 4;
 
-    const divisions = 4; // 1 quarter note = 4 divisions = 4 ticks
+    const divisions = 4; // MusicXML uses four divisions per quarter note.
 
     // 3. Prepare metadata and note overrides
     const songId = score.index ? `score-${score.index}` : `score-${Date.now().toString(36)}`;
@@ -213,7 +214,10 @@ export class MusicXmlSerializer {
               };
             }
 
-            const noteDuration = Math.max(1, note.durationTicks);
+            const noteDuration = Math.max(
+              1,
+              Math.round((note.durationTicks * divisions) / TICKS_PER_QUARTER_NOTE)
+            );
             const { type: noteType, isDotted } = durationToNoteType(noteDuration);
             let accidentalElement: string | undefined;
 

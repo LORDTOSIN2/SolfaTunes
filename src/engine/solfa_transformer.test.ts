@@ -26,7 +26,7 @@ describe('SolfaTransformer', () => {
     expect(voice.measures[1].notes[0]).toMatchObject({
       syllable: 'f',
       midiPitch: 65,
-      timestamp: 12,
+      timestamp: 48,
     });
   });
 
@@ -37,13 +37,13 @@ describe('SolfaTransformer', () => {
     );
     const notes = score.systems[0].voices['1'].measures[0].notes;
 
-    expect(notes.map(note => note.durationTicks)).toEqual([4, 2]);
+    expect(notes.map(note => note.durationTicks)).toEqual([16, 8]);
     expect(notes[0]).toMatchObject({ syllable: 'd', midiPitch: 60, timestamp: 0 });
     expect(notes[1]).toMatchObject({
       isRest: true,
       syllable: '·',
       midiPitch: 0,
-      timestamp: 4,
+      timestamp: 16,
     });
   });
 
@@ -54,20 +54,20 @@ describe('SolfaTransformer', () => {
     );
     const voices = score.systems[0].voices;
 
-    expect(voices['1'].measures[0].notes.map(note => note.timestamp)).toEqual([0, 4]);
+    expect(voices['1'].measures[0].notes.map(note => note.timestamp)).toEqual([0, 16]);
     expect(voices['2'].measures[0].notes[0]).toMatchObject({
       timestamp: 0,
-      durationTicks: 8,
+      durationTicks: 32,
     });
   });
 });
 
 describe('Solfa formatting helpers', () => {
   it.each([
-    ['3/4', 4],
-    ['6/8', 6],
-    ['9/8', 6],
-    ['12/8', 6],
+    ['3/4', 16],
+    ['6/8', 24],
+    ['9/8', 24],
+    ['12/8', 24],
   ])('calculates pulse ticks for %s meter', (meter, expectedTicks) => {
     expect(pulseTicks(meter)).toBe(expectedTicks);
   });

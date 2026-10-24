@@ -541,8 +541,8 @@ export class MusicXmlParser {
           const durationText = nEl.getChildText('duration');
           const divisions = measureDivisionsByVoice[voice.id]?.[mIndex] || 4;
           const rawDuration = durationText ? parseInt(durationText, 10) : divisions;
-          // SolfaTransformer scales note.durationTicks as durationMult * defaultLengthVal * 16 (where defaultLengthVal=0.25, mult*4)
-          // Thus durationMult must be rawDuration / divisions.
+          // MusicXML duration is expressed in divisions, where one quarter note
+          // is the current <divisions> value. The transformer converts it to ticks.
           const durationMult = rawDuration / divisions;
 
           const stableId = generateStableNoteId(voice.id, mNum, noteIdxInMeasure);
