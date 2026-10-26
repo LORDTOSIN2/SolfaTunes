@@ -290,4 +290,27 @@ describe('Piano Roll Adapter & Monophony Engine', () => {
       expect(serialized).toContain('C D E F');
     }
   });
+
+  it('confirms vertical grid line ticks strictly match meter definitions for 2/4, 3/4, 4/4, and 6/8', () => {
+    // 2/4 meter: 2 quarter-note beats of 16 ticks each = 32 ticks per measure
+    expect(getMeterTicksPerMeasure('2/4')).toBe(32);
+    expect(getMeterBeatTicks('2/4')).toBe(16);
+    expect(32 / getMeterBeatTicks('2/4')).toBe(2);
+
+    // 4/4 meter: 4 quarter-note beats of 16 ticks each = 64 ticks per measure
+    expect(getMeterTicksPerMeasure('4/4')).toBe(64);
+    expect(getMeterBeatTicks('4/4')).toBe(16);
+    expect(64 / getMeterBeatTicks('4/4')).toBe(4);
+
+    // 3/4 meter: 3 quarter-note beats of 16 ticks each = 48 ticks per measure
+    expect(getMeterTicksPerMeasure('3/4')).toBe(48);
+    expect(getMeterBeatTicks('3/4')).toBe(16);
+    expect(48 / getMeterBeatTicks('3/4')).toBe(3);
+
+    // 6/8 compound meter: 2 dotted-quarter beats of 24 ticks each = 48 ticks per measure
+    expect(getMeterTicksPerMeasure('6/8')).toBe(48);
+    expect(getMeterBeatTicks('6/8')).toBe(24);
+    expect(48 / getMeterBeatTicks('6/8')).toBe(2);
+  });
 });
+

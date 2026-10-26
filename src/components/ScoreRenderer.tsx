@@ -1606,6 +1606,31 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               </button>
             </Tooltip>
 
+            {/* Lyrics View directly next to Score View */}
+            <Tooltip content="Lyrics View" description="View hymn poetry and stanzas" side="bottom">
+              <button
+                onClick={() => {
+                  if (solfaEditTimerRef.current) {
+                    clearTimeout(solfaEditTimerRef.current);
+                    solfaEditTimerRef.current = null;
+                  }
+                  isEditingSolfaRef.current = false;
+                  setShowPianoRoll(false);
+                  setStudioMode('lyrics');
+                  onSelectNote(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                  studioMode === 'lyrics'
+                    ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400/30'
+                    : 'text-stone-400 hover:text-white'
+                }`}
+                aria-label="Lyrics View"
+              >
+                <FileText size={12} />
+                <span>Lyrics</span>
+              </button>
+            </Tooltip>
+
             <Tooltip content="Piano Roll" description="Interactive 4-voice chromatic sequencer editor" side="bottom">
               <button
                 onClick={() => {
@@ -1695,30 +1720,6 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               >
                 <Code size={12} />
                 <span>Source</span>
-              </button>
-            </Tooltip>
-
-            <Tooltip content="Lyrics View" description="View hymn poetry and stanzas" side="bottom">
-              <button
-                onClick={() => {
-                  if (solfaEditTimerRef.current) {
-                    clearTimeout(solfaEditTimerRef.current);
-                    solfaEditTimerRef.current = null;
-                  }
-                  isEditingSolfaRef.current = false;
-                  setShowPianoRoll(false);
-                  setStudioMode('lyrics');
-                  onSelectNote(null);
-                }}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-sans font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
-                  studioMode === 'lyrics'
-                    ? 'bg-indigo-600 text-white shadow-md ring-1 ring-indigo-400/30'
-                    : 'text-stone-400 hover:text-white'
-                }`}
-                aria-label="Lyrics View"
-              >
-                <FileText size={12} />
-                <span>Lyrics</span>
               </button>
             </Tooltip>
           </div>

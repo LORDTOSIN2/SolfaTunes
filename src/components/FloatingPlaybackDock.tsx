@@ -378,10 +378,10 @@ export const FloatingPlaybackDock: React.FC<FloatingPlaybackDockProps> = ({
                 </Tooltip>
               </div>
 
-              {/* Vocal Parts Fast-Mute/Solo Bar */}
+              {/* Vocal Parts Fast-Mute/Solo Bar (visible on both mobile and desktop) */}
               {voiceList.length > 0 && (
-                <div className="hidden sm:flex items-center gap-1.5 bg-black/40 border border-white/5 px-2.5 py-1.5 rounded-xl">
-                  <span className="text-[10px] font-mono uppercase font-bold text-stone-500 mr-1">
+                <div className="flex items-center gap-1 sm:gap-1.5 bg-black/40 border border-white/5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl shrink-0">
+                  <span className="text-[10px] font-mono uppercase font-bold text-stone-500 mr-0.5 sm:mr-1">
                     Voices:
                   </span>
                   {voiceList.map((v) => {

@@ -236,6 +236,47 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     didCenterRef.current = true;
   }, [notes.length, rowHeight, maxMidi]);
 
+  // Smooth vertical zoom scaling that preserves the current vertical center of the viewport
+  const handleVerticalZoom = useCallback(
+    (newRowHeight: number) => {
+      const clampedHeight = Math.max(12, Math.min(48, Math.round(newRowHeight)));
+      const container = scrollContainerRef.current;
+      if (!container) {
+        setRowHeight(clampedHeight);
+        return;
+      }
+      const oldRowHeight = rowHeight;
+      const currentScrollTop = container.scrollTop;
+      const clientHeight = container.clientHeight;
+      const currentCenterY = currentScrollTop + clientHeight / 2;
+      const totalOldHeight = keyCount * oldRowHeight;
+      const ratio = totalOldHeight > 0 ? currentCenterY / totalOldHeight : 0.5;
+
+      setRowHeight(clampedHeight);
+
+      requestAnimationFrame(() => {
+        if (container) {
+          const totalNewHeight = keyCount * clampedHeight;
+          const targetScrollTop = ratio * totalNewHeight - clientHeight / 2;
+          container.scrollTop = Math.max(0, Math.round(targetScrollTop));
+        }
+      });
+    },
+    [keyCount, rowHeight]
+  );
+
+  // Alt + Mouse wheel smoothly zooms pitch rows vertically without jarring jumps
+  const handleContainerWheel = useCallback(
+    (e: React.WheelEvent<HTMLDivElement>) => {
+      if (e.altKey) {
+        e.preventDefault();
+        const step = e.deltaY < 0 ? 2 : -2;
+        handleVerticalZoom(rowHeight + step);
+      }
+    },
+    [rowHeight, handleVerticalZoom]
+  );
+
   // -------------------------------------------------------------
   // Auto-Format on Blur Handler
   // -------------------------------------------------------------
@@ -1163,49 +1204,53 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 Display:
               </span>
 
-              {/* Horizontal Zoom */}
-              <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-md border border-white/10 text-[11px]">
-                <span className="text-stone-400 text-[10px] mr-1">Zoom:</span>
+              {/* Horizontal Zoom (Time) */}
+              <div className="flex items-center gap-1 bg-black/40 px-2.5 py-1 rounded-md border border-white/10 text-[11px]">
+                <span className="text-stone-400 text-[10px] mr-1">H-Zoom (Time):</span>
                 <button
-                  onClick={() => setPixelsPerTick((p) => Math.max(1.5, p * 0.8))}
-                  className="p-0.5 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer"
-                  title="Zoom Out Horizontally"
+                  type="button"
+                  onClick={() => setPixelsPerTick((p) => Math.max(1.5, Number((p * 0.8).toFixed(2))))}
+                  className="p-1 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer active:scale-95"
+                  title="Zoom Out Horizontally (Time Scale)"
+                  aria-label="Zoom out time scale"
                 >
                   <ZoomOut size={12} />
                 </button>
-                <span className="text-[10px] font-mono text-stone-300 w-8 text-center font-bold">
+                <span className="text-[10px] font-mono text-stone-300 w-10 text-center font-bold">
                   {Math.round(pixelsPerTick * 25)}%
                 </span>
                 <button
-                  onClick={() => setPixelsPerTick((p) => Math.min(10.0, p * 1.25))}
-                  className="p-0.5 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer"
-                  title="Zoom In Horizontally"
+                  type="button"
+                  onClick={() => setPixelsPerTick((p) => Math.min(10.0, Number((p * 1.25).toFixed(2))))}
+                  className="p-1 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer active:scale-95"
+                  title="Zoom In Horizontally (Time Scale)"
+                  aria-label="Zoom in time scale"
                 >
                   <ZoomIn size={12} />
                 </button>
               </div>
 
-              {/* Vertical Zoom */}
-              <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-md border border-white/10 text-[11px]">
-                <span className="text-stone-400 text-[10px] mr-1">Vertical:</span>
+              {/* Vertical Zoom (Pitch) */}
+              <div className="flex items-center gap-1 bg-black/40 px-2.5 py-1 rounded-md border border-white/10 text-[11px]">
+                <span className="text-stone-400 text-[10px] mr-1">V-Zoom (Pitch):</span>
                 <button
                   type="button"
-                  onClick={() => setRowHeight((height) => Math.max(10, Math.round(height / 1.2)))}
-                  className="p-0.5 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer"
-                  title="Zoom out vertically"
-                  aria-label="Zoom out vertically"
+                  onClick={() => handleVerticalZoom(rowHeight - 3)}
+                  className="p-1 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer active:scale-95"
+                  title="Zoom Out Vertically (Pitch Rows)"
+                  aria-label="Zoom out pitch rows"
                 >
                   <ZoomOut size={12} />
                 </button>
-                <span className="text-[10px] font-mono text-stone-300 w-8 text-center font-bold">
+                <span className="text-[10px] font-mono text-stone-300 w-10 text-center font-bold">
                   {Math.round((rowHeight / 20) * 100)}%
                 </span>
                 <button
                   type="button"
-                  onClick={() => setRowHeight((height) => Math.min(40, Math.round(height * 1.2)))}
-                  className="p-0.5 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer"
-                  title="Zoom in vertically"
-                  aria-label="Zoom in vertically"
+                  onClick={() => handleVerticalZoom(rowHeight + 3)}
+                  className="p-1 hover:bg-white/10 rounded text-stone-300 hover:text-white cursor-pointer active:scale-95"
+                  title="Zoom In Vertically (Pitch Rows)"
+                  aria-label="Zoom in pitch rows"
                 >
                   <ZoomIn size={12} />
                 </button>
@@ -1214,31 +1259,34 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
               {/* Row Height Presets */}
               <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded-md border border-white/10 text-[10px]">
                 <button
-                  onClick={() => setRowHeight(16)}
-                  className={`px-2 py-0.5 rounded ${
-                    rowHeight === 16 ? 'bg-indigo-600 text-white font-bold' : 'text-stone-400 hover:text-white'
+                  type="button"
+                  onClick={() => handleVerticalZoom(14)}
+                  className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
+                    rowHeight === 14 ? 'bg-indigo-600 text-white font-bold shadow' : 'text-stone-400 hover:text-white'
                   }`}
-                  title="Compact key rows (16px)"
+                  title="Compact key rows (14px)"
                 >
-                  Compact
+                  Compact 14px
                 </button>
                 <button
-                  onClick={() => setRowHeight(20)}
-                  className={`px-2 py-0.5 rounded ${
-                    rowHeight === 20 ? 'bg-indigo-600 text-white font-bold' : 'text-stone-400 hover:text-white'
+                  type="button"
+                  onClick={() => handleVerticalZoom(20)}
+                  className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
+                    rowHeight === 20 ? 'bg-indigo-600 text-white font-bold shadow' : 'text-stone-400 hover:text-white'
                   }`}
                   title="Standard key rows (20px)"
                 >
-                  Standard
+                  Default 20px
                 </button>
                 <button
-                  onClick={() => setRowHeight(26)}
-                  className={`px-2 py-0.5 rounded ${
-                    rowHeight === 26 ? 'bg-indigo-600 text-white font-bold' : 'text-stone-400 hover:text-white'
+                  type="button"
+                  onClick={() => handleVerticalZoom(28)}
+                  className={`px-2 py-0.5 rounded cursor-pointer transition-colors ${
+                    rowHeight === 28 ? 'bg-indigo-600 text-white font-bold shadow' : 'text-stone-400 hover:text-white'
                   }`}
-                  title="Spacious key rows (26px)"
+                  title="Spacious key rows (28px)"
                 >
-                  Large
+                  Large 28px
                 </button>
               </div>
             </div>
@@ -1295,6 +1343,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
       <div className="flex-1 flex overflow-hidden relative min-h-0">
         <div
           ref={scrollContainerRef}
+          onWheel={handleContainerWheel}
           className="flex-1 flex overflow-auto relative"
         >
           {/* Left Piano Keyboard Column (Sticky on horizontal scroll, fully sized) */}
@@ -1460,7 +1509,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 />
               )}
 
-              {/* Beat and measure lines follow the score's meter */}
+              {/* Beat and primary pulse lines strictly matching the score's meter (e.g. 2/4, 4/4, 3/4, 6/8) */}
               {beatLines.map((line) => (
                 <div
                   key={`beat-line-${line}`}
@@ -1469,12 +1518,12 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                   style={{
                     left: `${line * pixelsPerTick}px`,
                     height: `${totalGridHeight}px`,
-                    borderLeft: `1px solid rgba(129,140,248,${gridAlpha * 0.65})`,
+                    borderLeft: `1px solid rgba(165,180,252,${Math.max(0.18, gridAlpha * 0.75)})`,
                   }}
                 />
               ))}
 
-              {/* Measure boundaries follow the playback timeline. */}
+              {/* Measure boundaries strictly matching the score's meter, anacrusis pickup, and measures */}
               {measureColumns.map((col) => (
                 <div
                   key={`m-line-${col.measureNumber}`}
@@ -1482,7 +1531,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                   style={{
                     left: `${col.startTick * pixelsPerTick}px`,
                     height: `${totalGridHeight}px`,
-                    borderLeft: `2px solid rgba(129,140,248,${gridAlpha})`,
+                    borderLeft: `2px solid rgba(129,140,248,${Math.max(0.48, gridAlpha * 1.5)})`,
                   }}
                 />
               ))}

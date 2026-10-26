@@ -61,6 +61,7 @@ export interface CommandPaletteProps {
   onExportAbc: () => void;
   onExportMusicXml: () => void;
   onTriggerImportMusicXml: () => void;
+  onTriggerImportAbc?: () => void;
 }
 
 interface PaletteCommand {
@@ -101,6 +102,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onExportAbc,
   onExportMusicXml,
   onTriggerImportMusicXml,
+  onTriggerImportAbc,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -129,6 +131,18 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         badge: workspaceMode === 'read' ? 'Active' : undefined,
         action: () => {
           onSetWorkspaceMode('read');
+          onClose();
+        },
+      },
+      {
+        id: 'ws-lyrics',
+        title: 'Hymn Lyrics View',
+        category: 'Workspace',
+        subtitle: 'Formatted text view of stanzas and choruses',
+        icon: <FileText size={16} className="text-blue-400" />,
+        badge: workspaceMode === 'lyrics' ? 'Active' : undefined,
+        action: () => {
+          onSetWorkspaceMode('lyrics');
           onClose();
         },
       },
@@ -177,18 +191,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         badge: workspaceMode === 'source' ? 'Active' : undefined,
         action: () => {
           onSetWorkspaceMode('source');
-          onClose();
-        },
-      },
-      {
-        id: 'ws-lyrics',
-        title: 'Hymn Lyrics View',
-        category: 'Workspace',
-        subtitle: 'Formatted text view of stanzas and choruses',
-        icon: <FileText size={16} className="text-blue-400" />,
-        badge: workspaceMode === 'lyrics' ? 'Active' : undefined,
-        action: () => {
-          onSetWorkspaceMode('lyrics');
           onClose();
         },
       },
@@ -432,6 +434,17 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         action: () => {
           onExportAbc();
           onClose();
+        },
+      },
+      {
+        id: 'file-import-abc',
+        title: 'Import .abc or .txt file...',
+        category: 'File & Export',
+        subtitle: 'Upload and load ABC notation or plain text score from your computer',
+        icon: <FileUp size={16} className="text-amber-400" />,
+        action: () => {
+          onClose();
+          onTriggerImportAbc?.();
         },
       },
       {

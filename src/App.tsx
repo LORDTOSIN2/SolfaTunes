@@ -21,7 +21,7 @@ import { ParsedScore, ParseWarning, SelectedNoteLocation } from './types';
 import { MidiPlayer } from './audio/midi_player';
 import { MidiWriter } from './audio/midi_writer';
 import { serializeScoreToAbc } from './engine/abc_serializer';
-import { Music, Download, FileDown, FileUp, ChevronRight, Settings, Command, Maximize2, Minimize2 } from 'lucide-react';
+import { Music, Download, FileDown, FileUp, ChevronRight, ChevronDown, Settings, Command, Maximize2, Minimize2 } from 'lucide-react';
 import { FloatingPlaybackDock } from './components/FloatingPlaybackDock';
 import { MiniFloatingPlaybackButton } from './components/MiniFloatingPlaybackButton';
 import { SettingsModal } from './components/SettingsModal';
@@ -93,8 +93,23 @@ export default function App() {
   const [studioMode, setStudioMode] = useState<WorkspaceMode>('interactive');
   const scoreContainerRef = useRef<HTMLDivElement | null>(null);
   const musicXmlInputRef = useRef<HTMLInputElement | null>(null);
+  const abcFileInputRef = useRef<HTMLInputElement | null>(null);
   const musicXmlProvenanceRef = useRef<MusicalDocument | null>(null);
   const skipNextAbcParseRef = useRef(false);
+  const [isCommandsMenuOpen, setIsCommandsMenuOpen] = useState<boolean>(false);
+  const commandsMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (commandsMenuRef.current && !commandsMenuRef.current.contains(e.target as Node)) {
+        setIsCommandsMenuOpen(false);
+      }
+    };
+    if (isCommandsMenuOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      return () => document.removeEventListener('mousedown', handleOutsideClick);
+    }
+  }, [isCommandsMenuOpen]);
 
   // Compute total duration in piano-roll ticks.
   const totalTicks = useMemo(() => {
@@ -468,6 +483,26 @@ export default function App() {
     }
   };
 
+  const handleImportAbcFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      handleLoadAbcText(text);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setMusicXmlStatus({
+        type: 'error',
+        message: `ABC file could not be read. ${message}`,
+      });
+    }
+  };
+
+  const handleTriggerImportAbc = () => {
+    abcFileInputRef.current?.click();
+  };
+
   const handleExportMusicXml = () => {
     if (!musicalDocument) return;
 
@@ -609,66 +644,134 @@ export default function App() {
               className="hidden"
               aria-label="Import MusicXML file"
             />
-            <Tooltip content="Open MusicXML" description="Import existing .xml or .musicxml sheet file" side="bottom">
-              <button
-                type="button"
-                onClick={() => musicXmlInputRef.current?.click()}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-                aria-label="Open MusicXML project"
-              >
-                <FileUp size={16} />
-                <span className="hidden sm:inline text-xs font-semibold">Open XML</span>
-              </button>
-            </Tooltip>
+            <input
+              ref={abcFileInputRef}
+              type="file"
+              accept=".abc,.txt"
+              onChange={handleImportAbcFile}
+              className="hidden"
+              aria-label="Import ABC or TXT score file"
+            />
 
-            <Tooltip content="Save MusicXML" description="Export project as standard MusicXML notation" side="bottom">
-              <button
-                type="button"
-                onClick={handleExportMusicXml}
-                disabled={!musicalDocument}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Save project as MusicXML"
-              >
-                <FileDown size={16} />
-                <span className="hidden sm:inline text-xs font-semibold">Save project</span>
-              </button>
-            </Tooltip>
+            {/* Quick Actions Commands Button & Dropdown Menu */}
+            <div className="relative" ref={commandsMenuRef}>
+              <div className="inline-flex rounded-lg border border-white/10 bg-white/5 shadow-sm">
+                <Tooltip content="Command Palette" shortcut="⌘K" description="Search all actions, files, views, and settings" side="bottom">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCommandPaletteOpen(true);
+                      setIsCommandsMenuOpen(false);
+                    }}
+                    className="inline-flex h-10 items-center justify-center gap-1.5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white rounded-l-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 cursor-pointer"
+                    aria-label="Command Palette"
+                  >
+                    <Command size={15} />
+                    <span className="text-xs font-semibold">Commands</span>
+                    <kbd className="hidden lg:inline text-[9px] font-mono text-stone-400 bg-black/40 px-1 py-0.5 rounded border border-white/10">⌘K</kbd>
+                  </button>
+                </Tooltip>
+                <Tooltip content="Commands Menu" description="Quick access to Export ABC, Export MIDI, and Import files" side="bottom">
+                  <button
+                    type="button"
+                    onClick={() => setIsCommandsMenuOpen((prev) => !prev)}
+                    className="inline-flex h-10 w-8 items-center justify-center border-l border-white/10 text-stone-400 hover:text-white hover:bg-white/10 rounded-r-lg cursor-pointer transition-colors"
+                    aria-label="Toggle Commands Menu"
+                    aria-expanded={isCommandsMenuOpen}
+                  >
+                    <ChevronDown size={14} className={isCommandsMenuOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                  </button>
+                </Tooltip>
+              </div>
 
-            <Tooltip content="Export ABC" description="Download score in standard ABC text format" side="bottom">
-              <button
-                onClick={handleExportAbc}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-                aria-label="Download ABC notation"
-              >
-                <FileDown size={16} />
-                <span className="hidden sm:inline text-xs font-semibold">ABC</span>
-              </button>
-            </Tooltip>
+              {/* Commands Quick Dropdown Menu */}
+              {isCommandsMenuOpen && (
+                <div className="absolute right-0 top-full mt-2 w-64 bg-[#14161E] border border-white/10 rounded-xl shadow-2xl py-1.5 z-50 text-xs text-stone-200 animate-in fade-in zoom-in-95 duration-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCommandsMenuOpen(false);
+                      setIsCommandPaletteOpen(true);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 hover:bg-indigo-600/20 hover:text-indigo-200 cursor-pointer text-left transition-colors font-medium"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Command size={14} className="text-indigo-400" />
+                      <span>Search All Commands...</span>
+                    </div>
+                    <kbd className="text-[10px] font-mono text-stone-400 bg-black/40 px-1 py-0.5 rounded border border-white/10">⌘K</kbd>
+                  </button>
 
-            <Tooltip content="Export MIDI" description="Generate .mid audio file for DAWs or media players" side="bottom">
-              <button
-                onClick={handleExportMidi}
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-indigo-500/60 bg-indigo-600 px-3 text-white shadow-sm transition-colors hover:bg-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-                aria-label="Export MIDI"
-              >
-                <Download size={16} />
-                <span className="hidden sm:inline text-xs font-semibold">MIDI</span>
-              </button>
-            </Tooltip>
+                  <div className="my-1 border-t border-white/10" />
 
-            {/* Quick Actions Command Palette Button */}
-            <Tooltip content="Command Palette" shortcut="⌘K" description="Fast search and shortcut palette" side="bottom">
-              <button
-                type="button"
-                onClick={() => setIsCommandPaletteOpen(true)}
-                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 text-stone-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 cursor-pointer shadow-sm"
-                aria-label="Command Palette"
-              >
-                <Command size={15} />
-                <span className="hidden md:inline text-xs font-semibold">Commands</span>
-                <kbd className="hidden lg:inline text-[9px] font-mono text-stone-400 bg-black/40 px-1 py-0.5 rounded border border-white/10">⌘K</kbd>
-              </button>
-            </Tooltip>
+                  <div className="px-3 py-1 text-[10px] font-mono uppercase font-bold text-stone-500">
+                    Import
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCommandsMenuOpen(false);
+                      handleTriggerImportAbc();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 cursor-pointer text-left transition-colors"
+                  >
+                    <FileUp size={14} className="text-amber-400" />
+                    <span>Import .abc or .txt file...</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCommandsMenuOpen(false);
+                      musicXmlInputRef.current?.click();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 cursor-pointer text-left transition-colors"
+                  >
+                    <FileUp size={14} className="text-emerald-400" />
+                    <span>Open MusicXML (.xml, .musicxml)...</span>
+                  </button>
+
+                  <div className="my-1 border-t border-white/10" />
+
+                  <div className="px-3 py-1 text-[10px] font-mono uppercase font-bold text-stone-500">
+                    Export
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCommandsMenuOpen(false);
+                      handleExportAbc();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 cursor-pointer text-left transition-colors"
+                  >
+                    <FileDown size={14} className="text-amber-400" />
+                    <span>Export ABC notation (.abc)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCommandsMenuOpen(false);
+                      handleExportMidi();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 cursor-pointer text-left transition-colors"
+                  >
+                    <Download size={14} className="text-indigo-400" />
+                    <span>Export MIDI audio (.mid)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCommandsMenuOpen(false);
+                      handleExportMusicXml();
+                    }}
+                    disabled={!musicalDocument}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-white/10 cursor-pointer text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <FileDown size={14} className="text-emerald-400" />
+                    <span>Save project (MusicXML)</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Complete Full Screen Button */}
             <Tooltip content={isFullscreen ? 'Exit Full Screen' : 'Full Screen'} shortcut="F" description="Expand workspace to maximum viewport" side="bottom">
@@ -931,6 +1034,7 @@ export default function App() {
         onExportAbc={handleExportAbc}
         onExportMusicXml={handleExportMusicXml}
         onTriggerImportMusicXml={() => musicXmlInputRef.current?.click()}
+        onTriggerImportAbc={handleTriggerImportAbc}
       />
     </div>
   );

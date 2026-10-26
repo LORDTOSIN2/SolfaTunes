@@ -226,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {dragActive ? 'Drop your file here!' : 'Import .abc or .txt file'}
               </p>
               <p className="text-[10px] text-stone-500 mt-1">
-                Drag & drop or click to upload from your computer
+                Drag & drop or click • Also in Commands (⌘K)
               </p>
             </div>
             <input
