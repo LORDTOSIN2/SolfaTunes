@@ -592,7 +592,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
                   ? 'text-indigo-900 font-black'
                   : 'text-black'
               }`}
-              style={{ minWidth: item.type === 'note' ? undefined : '1.25rem' }}
+              style={{ minWidth: item.type === 'note' ? undefined : '0.9em' }}
               title={
                 isEditorMode
                   ? `${item.type === 'note' ? `Note: ${item.text}` : item.type === 'rest' ? 'Rest' : 'Sustained note'}. Click to edit.`
@@ -739,72 +739,85 @@ const BarlineGraphic: React.FC<{ type: string; height: number }> = ({ type, heig
 };
 
 /**
- * Container that enforces single-row display and automatically scales
- * measures down if they overflow the available width.
+ * Container that provides smooth horizontal scrolling for measures
+ * when font sizes or measure counts exceed the viewport width.
+ * On mobile and large font sizes (up to 96px), this ensures
+ * 4-part choir alignment across Soprano, Alto, Tenor, and Bass
+ * without squashing text or breaking harmonic alignment.
  */
-interface AutoscalingMeasuresProps {
+interface ScrollableSystemRowProps {
   systemHeight: number;
   children: React.ReactNode;
 }
 
-const AutoscalingMeasures: React.FC<AutoscalingMeasuresProps> = ({ systemHeight, children }) => {
+const ScrollableSystemRow: React.FC<ScrollableSystemRowProps> = ({ systemHeight, children }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+
+  const checkScroll = () => {
+    const el = containerRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 6);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 6);
+  };
 
   useEffect(() => {
-    const container = containerRef.current;
-    const content = contentRef.current;
-    if (!container || !content) return;
+    const el = containerRef.current;
+    if (!el) return;
+    checkScroll();
 
-    const updateScale = () => {
-      const containerWidth = container.getBoundingClientRect().width;
-      
-      const prevTransform = content.style.transform;
-      content.style.transform = 'none';
-      const contentWidth = content.scrollWidth || content.getBoundingClientRect().width;
-      content.style.transform = prevTransform;
-
-      if (contentWidth > containerWidth && containerWidth > 0) {
-        const newScale = containerWidth / contentWidth;
-        setScale(newScale);
-        content.style.transform = `scale(${newScale})`;
-      } else {
-        setScale(1);
-        content.style.transform = 'none';
-      }
-    };
+    const handleScroll = () => checkScroll();
+    el.addEventListener('scroll', handleScroll, { passive: true });
 
     const resizeObserver = new ResizeObserver(() => {
-      updateScale();
+      checkScroll();
     });
-
-    resizeObserver.observe(container);
-    resizeObserver.observe(content);
-
-    updateScale();
+    resizeObserver.observe(el);
 
     return () => {
+      el.removeEventListener('scroll', handleScroll);
       resizeObserver.disconnect();
     };
   }, [children]);
 
   return (
-    <div
-      ref={containerRef}
-      className="flex-1 overflow-hidden relative"
-      style={{ height: `${systemHeight * scale}px`, transition: 'height 150ms ease-out' }}
-    >
+    <div className="relative w-full overflow-hidden rounded-xl border border-black/5 bg-[#FDFCF8]">
+      {/* Scroll left indicator cue */}
+      {canScrollLeft && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-14 sm:left-20 top-0 bottom-0 w-8 z-30 bg-gradient-to-r from-[#FDFCF8] via-[#FDFCF8]/80 to-transparent"
+        />
+      )}
+
+      {/* Main horizontal scrolling container */}
       <div
-        ref={contentRef}
-        className="flex flex-row flex-nowrap justify-between w-max min-w-full origin-top-left transition-transform duration-150 ease-out"
-        style={{ height: `${systemHeight}px` }}
+        ref={containerRef}
+        className="w-full overflow-x-auto touch-pan-x scroll-smooth overscroll-x-contain pb-1 [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.15)_transparent]"
+        style={{ WebkitOverflowScrolling: 'touch', minHeight: `${systemHeight}px` }}
       >
-        {children}
+        <div
+          className="flex flex-row flex-nowrap items-start w-max min-w-full relative"
+          style={{ height: `${systemHeight}px` }}
+        >
+          {children}
+        </div>
       </div>
+
+      {/* Scroll right indicator cue */}
+      {canScrollRight && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 z-30 bg-gradient-to-l from-[#FDFCF8] via-[#FDFCF8]/80 to-transparent flex items-center justify-end pr-1.5"
+        >
+          <span className="w-1.5 h-6 rounded-full bg-black/15" />
+        </div>
+      )}
     </div>
   );
 };
+
 
 export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   score,
@@ -1070,6 +1083,20 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     return findActiveMeasureRange(measureRanges, playhead);
   }, [measureRanges, currentTick, currentEighth]);
 
+  // Active playing measure reference for smooth mobile / zoomed follow-along
+  const activeMeasureRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (isPlaying && activeMeasureRef.current) {
+      activeMeasureRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    }
+  }, [isPlaying, activeMeasure?.systemIndex, activeMeasure?.measureIndex]);
+
+
   const selectedNoteObj = useMemo(() => {
     if (!score || !selectedNote) return null;
     try {
@@ -1320,7 +1347,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     if (!score) return null;
     return (
       <div
-        className="mx-auto max-w-4xl bg-[#FDFCF8] text-black border border-black/5 shadow-2xl rounded-2xl p-6 sm:p-10 font-sans relative transition-all overflow-hidden"
+        className="mx-auto w-full max-w-5xl bg-[#FDFCF8] text-black border border-black/5 shadow-2xl rounded-2xl p-3 sm:p-6 md:p-10 font-sans relative transition-all"
         style={{
           transform: `scale(${scale})`,
           transformOrigin: 'top center',
@@ -1334,9 +1361,9 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
 
         <div className="relative z-10">
           {/* Piece Headers */}
-          <div className="mb-12 border-b-2 border-black/10 pb-4 flex justify-between items-end">
+          <div className="mb-8 sm:mb-12 border-b-2 border-black/10 pb-4 flex justify-between items-end gap-4">
             <div>
-              <h1 className="font-serif italic font-medium text-3xl tracking-tight text-black">
+              <h1 className="font-serif italic font-medium text-2xl sm:text-3xl tracking-tight text-black">
                 {score.title}
               </h1>
               {score.composer && (
@@ -1345,36 +1372,10 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 </p>
               )}
             </div>
-            <div className="text-right uppercase tracking-widest font-bold text-[10px] text-black/40">
+            <div className="text-right uppercase tracking-widest font-bold text-[10px] text-black/40 shrink-0">
               <p>Key: {score.key}</p>
               <p>Meter: {score.meter}</p>
             </div>
-          </div>
-
-          {/* Voice Mute / Solo Practice Panel */}
-          <div className="mb-8 p-4 bg-black/5 border border-black/5 rounded-xl flex flex-wrap items-center gap-3 text-xs text-black/60">
-            <span className="font-bold uppercase tracking-wider text-[10px] mr-2 text-black/50">Practice Tracks:</span>
-            {score.voices.map((v) => {
-              const active = !mutedVoices[v.id];
-              return (
-                <button
-                  key={`practice-voice-${v.id}`}
-                  onClick={() => toggleMute(v.id)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
-                    active
-                      ? 'bg-indigo-600 border border-indigo-700 text-white shadow-sm'
-                      : 'bg-black/5 border border-black/10 text-black/40'
-                  }`}
-                >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${
-                      active ? 'bg-white' : 'bg-black/30'
-                    }`}
-                  />
-                  {v.name}
-                </button>
-              );
-            })}
           </div>
 
           {/* Systems Loop */}
@@ -1386,11 +1387,14 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 ...score.voices.map(voice => system.voices[voice.id]?.measures.length || 0)
               );
 
-              const rowHeight = fontSize * 2.2;
+              const rowHeight = Math.max(28, fontSize * 2.2);
               const dividerHeight = 12;
               const voiceCount = layoutRows.filter(r => r.type === 'voice').length;
               const dividerCount = layoutRows.filter(r => r.type === 'divider').length;
               const systemHeight = (voiceCount * rowHeight) + (dividerCount * dividerHeight);
+
+              // Dynamic width for sticky voice label column pinned on left
+              const labelWidthPx = fontSize >= 48 ? Math.max(48, Math.round(fontSize * 0.9)) : fontSize >= 28 ? 64 : 56;
 
               return (
                 <div
@@ -1398,20 +1402,29 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                   className="flex flex-col border-b border-dashed border-black/10 pb-8 last:border-b-0"
                 >
                   {/* System Header with Index */}
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-black/30 mb-2 font-bold">
-                    System {system.systemIndex + 1}
+                  <div className="text-[10px] font-mono uppercase tracking-widest text-black/30 mb-2 font-bold flex items-center justify-between">
+                    <span>System {system.systemIndex + 1}</span>
+                    <span className="text-[9px] font-sans text-black/30 font-normal sm:hidden">
+                      Swipe horizontally to view measures →
+                    </span>
                   </div>
 
-                  {/* Main Alignment Block with Autoscale wrapping both labels and measures */}
+                  {/* Main Alignment Block with ScrollableSystemRow and sticky voice column */}
                   <div className="flex items-start w-full">
-                    <AutoscalingMeasures systemHeight={systemHeight}>
-                      {/* Bracing & Voice Labels block */}
-                      <div className="w-20 flex-shrink-0 relative mr-6" style={{ height: `${systemHeight}px` }}>
+                    <ScrollableSystemRow systemHeight={systemHeight}>
+                      {/* Sticky Bracing & Voice Labels column - pinned on left */}
+                      <div
+                        className="sticky left-0 z-20 bg-[#FDFCF8] flex-shrink-0 flex items-stretch pr-2 mr-2 border-r border-black/10 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)]"
+                        style={{
+                          height: `${systemHeight}px`,
+                          width: `${labelWidthPx}px`,
+                        }}
+                      >
                         {score.voicePairingGroups.map((group, gIdx) =>
                           renderBrackets(system, group, gIdx)
                         )}
 
-                        <div className="flex flex-col h-full justify-start pr-2 text-right">
+                        <div className="flex flex-col h-full justify-start w-full pr-1 text-right select-none">
                           {layoutRows.map((row, rIdx) => {
                             if (row.type === 'divider') {
                               return (
@@ -1423,18 +1436,22 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                             }
                             const voice = row.voice;
                             const isMuted = !!mutedVoices[voice.id];
+                            // Abbreviate to S, A, T, B when font size is large or width is narrow
+                            const voiceLabel = fontSize >= 28 ? (voice.name ? voice.name.charAt(0) : voice.id) : voice.name;
+
                             return (
                               <div
                                 key={`label-${system.systemIndex}-${voice.id}`}
-                                className="font-serif italic font-bold transition-opacity duration-200 text-black/80"
+                                title={voice.name}
+                                className="font-serif italic font-bold transition-opacity duration-200 text-black/80 truncate"
                                 style={{
-                                  fontSize: `${fontSize * 0.85}px`,
+                                  fontSize: `${Math.min(fontSize * 0.85, 48)}px`,
                                   height: `${rowHeight}px`,
                                   lineHeight: `${rowHeight}px`,
                                   opacity: isMuted ? 0.25 : 1.0
                                 }}
                               >
-                                {voice.name}
+                                {voiceLabel}
                               </div>
                             );
                           })}
@@ -1443,7 +1460,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
 
                       {/* Measures Block */}
                       {Array.from({ length: systemMeasuresCount }).map((_, mIndex) => {
-                        const isPlaying =
+                        const isPlayingThisMeasure =
                           activeMeasure &&
                           activeMeasure.systemIndex === system.systemIndex &&
                           activeMeasure.measureIndex === mIndex;
@@ -1453,8 +1470,9 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                         return (
                           <div
                             key={`measure-${system.systemIndex}-${mIndex}`}
-                            className={`flex items-stretch rounded-lg border transition-colors duration-150 ${
-                              isPlaying
+                            ref={isPlayingThisMeasure ? activeMeasureRef : undefined}
+                            className={`flex items-stretch rounded-lg border transition-colors duration-150 shrink-0 ${
+                              isPlayingThisMeasure
                                 ? 'bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-500/20 shadow-sm'
                                 : 'border-transparent'
                             }`}
@@ -1480,7 +1498,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                                 return (
                                   <div
                                     key={`notes-${system.systemIndex}-${mIndex}-${voice.id}`}
-                                    className="font-serif font-black text-center whitespace-nowrap px-4"
+                                    className="font-serif font-black text-center whitespace-nowrap px-3 sm:px-4"
                                     style={{
                                       fontSize: `${fontSize}px`,
                                       height: `${rowHeight}px`,
@@ -1498,7 +1516,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                                         measureIndex={mIndex}
                                         selectedNote={selectedNote}
                                         onSelectNote={onSelectNote}
-                                        isPlaying={isPlaying}
+                                        isPlaying={isPlayingThisMeasure}
                                         isMuted={isMuted}
                                         isEditorMode={isInteractive}
                                         currentTick={currentTick}
@@ -1515,7 +1533,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                           </div>
                         );
                       })}
-                    </AutoscalingMeasures>
+                    </ScrollableSystemRow>
                   </div>
                 </div>
               );
@@ -1749,23 +1767,46 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             </Tooltip>
           </div>
 
-          {/* Font Size Controls */}
-          <div className="flex items-center gap-1.5 bg-black/40 px-2 py-1 rounded-xl border border-white/10 shadow-inner">
-            <Tooltip content="Decrease Font" description="Reduce notation font size" side="bottom">
+          {/* Font Size Controls (Supports up to 96px with stepper & direct preset selector) */}
+          <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-xl border border-white/10 shadow-inner">
+            <Tooltip content="Decrease Font" description="Reduce notation font size (down to 12px)" side="bottom">
               <button
-                onClick={() => setFontSize(Math.max(12, fontSize - 2))}
+                onClick={() => {
+                  const step = fontSize > 48 ? 8 : fontSize > 24 ? 4 : 2;
+                  setFontSize(Math.max(12, fontSize - step));
+                }}
                 className="p-1 hover:bg-white/10 rounded-lg text-stone-300 hover:text-white transition-colors cursor-pointer"
                 aria-label="Decrease Font Size"
               >
                 <Type size={11} className="scale-75" />
               </button>
             </Tooltip>
-            <span className="text-[11px] font-mono font-bold text-[#6366F1] w-10 text-center">
-              {fontSize}px
-            </span>
-            <Tooltip content="Increase Font" description="Enlarge notation font size" side="bottom">
+            <div className="relative flex items-center">
+              <select
+                aria-label="Select Notation Font Size"
+                value={fontSize}
+                onChange={(e) => setFontSize(parseInt(e.target.value, 10))}
+                className="bg-transparent text-[11px] font-mono font-bold text-[#6366F1] hover:text-[#818CF8] text-center focus:outline-none cursor-pointer appearance-none px-1"
+                title="Click to choose font size preset (up to 96px)"
+              >
+                {[12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 60, 72, 84, 96].map((sz) => (
+                  <option key={sz} value={sz} className="bg-[#161822] text-stone-200">
+                    {sz}px
+                  </option>
+                ))}
+                {!([12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 60, 72, 84, 96].includes(fontSize)) && (
+                  <option value={fontSize} className="bg-[#161822] text-stone-200">
+                    {fontSize}px
+                  </option>
+                )}
+              </select>
+            </div>
+            <Tooltip content="Increase Font" description="Enlarge notation font size up to 96px" side="bottom">
               <button
-                onClick={() => setFontSize(Math.min(28, fontSize + 2))}
+                onClick={() => {
+                  const step = fontSize >= 48 ? 8 : fontSize >= 24 ? 4 : 2;
+                  setFontSize(Math.min(96, fontSize + step));
+                }}
                 className="p-1 hover:bg-white/10 rounded-lg text-stone-300 hover:text-white transition-colors cursor-pointer"
                 aria-label="Increase Font Size"
               >

@@ -126,4 +126,19 @@ describe('score fixtures', () => {
       }
     });
   });
+
+  it('populates hymn meters for standard hymn scores and extracts meters from comments or tune lookup', () => {
+    const scoresWithMeters = SCORES.filter(s => !!s.hymnMeter);
+    expect(scoresWithMeters.length).toBeGreaterThan(0);
+
+    const franconiaScore = SCORES.find(s => s.tuneName?.toLowerCase().includes('franconia') || s.title.toLowerCase().includes('franconia'));
+    expect(franconiaScore?.hymnMeter).toBe('8.6.8.6');
+
+    const viennaScore = SCORES.find(s => s.tuneName?.toLowerCase().includes('vienna') || s.title.toLowerCase().includes('vienna'));
+    expect(viennaScore?.hymnMeter).toBe('7.7.7.7');
+
+    const stuttgartScore = SCORES.find(s => s.fileName.toLowerCase().includes('stuttgart'));
+    expect(stuttgartScore?.hymnMeter).toBe('8.7.8.7');
+  });
 });
+

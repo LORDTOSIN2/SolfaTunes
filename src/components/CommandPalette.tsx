@@ -72,6 +72,7 @@ interface PaletteCommand {
   icon: React.ReactNode;
   shortcut?: string;
   badge?: string;
+  keywords?: string[];
   action: () => void;
 }
 
@@ -464,13 +465,15 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     scores.forEach((song) => {
       const displayTitle = getScoreDisplayTitle(song, 'hymn');
       const isSelected = song.id === selectedScoreId;
+      const meterPart = song.hymnMeter ? ` • Meter: ${song.hymnMeter}` : '';
       list.push({
         id: `song-${song.id}`,
         title: displayTitle,
         category: 'Score Library',
-        subtitle: `${song.composer} • ${song.tuneName ? `Tune: ${song.tuneName}` : song.fileName}`,
+        subtitle: `${song.composer} • ${song.tuneName ? `Tune: ${song.tuneName}` : song.fileName}${meterPart}`,
         icon: <Music size={16} className={isSelected ? 'text-indigo-400' : 'text-stone-400'} />,
-        badge: isSelected ? 'Loaded' : undefined,
+        badge: isSelected ? 'Loaded' : song.hymnMeter || undefined,
+        keywords: [song.hymnMeter || '', song.timeMeter || '', song.tuneName || '', song.hymnName || ''],
         action: () => {
           onSelectScore(song);
           onClose();
@@ -491,16 +494,34 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     settings,
   ]);
 
-  // Filter commands by search query
+  // Filter commands by search query (including hymn meters like 6.6.6.6)
   const filteredCommands = useMemo(() => {
     if (!query.trim()) return allCommands;
     const q = query.toLowerCase().trim();
-    return allCommands.filter(
-      (cmd) =>
+    const normalizedQ = q.replace(/[^a-z0-9]/gi, '');
+
+    return allCommands.filter((cmd) => {
+      if (
         cmd.title.toLowerCase().includes(q) ||
         (cmd.subtitle && cmd.subtitle.toLowerCase().includes(q)) ||
-        cmd.category.toLowerCase().includes(q)
-    );
+        cmd.category.toLowerCase().includes(q) ||
+        (cmd.badge && cmd.badge.toLowerCase().includes(q))
+      ) {
+        return true;
+      }
+
+      // Check keywords and normalized queries (e.g. 6.6.6.6 matches 6666)
+      if (cmd.keywords && cmd.keywords.length > 0) {
+        for (const kw of cmd.keywords) {
+          if (!kw) continue;
+          const lkw = kw.toLowerCase();
+          if (lkw.includes(q)) return true;
+          if (normalizedQ && lkw.replace(/[^a-z0-9]/gi, '').includes(normalizedQ)) return true;
+        }
+      }
+
+      return false;
+    });
   }, [allCommands, query]);
 
   // Handle keyboard navigation within the list
