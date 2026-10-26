@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { getScoreDisplayTitle, SCORES, ScoreLibraryItem, ScoreTitleMode } from '../utils/scores';
 import { ParseWarning } from '../types';
-import { FileMusic, AlertTriangle, Upload, ChevronDown, ChevronUp, ChevronLeft, Music, Search, X } from 'lucide-react';
+import { FileMusic, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, Music, Search, X } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
 interface SidebarProps {
-  onLoadAbcText: (text: string) => void;
+  onLoadAbcText?: (text: string) => void;
   warnings: ParseWarning[];
   onLoadScore: (score: ScoreLibraryItem) => void;
   selectedScoreId?: string;
@@ -18,59 +18,13 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  onLoadAbcText,
   warnings,
   onLoadScore,
   selectedScoreId,
   onCollapse,
 }) => {
-  const [dragActive, setDragActive] = useState(false);
   const [showWarnings, setShowWarnings] = useState(true);
   const [titleMode, setTitleMode] = useState<ScoreTitleMode>('hymn');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Drag and drop handlers
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      readAndSetFile(file);
-    }
-  };
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      readAndSetFile(e.target.files[0]);
-    }
-  };
-
-  const readAndSetFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target && typeof event.target.result === 'string') {
-        onLoadAbcText(event.target.result);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const triggerFileSelect = () => {
-    fileInputRef.current?.click();
-  };
-
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredScores = useMemo(() => {
@@ -139,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
         <p className="text-[11px] text-stone-400 mt-1">
-          Choose a score to open it, or import your own.
+          Choose a score to open it.
         </p>
       </div>
 
@@ -291,51 +245,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Drag and Drop File Zone */}
-        <Tooltip
-          content="Import Score File"
-          description="Drag & drop or browse to load ABC (.abc) or Plain Text (.txt) scores"
-          side="top"
-        >
-          <div
-            onDragEnter={handleDrag}
-            onDragOver={handleDrag}
-            onDragLeave={handleDrag}
-            onDrop={handleDrop}
-            onClick={triggerFileSelect}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                triggerFileSelect();
-              }
-            }}
-            role="button"
-            tabIndex={0}
-            aria-label="Import an ABC or TXT music file"
-            className={`border-2 border-dashed rounded-lg p-5 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-2 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-              dragActive
-                ? 'border-[#4F46E5] bg-[#4F46E5]/10 scale-[0.99]'
-                : 'border-white/10 hover:border-[#4F46E5]/50 bg-white/[0.01] hover:bg-white/[0.03]'
-            }`}
-          >
-            <Upload size={20} className={dragActive ? 'text-[#6366F1]' : 'text-stone-400'} />
-            <div>
-              <p className="text-xs font-semibold text-stone-200">
-                {dragActive ? 'Drop your file here!' : 'Import .abc or .txt file'}
-              </p>
-              <p className="text-[10px] text-stone-500 mt-1">
-                Drag & drop or click • Also in Commands (⌘K)
-              </p>
-            </div>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileInput}
-              accept=".abc,.txt"
-              className="hidden"
-            />
-          </div>
-        </Tooltip>
 
         {/* Collapsible Parser Warnings Banner */}
         {warnings.length > 0 && (
