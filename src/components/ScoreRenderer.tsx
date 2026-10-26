@@ -37,6 +37,7 @@ import { MidiPlayer } from '../audio/midi_player';
 import { AppSettings } from '../utils/settings';
 import { Tooltip } from './Tooltip';
 import { TICKS_PER_WHOLE_NOTE } from '../engine/timing';
+import { calculateFitFontSize } from '../utils/score_fit';
 
 export type StudioWorkspaceMode = 'read' | 'lyrics' | 'interactive' | 'source' | 'pianoroll' | 'split';
 
@@ -579,7 +580,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
                 });
               } : undefined}
               disabled={!isEditorMode}
-              className={`inline-block px-1 rounded font-serif font-black text-center ${
+              className={`inline-block px-0.5 sm:px-1 rounded font-serif font-black text-center ${
                 isMuted ? 'pointer-events-none' : ''
               } ${
                 isEditorMode && !isMuted ? 'cursor-pointer hover:bg-indigo-100' : ''
@@ -610,7 +611,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
           itemElements.push(
             <span
               key={`item-${cellIdx}-${partIdx}-${itemIdx}`}
-              className="text-black/20 font-light select-none px-1"
+              className="text-black/20 font-light select-none px-0.5 sm:px-1"
             >
               {item.text}
             </span>
@@ -658,7 +659,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
     // Pulse separator: colon ':'
     if (cellIdx < cellsData.length - 1) {
       renderedElements.push(
-        <span key={`sep-${cellIdx}`} className="mx-2 text-black/30 font-light select-none">
+        <span key={`sep-${cellIdx}`} className="mx-0.5 sm:mx-1 text-black/30 font-light select-none">
           :
         </span>
       );
@@ -1095,6 +1096,34 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
       });
     }
   }, [isPlaying, activeMeasure?.systemIndex, activeMeasure?.measureIndex]);
+
+  // Outer container for sheet music to measure available width
+  const sheetMusicContainerRef = useRef<HTMLDivElement | null>(null);
+  const prevScoreIdRef = useRef<string | null>(null);
+
+  // Automatically calculate the ideal notation font size so all notes
+  // across the widest system fit on screen without scrolling when a score loads.
+  const fitScoreToScreen = () => {
+    if (!score) return;
+    const containerWidth =
+      sheetMusicContainerRef.current?.clientWidth ||
+      (typeof window !== 'undefined' ? window.innerWidth : 390);
+    const fitSize = calculateFitFontSize(score, containerWidth);
+    setFontSize(fitSize);
+  };
+
+  // When a score is loaded or changed, auto-fit font size so notes fit without scrolling
+  useEffect(() => {
+    if (!score) return;
+    const scoreKey = `${score.title || 'untitled'}-${score.systems.length}`;
+    if (scoreKey !== prevScoreIdRef.current) {
+      prevScoreIdRef.current = scoreKey;
+      const timer = setTimeout(() => {
+        fitScoreToScreen();
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [score]);
 
 
   const selectedNoteObj = useMemo(() => {
