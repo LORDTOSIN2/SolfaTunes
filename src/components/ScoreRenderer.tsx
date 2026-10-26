@@ -37,6 +37,11 @@ import { MidiPlayer } from '../audio/midi_player';
 import { AppSettings } from '../utils/settings';
 import { Tooltip } from './Tooltip';
 import { TICKS_PER_WHOLE_NOTE } from '../engine/timing';
+import {
+  isLikelyLyricsOrVerse,
+  formatAsWLyrics,
+  toggleWLyricsOnLines,
+} from '../utils/lyrics_formatter';
 
 export type StudioWorkspaceMode = 'read' | 'lyrics' | 'interactive' | 'source' | 'pianoroll' | 'split';
 
@@ -94,10 +99,11 @@ const highlightAbc = (text: string): React.ReactNode => {
     const headerMatch = line.match(/^([A-Za-z]):(.*)$/);
     if (headerMatch) {
       const [_, field, content] = headerMatch;
+      const isLyric = field.toUpperCase() === 'W';
       return (
         <span key={lineIdx}>
-          <span className="text-[#818CF8] font-bold">{field}:</span>
-          <span className="text-stone-300">{content}</span>
+          <span className={isLyric ? "text-emerald-400 font-bold" : "text-[#818CF8] font-bold"}>{field}:</span>
+          <span className={isLyric ? "text-emerald-300 font-serif" : "text-stone-300"}>{content}</span>
           {lineIdx < lines.length - 1 && '\n'}
         </span>
       );
@@ -1074,6 +1080,124 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     }
   };
 
+  // Lyrics Paste Notification & Auto-Formatting State
+  const [lyricsPasteToast, setLyricsPasteToast] = useState<{
+    visible: boolean;
+    lineCount: number;
+    timer?: ReturnType<typeof setTimeout>;
+  }>({ visible: false, lineCount: 0 });
+
+  const showLyricsToast = (lineCount: number) => {
+    setLyricsPasteToast((prev) => {
+      if (prev.timer) clearTimeout(prev.timer);
+      const timer = setTimeout(() => {
+        setLyricsPasteToast({ visible: false, lineCount: 0 });
+      }, 4500);
+      return { visible: true, lineCount, timer };
+    });
+  };
+
+  const handleEditorPaste = (
+    e: React.ClipboardEvent<HTMLTextAreaElement>,
+    editorType: 'solfa' | 'abc'
+  ) => {
+    const isAutoLyricsEnabled = settings ? settings.autoFormatPastedLyrics : true;
+    if (!isAutoLyricsEnabled) return;
+
+    const pastedText = e.clipboardData.getData('text');
+    if (!pastedText) return;
+
+    if (isLikelyLyricsOrVerse(pastedText)) {
+      e.preventDefault();
+      const { formatted, lineCount } = formatAsWLyrics(pastedText);
+
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+
+      let insertedViaExecCommand = false;
+      try {
+        insertedViaExecCommand = document.execCommand('insertText', false, formatted);
+      } catch {
+        insertedViaExecCommand = false;
+      }
+
+      if (!insertedViaExecCommand) {
+        const currentVal = textarea.value;
+        const nextVal = currentVal.substring(0, start) + formatted + currentVal.substring(end);
+        if (editorType === 'solfa') {
+          handleSolfaChange(nextVal);
+        } else {
+          setAbcText(nextVal);
+        }
+        requestAnimationFrame(() => {
+          textarea.selectionStart = textarea.selectionEnd = start + formatted.length;
+        });
+      } else {
+        if (editorType === 'solfa') {
+          handleSolfaChange(textarea.value);
+        } else {
+          setAbcText(textarea.value);
+        }
+      }
+
+      showLyricsToast(lineCount);
+    }
+  };
+
+  const handleToggleLyricsSelection = (editorType: 'solfa' | 'abc') => {
+    const textarea = editorType === 'solfa' ? solfaTextareaRef.current : editorTextareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentVal = textarea.value;
+
+    if (start === end) {
+      // Append a sample lyrics stanza template with W: lines
+      const template = '\n\nW: First line of verse\nW: Second line of verse\nW: Third line of verse\nW: Fourth line of verse\n';
+      const nextVal = currentVal + template;
+      if (editorType === 'solfa') {
+        handleSolfaChange(nextVal);
+      } else {
+        setAbcText(nextVal);
+      }
+      showLyricsToast(4);
+      return;
+    }
+
+    const selectedText = currentVal.substring(start, end);
+    const { result, action } = toggleWLyricsOnLines(selectedText);
+
+    let insertedViaExecCommand = false;
+    try {
+      insertedViaExecCommand = document.execCommand('insertText', false, result);
+    } catch {
+      insertedViaExecCommand = false;
+    }
+
+    if (!insertedViaExecCommand) {
+      const nextVal = currentVal.substring(0, start) + result + currentVal.substring(end);
+      if (editorType === 'solfa') {
+        handleSolfaChange(nextVal);
+      } else {
+        setAbcText(nextVal);
+      }
+      requestAnimationFrame(() => {
+        textarea.selectionStart = start;
+        textarea.selectionEnd = start + result.length;
+      });
+    } else {
+      if (editorType === 'solfa') {
+        handleSolfaChange(textarea.value);
+      } else {
+        setAbcText(textarea.value);
+      }
+    }
+
+    showLyricsToast(action === 'added' ? result.split('\n').length : 0);
+  };
+
   // 1. Calculate measure tick ranges to highlight active measures
   const measureRanges = useMemo(() => getScoreMeasureRanges(score), [score]);
 
@@ -2015,6 +2139,37 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 </button>
               )}
 
+              {/* Auto W: Lyrics Toggle */}
+              <label
+                className="flex items-center gap-1.5 text-[10px] text-stone-300 font-sans font-bold cursor-pointer select-none px-2.5 py-1.5 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
+                title="Automatically prepend 'W: ' to pasted lyrics, hymn stanzas, and verses"
+              >
+                <input
+                  type="checkbox"
+                  checked={settings ? settings.autoFormatPastedLyrics : true}
+                  onChange={(e) => {
+                    if (onUpdateSettings && settings) {
+                      onUpdateSettings({ ...settings, autoFormatPastedLyrics: e.target.checked });
+                    }
+                  }}
+                  className="w-3.5 h-3.5 text-emerald-500 rounded focus:ring-0 cursor-pointer accent-emerald-500"
+                />
+                <span className="flex items-center gap-1 text-emerald-300/90">
+                  <span>Auto W: Lyrics</span>
+                </span>
+              </label>
+
+              {/* Format / Wrap Selection as W: Lyrics Button */}
+              <button
+                type="button"
+                onClick={() => handleToggleLyricsSelection(sourceTab)}
+                className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-200 rounded-lg active:scale-95 transition-all font-sans font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-sm"
+                title="Format selected lines as 'W: ' hymn lyrics lines (or insert lyrics template if nothing selected)"
+              >
+                <FileText size={12} className="text-emerald-400" />
+                <span>Format W:</span>
+              </button>
+
               {/* Split Preview Active Indicator (if enabled in settings) */}
               {showLivePreview && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 rounded-lg text-[10px] font-sans font-bold">
@@ -2125,7 +2280,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                     Auto-Align Grid & Tips
                   </p>
                   <p className="text-indigo-100/80 font-medium font-sans">
-                    Click <span className="font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded">Format & Align Grid</span> to normalize octaves to unicode subscripts (<span className="font-mono text-white">s₁</span>, <span className="font-mono text-white">d₂</span>) and perfectly align vertical choir bars and colons. Enable <span className="font-bold text-white">Format on Blur</span> to align automatically as you edit!
+                    Click <span className="font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded">Format & Align Grid</span> to normalize octaves and align bars and colons. Paste raw hymn verses anytime—they are auto-formatted with <span className="font-mono text-emerald-300 font-bold">W:</span> to become instant score lyrics!
                   </p>
                 </div>
               </div>
@@ -2139,7 +2294,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                     <li><span className="font-bold font-mono text-white">T: Title</span>, <span className="font-bold font-mono text-white">C: Composer</span>.</li>
                     <li><span className="font-bold font-mono text-white">K: Key</span> (e.g., <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">K:G</span>, <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">K:C</span>).</li>
                     <li><span className="font-bold font-mono text-white">M: Meter</span> (e.g., <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">M:4/4</span>).</li>
-                    <li><span className="font-bold font-mono text-white">V:S name="Soprano"</span> Voice declaration header.</li>
+                    <li><span className="font-bold font-mono text-white">W: Lyrics</span> Whole stanza/verse line.</li>
                   </ul>
                 </div>
                 <div className="flex-1">
@@ -2155,10 +2310,10 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 </div>
                 <div className="flex-1">
                   <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
-                    Grid Aligner Hint
+                    Grid Aligner & Lyrics
                   </p>
                   <p className="text-indigo-100/80 font-medium font-sans">
-                    Write notes for different voices (e.g., <span className="font-mono text-white bg-black/30 px-1">V:S</span>, <span className="font-mono text-white bg-black/30 px-1">V:A</span>, etc.) in consecutive lines. Use <span className="font-mono text-white">|</span> for measure lines. Click <span className="font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded">Align Bar Lines</span> to instantly make them line up vertically for a beautiful choir grid layout!
+                    Click <span className="font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded">Align Bar Lines</span> to align bars across voices. When you paste verses or stanzas, <span className="font-mono text-emerald-300 font-bold">Auto W: Lyrics</span> automatically prepends <span className="font-mono text-emerald-300">W: </span> to each line!
                   </p>
                 </div>
               </div>
@@ -2168,7 +2323,28 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
           {/* Editor Main Area (Lines & Scrollable Panel) */}
           <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
             {/* Left: Code Editor Pane */}
-            <div className={`flex flex-col overflow-hidden ${showLivePreview ? 'w-full lg:w-1/2 border-b lg:border-b-0 lg:border-r border-white/10' : 'w-full flex-1'}`}>
+            <div className={`flex flex-col overflow-hidden relative ${showLivePreview ? 'w-full lg:w-1/2 border-b lg:border-b-0 lg:border-r border-white/10' : 'w-full flex-1'}`}>
+              {/* Floating Lyrics Paste Toast Notification */}
+              {lyricsPasteToast.visible && (
+                <div className="absolute top-3 right-6 z-40 bg-emerald-950/95 border border-emerald-500/40 text-emerald-100 px-3.5 py-2 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs animate-in fade-in slide-in-from-top-2 duration-200 backdrop-blur-md">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span>
+                    Auto-formatted pasted text into <strong>{lyricsPasteToast.lineCount}</strong> lyric lines with <code className="bg-emerald-900/80 px-1 py-0.5 rounded font-mono font-bold text-white">W:</code>
+                  </span>
+                  <span className="text-[10px] text-emerald-300/80 font-mono hidden sm:inline">
+                    (⌘Z / Ctrl+Z to undo)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setLyricsPasteToast({ visible: false, lineCount: 0 })}
+                    className="text-emerald-400 hover:text-white p-0.5 ml-1 rounded cursor-pointer"
+                    title="Dismiss notification"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+
               <div className="flex-1 flex overflow-hidden relative">
                 {sourceTab === 'solfa' ? (
                   <>
@@ -2201,6 +2377,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                         ref={solfaTextareaRef}
                         value={solfaText}
                         onChange={(e) => handleSolfaChange(e.target.value)}
+                        onPaste={(e) => handleEditorPaste(e, 'solfa')}
                         onBlur={handleSolfaBlur}
                         onScroll={handleSolfaScroll}
                         className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
@@ -2241,6 +2418,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                         ref={editorTextareaRef}
                         value={abcText}
                         onChange={(e) => setAbcText(e.target.value)}
+                        onPaste={(e) => handleEditorPaste(e, 'abc')}
                         onScroll={handleEditorScroll}
                         className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
                         placeholder="Type or paste ABC notation here..."

@@ -312,6 +312,20 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         },
       })),
       {
+        id: 'toggle-auto-format-lyrics',
+        title: settings.autoFormatPastedLyrics
+          ? 'Disable Auto-Format Pasted Lyrics (W:)'
+          : 'Enable Auto-Format Pasted Lyrics (W:)',
+        category: 'View & Focus',
+        subtitle: 'Auto-prepends "W: " to pasted hymn verses and stanzas',
+        icon: <FileText size={16} className="text-emerald-400" />,
+        badge: settings.autoFormatPastedLyrics ? 'Enabled' : 'Disabled',
+        action: () => {
+          onUpdateSettings({ ...settings, autoFormatPastedLyrics: !settings.autoFormatPastedLyrics });
+          onClose();
+        },
+      },
+      {
         id: 'view-settings',
         title: 'Open Workspace Settings',
         category: 'View & Focus',
