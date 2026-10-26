@@ -524,6 +524,7 @@ interface InteractiveRhythmLineProps {
   isMuted: boolean;
   isEditorMode: boolean;
   currentTick?: number;
+  fontSize?: number;
 }
 
 const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
@@ -539,12 +540,16 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
   isMuted,
   isEditorMode,
   currentTick,
+  fontSize,
 }) => {
   const meterStr = meter || (meterDenominator ? `4/${meterDenominator}` : '4/4');
   const cellsData = useMemo(() => analyzeMeasureCells(measure, meterStr), [measure, meterStr]);
   if (cellsData.length === 0) return <>{"\u00A0"}</>;
 
   const renderedElements: React.ReactNode[] = [];
+  const notePadClass = fontSize && fontSize <= 6 ? 'px-0' : fontSize && fontSize <= 10 ? 'px-0.5' : 'px-1';
+  const sepMarginClass = fontSize && fontSize <= 6 ? 'mx-0.5' : fontSize && fontSize <= 10 ? 'mx-1' : 'mx-2';
+  const minRestWidth = fontSize && fontSize <= 6 ? '0.6em' : '0.9em';
 
   cellsData.forEach((cell, cellIdx) => {
     const partElements: React.ReactNode[] = [];
@@ -585,7 +590,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
                 });
               } : undefined}
               disabled={!isEditorMode}
-              className={`inline-block px-1 rounded font-serif font-black text-center ${
+              className={`inline-block ${notePadClass} rounded font-serif font-black text-center ${
                 isMuted ? 'pointer-events-none' : ''
               } ${
                 isEditorMode && !isMuted ? 'cursor-pointer hover:bg-indigo-100' : ''
@@ -598,7 +603,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
                   ? 'text-indigo-900 font-black'
                   : 'text-black'
               }`}
-              style={{ minWidth: item.type === 'note' ? undefined : '0.9em' }}
+              style={{ minWidth: item.type === 'note' ? undefined : minRestWidth }}
               title={
                 isEditorMode
                   ? `${item.type === 'note' ? `Note: ${item.text}` : item.type === 'rest' ? 'Rest' : 'Sustained note'}. Click to edit.`
@@ -616,7 +621,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
           itemElements.push(
             <span
               key={`item-${cellIdx}-${partIdx}-${itemIdx}`}
-              className="text-black/20 font-light select-none px-1"
+              className={`text-black/20 font-light select-none ${notePadClass}`}
             >
               {item.text}
             </span>
@@ -664,7 +669,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
     // Pulse separator: colon ':'
     if (cellIdx < cellsData.length - 1) {
       renderedElements.push(
-        <span key={`sep-${cellIdx}`} className="mx-2 text-black/30 font-light select-none">
+        <span key={`sep-${cellIdx}`} className={`${sepMarginClass} text-black/30 font-light select-none`}>
           :
         </span>
       );
@@ -800,6 +805,7 @@ const ScrollableSystemRow: React.FC<ScrollableSystemRowProps> = ({ systemHeight,
       {/* Main horizontal scrolling container */}
       <div
         ref={containerRef}
+        data-system-scroll="true"
         className="w-full overflow-x-auto touch-pan-x scroll-smooth overscroll-x-contain pb-1 [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.15)_transparent]"
         style={{ WebkitOverflowScrolling: 'touch', minHeight: `${systemHeight}px` }}
       >
@@ -858,6 +864,164 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   onStop,
 }) => {
   const [showHelp, setShowHelp] = useState<boolean>(false);
+  const paperSheetContainerRef = useRef<HTMLDivElement | null>(null);
+  const fontSizeRef = useRef<number>(fontSize);
+  useEffect(() => {
+    fontSizeRef.current = fontSize;
+  }, [fontSize]);
+
+  const autofitFontSize = (targetMaxFont?: number) => {
+    if (!score || !score.systems || score.systems.length === 0) return;
+    if (studioMode !== 'read' && studioMode !== 'interactive') return;
+
+    const sheetEl = paperSheetContainerRef.current;
+    const currentSize = fontSizeRef.current;
+
+    // 1. Precise DOM-based measurement if the sheet is rendered
+    if (sheetEl) {
+      const scrollContainers = sheetEl.querySelectorAll<HTMLDivElement>('[data-system-scroll="true"]');
+      if (scrollContainers.length > 0) {
+        let maxScrollWidth = 0;
+        let minClientWidth = sheetEl.clientWidth;
+
+        scrollContainers.forEach((el) => {
+          if (el.clientWidth > 0) {
+            minClientWidth = Math.min(minClientWidth, el.clientWidth);
+          }
+          maxScrollWidth = Math.max(maxScrollWidth, el.scrollWidth);
+        });
+
+        if (maxScrollWidth > 0 && minClientWidth > 0) {
+          // Provide an 8px safety breathing room so scrollbars never appear
+          const availWidth = minClientWidth - 8;
+          const ratio = availWidth / maxScrollWidth;
+
+          let idealSize: number;
+          if (ratio < 1) {
+            // Content overflows: scale font down so horizontal scrolling is unnecessary
+            idealSize = Math.floor(currentSize * ratio);
+          } else {
+            // Content already fits: scale up moderately if room, up to targetMaxFont (default 24px)
+            const maxCap = targetMaxFont || 24;
+            idealSize = Math.min(maxCap, Math.floor(currentSize * ratio));
+          }
+
+          // Strictly clamp within requested 2–96px range
+          idealSize = Math.max(2, Math.min(96, idealSize));
+
+          if (idealSize !== currentSize) {
+            setFontSize(idealSize);
+          }
+          return idealSize;
+        }
+      }
+    }
+
+    // 2. Fallback analytical estimation before DOM is measured
+    let maxMeasures = 1;
+    score.systems.forEach((sys) => {
+      score.voices.forEach((v) => {
+        const line = sys.voices[v.id];
+        if (line) {
+          maxMeasures = Math.max(maxMeasures, line.measures.length);
+        }
+      });
+    });
+
+    const windowW = typeof window !== 'undefined' ? window.innerWidth : 1024;
+    const isSidebarOpen = settings?.showSidebar && !settings?.zenMode && !isFullscreen;
+    const estContainerWidth = isSidebarOpen ? Math.max(320, windowW - 360) : Math.max(320, windowW - 64);
+    const estSheetWidth = Math.min(1024, estContainerWidth) - 48;
+
+    const beats = score.meter === '3/4' ? 3 : score.meter === '2/4' ? 2 : score.meter === '6/8' ? 6 : 4;
+    const estUnitsPerMeasure = beats * 1.8;
+    const totalUnits = maxMeasures * estUnitsPerMeasure;
+    const fixedWidth = maxMeasures * 16 + 56;
+    const netWidth = Math.max(80, estSheetWidth - fixedWidth);
+
+    let estSize = Math.floor(netWidth / Math.max(1, totalUnits));
+    estSize = Math.max(2, Math.min(96, estSize));
+
+    setFontSize(estSize);
+    return estSize;
+  };
+
+  // Autofit on loading a score or switching into score view / visual edit view
+  const prevScoreIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!score) return;
+    const currentScoreId = `${score.id || ''}_${score.title}_${score.systems.length}`;
+    if (currentScoreId !== prevScoreIdRef.current) {
+      prevScoreIdRef.current = currentScoreId;
+      if (studioMode === 'read' || studioMode === 'interactive') {
+        autofitFontSize();
+        const raf = requestAnimationFrame(() => autofitFontSize());
+        const t = setTimeout(() => autofitFontSize(), 180);
+        return () => {
+          cancelAnimationFrame(raf);
+          clearTimeout(t);
+        };
+      }
+    }
+  }, [score, studioMode]);
+
+  // Autofit when switching mode to score view ('read') or visual edit view ('interactive')
+  const prevModeRef = useRef<string>(studioMode);
+  useEffect(() => {
+    if (studioMode !== prevModeRef.current) {
+      prevModeRef.current = studioMode;
+      if (studioMode === 'read' || studioMode === 'interactive') {
+        autofitFontSize();
+        const raf = requestAnimationFrame(() => autofitFontSize());
+        const t = setTimeout(() => autofitFontSize(), 180);
+        return () => {
+          cancelAnimationFrame(raf);
+          clearTimeout(t);
+        };
+      }
+    }
+  }, [studioMode]);
+
+  // Fine-tuning pass to eliminate any residual 1px overflow
+  useEffect(() => {
+    if (studioMode !== 'read' && studioMode !== 'interactive') return;
+    const sheetEl = paperSheetContainerRef.current;
+    if (!sheetEl) return;
+
+    const t = setTimeout(() => {
+      const scrollContainers = sheetEl.querySelectorAll<HTMLDivElement>('[data-system-scroll="true"]');
+      let overflows = false;
+      scrollContainers.forEach((el) => {
+        if (el.scrollWidth > el.clientWidth + 1) {
+          overflows = true;
+        }
+      });
+      if (overflows && fontSizeRef.current > 2) {
+        setFontSize((prev) => Math.max(2, prev - 1));
+      }
+    }, 120);
+
+    return () => clearTimeout(t);
+  }, [fontSize, studioMode]);
+
+  // Autofit when layout dimensions change (Fullscreen, Zen Mode, Sidebar toggle)
+  useEffect(() => {
+    if (studioMode === 'read' || studioMode === 'interactive') {
+      const t = setTimeout(() => autofitFontSize(), 150);
+      return () => clearTimeout(t);
+    }
+  }, [isFullscreen, settings?.zenMode, settings?.showSidebar]);
+
+  // Autofit when window resizes
+  useEffect(() => {
+    const handleResize = () => {
+      if (studioMode === 'read' || studioMode === 'interactive') {
+        autofitFontSize();
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [studioMode, score]);
 
   // Split View Resizer state (clamped between 20% and 80%, default 50%)
   const [splitRatio, setSplitRatio] = useState<number>(50);
@@ -1471,6 +1635,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     if (!score) return null;
     return (
       <div
+        ref={paperSheetContainerRef}
         className="mx-auto w-full max-w-5xl bg-[#FDFCF8] text-black border border-black/5 shadow-2xl rounded-2xl p-3 sm:p-6 md:p-10 font-sans relative transition-all"
         style={{
           transform: `scale(${scale})`,
@@ -1511,14 +1676,16 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 ...score.voices.map(voice => system.voices[voice.id]?.measures.length || 0)
               );
 
-              const rowHeight = Math.max(28, fontSize * 2.2);
-              const dividerHeight = 12;
+              const rowHeight = fontSize <= 6 ? Math.max(8, Math.round(fontSize * 2.2)) : fontSize <= 12 ? Math.max(14, Math.round(fontSize * 2.0)) : Math.max(28, Math.round(fontSize * 2.2));
+              const dividerHeight = fontSize <= 6 ? 4 : fontSize <= 12 ? 8 : 12;
               const voiceCount = layoutRows.filter(r => r.type === 'voice').length;
               const dividerCount = layoutRows.filter(r => r.type === 'divider').length;
               const systemHeight = (voiceCount * rowHeight) + (dividerCount * dividerHeight);
 
               // Dynamic width for sticky voice label column pinned on left
-              const labelWidthPx = fontSize >= 48 ? Math.max(48, Math.round(fontSize * 0.9)) : fontSize >= 28 ? 64 : 56;
+              const labelWidthPx = fontSize >= 48 ? Math.max(48, Math.round(fontSize * 0.9)) : fontSize >= 28 ? 64 : fontSize <= 6 ? 18 : fontSize <= 12 ? 32 : 56;
+              const notesPaddingClass = fontSize <= 6 ? 'px-0.5' : fontSize <= 10 ? 'px-1' : fontSize <= 14 ? 'px-1.5 sm:px-2' : 'px-3 sm:px-4';
+              const measurePaddingCol = fontSize <= 6 ? 'px-0.5' : fontSize <= 10 ? 'px-1' : 'px-2';
 
               return (
                 <div
@@ -1560,8 +1727,8 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                             }
                             const voice = row.voice;
                             const isMuted = !!mutedVoices[voice.id];
-                            // Abbreviate to S, A, T, B when font size is large or width is narrow
-                            const voiceLabel = fontSize >= 28 ? (voice.name ? voice.name.charAt(0) : voice.id) : voice.name;
+                            // Abbreviate to S, A, T, B when font size is small or very large
+                            const voiceLabel = fontSize <= 12 || fontSize >= 28 ? (voice.name ? voice.name.charAt(0) : voice.id) : voice.name;
 
                             return (
                               <div
@@ -1569,7 +1736,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                                 title={voice.name}
                                 className="font-serif italic font-bold transition-opacity duration-200 text-black/80 truncate"
                                 style={{
-                                  fontSize: `${Math.min(fontSize * 0.85, 48)}px`,
+                                  fontSize: `${Math.max(2, Math.min(fontSize * 0.85, 48))}px`,
                                   height: `${rowHeight}px`,
                                   lineHeight: `${rowHeight}px`,
                                   opacity: isMuted ? 0.25 : 1.0
@@ -1601,7 +1768,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                                 : 'border-transparent'
                             }`}
                           >
-                            <div className="flex flex-col justify-start px-2" style={{ height: `${systemHeight}px` }}>
+                            <div className={`flex flex-col justify-start ${measurePaddingCol}`} style={{ height: `${systemHeight}px` }}>
                               {layoutRows.map((row, rIdx) => {
                                 if (row.type === 'divider') {
                                   return (
@@ -1622,7 +1789,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                                 return (
                                   <div
                                     key={`notes-${system.systemIndex}-${mIndex}-${voice.id}`}
-                                    className="font-serif font-black text-center whitespace-nowrap px-3 sm:px-4"
+                                    className={`font-serif font-black text-center whitespace-nowrap ${notesPaddingClass}`}
                                     style={{
                                       fontSize: `${fontSize}px`,
                                       height: `${rowHeight}px`,
@@ -1644,6 +1811,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                                         isMuted={isMuted}
                                         isEditorMode={isInteractive}
                                         currentTick={currentTick}
+                                        fontSize={fontSize}
                                       />
                                     ) : (
                                       '\u00A0'
@@ -1891,13 +2059,14 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             </Tooltip>
           </div>
 
-          {/* Font Size Controls (Supports up to 96px with stepper & direct preset selector) */}
+          {/* Font Size Controls (Updated range: 2–96px with stepper, direct preset selector & Autofit button) */}
           <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-xl border border-white/10 shadow-inner">
-            <Tooltip content="Decrease Font" description="Reduce notation font size (down to 12px)" side="bottom">
+            <Tooltip content="Decrease Font" description="Reduce notation font size (down to 2px)" side="bottom">
               <button
+                type="button"
                 onClick={() => {
-                  const step = fontSize > 48 ? 8 : fontSize > 24 ? 4 : 2;
-                  setFontSize(Math.max(12, fontSize - step));
+                  const step = fontSize > 48 ? 8 : fontSize > 24 ? 4 : fontSize > 8 ? 2 : 1;
+                  setFontSize(Math.max(2, fontSize - step));
                 }}
                 className="p-1 hover:bg-white/10 rounded-lg text-stone-300 hover:text-white transition-colors cursor-pointer"
                 aria-label="Decrease Font Size"
@@ -1909,16 +2078,16 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               <select
                 aria-label="Select Notation Font Size"
                 value={fontSize}
-                onChange={(e) => setFontSize(parseInt(e.target.value, 10))}
+                onChange={(e) => setFontSize(Math.max(2, Math.min(96, parseInt(e.target.value, 10))))}
                 className="bg-transparent text-[11px] font-mono font-bold text-[#6366F1] hover:text-[#818CF8] text-center focus:outline-none cursor-pointer appearance-none px-1"
-                title="Click to choose font size preset (up to 96px)"
+                title="Click to choose font size preset (2px to 96px)"
               >
-                {[12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 60, 72, 84, 96].map((sz) => (
+                {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48, 60, 72, 84, 96].map((sz) => (
                   <option key={sz} value={sz} className="bg-[#161822] text-stone-200">
                     {sz}px
                   </option>
                 ))}
-                {!([12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 60, 72, 84, 96].includes(fontSize)) && (
+                {!([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48, 60, 72, 84, 96].includes(fontSize)) && (
                   <option value={fontSize} className="bg-[#161822] text-stone-200">
                     {fontSize}px
                   </option>
@@ -1927,14 +2096,26 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             </div>
             <Tooltip content="Increase Font" description="Enlarge notation font size up to 96px" side="bottom">
               <button
+                type="button"
                 onClick={() => {
-                  const step = fontSize >= 48 ? 8 : fontSize >= 24 ? 4 : 2;
+                  const step = fontSize >= 48 ? 8 : fontSize >= 24 ? 4 : fontSize >= 8 ? 2 : 1;
                   setFontSize(Math.min(96, fontSize + step));
                 }}
                 className="p-1 hover:bg-white/10 rounded-lg text-stone-300 hover:text-white transition-colors cursor-pointer"
                 aria-label="Increase Font Size"
               >
                 <Type size={13} />
+              </button>
+            </Tooltip>
+            <Tooltip content="Autofit to Width" description="Fit font size (2–96px) to page width without horizontal scrolling" side="bottom">
+              <button
+                type="button"
+                onClick={() => autofitFontSize()}
+                className="ml-0.5 px-1.5 py-0.5 hover:bg-white/10 rounded-md text-indigo-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-sans font-bold border border-indigo-500/20"
+                aria-label="Autofit Font Size to Page Width"
+              >
+                <Maximize2 size={10} className="rotate-45 text-indigo-400" />
+                <span className="hidden sm:inline">Fit</span>
               </button>
             </Tooltip>
           </div>
