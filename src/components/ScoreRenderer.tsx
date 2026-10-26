@@ -54,6 +54,8 @@ interface ScoreRendererProps {
   currentEighth?: number;
   fontSize: number;
   setFontSize: (size: number) => void;
+  isManualFontSize?: boolean;
+  setIsManualFontSize?: (manual: boolean) => void;
   scale: number;
   setScale: (scale: number) => void;
   mutedVoices: { [voiceId: string]: boolean };
@@ -840,6 +842,8 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   currentEighth,
   fontSize,
   setFontSize,
+  isManualFontSize,
+  setIsManualFontSize,
   scale,
   setScale,
   mutedVoices,
@@ -865,14 +869,34 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
 }) => {
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const paperSheetContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Manual font size adjustment state: when true, auto-fit is disabled
+  const [localIsManualFontSize, setLocalIsManualFontSize] = useState<boolean>(false);
+  const isManual = isManualFontSize !== undefined ? isManualFontSize : localIsManualFontSize;
+  const isManualRef = useRef<boolean>(isManual);
+  useEffect(() => {
+    isManualRef.current = isManual;
+  }, [isManual]);
+
+  const setIsManual = (val: boolean) => {
+    isManualRef.current = val;
+    if (setIsManualFontSize) {
+      setIsManualFontSize(val);
+    } else {
+      setLocalIsManualFontSize(val);
+    }
+  };
+
   const fontSizeRef = useRef<number>(fontSize);
   useEffect(() => {
     fontSizeRef.current = fontSize;
   }, [fontSize]);
 
-  const autofitFontSize = (targetMaxFont?: number) => {
+  const autofitFontSize = (force = false, targetMaxFont?: number) => {
     if (!score || !score.systems || score.systems.length === 0) return;
     if (studioMode !== 'read' && studioMode !== 'interactive') return;
+    // Retain user's manual font size: do not auto-fit unless explicitly forced (e.g. score load or Fit button)
+    if (!force && isManualRef.current) return;
 
     const sheetEl = paperSheetContainerRef.current;
     const currentSize = fontSizeRef.current;
@@ -946,17 +970,18 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     return estSize;
   };
 
-  // Autofit on loading a score or switching into score view / visual edit view
+  // Autofit on loading a new score (resets manual mode so the new score fits comfortably)
   const prevScoreIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!score) return;
     const currentScoreId = `${score.id || ''}_${score.title}_${score.systems.length}`;
     if (currentScoreId !== prevScoreIdRef.current) {
       prevScoreIdRef.current = currentScoreId;
+      setIsManual(false);
       if (studioMode === 'read' || studioMode === 'interactive') {
-        autofitFontSize();
-        const raf = requestAnimationFrame(() => autofitFontSize());
-        const t = setTimeout(() => autofitFontSize(), 180);
+        autofitFontSize(true);
+        const raf = requestAnimationFrame(() => autofitFontSize(true));
+        const t = setTimeout(() => autofitFontSize(true), 180);
         return () => {
           cancelAnimationFrame(raf);
           clearTimeout(t);
@@ -965,12 +990,12 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     }
   }, [score, studioMode]);
 
-  // Autofit when switching mode to score view ('read') or visual edit view ('interactive')
+  // Autofit when switching mode to score view ('read') or visual edit view ('interactive') if not manual
   const prevModeRef = useRef<string>(studioMode);
   useEffect(() => {
     if (studioMode !== prevModeRef.current) {
       prevModeRef.current = studioMode;
-      if (studioMode === 'read' || studioMode === 'interactive') {
+      if (!isManualRef.current && (studioMode === 'read' || studioMode === 'interactive')) {
         autofitFontSize();
         const raf = requestAnimationFrame(() => autofitFontSize());
         const t = setTimeout(() => autofitFontSize(), 180);
@@ -982,40 +1007,18 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     }
   }, [studioMode]);
 
-  // Fine-tuning pass to eliminate any residual 1px overflow
+  // Autofit when layout dimensions change (Fullscreen, Zen Mode, Sidebar toggle), only if not manually adjusted
   useEffect(() => {
-    if (studioMode !== 'read' && studioMode !== 'interactive') return;
-    const sheetEl = paperSheetContainerRef.current;
-    if (!sheetEl) return;
-
-    const t = setTimeout(() => {
-      const scrollContainers = sheetEl.querySelectorAll<HTMLDivElement>('[data-system-scroll="true"]');
-      let overflows = false;
-      scrollContainers.forEach((el) => {
-        if (el.scrollWidth > el.clientWidth + 1) {
-          overflows = true;
-        }
-      });
-      if (overflows && fontSizeRef.current > 2) {
-        setFontSize((prev) => Math.max(2, prev - 1));
-      }
-    }, 120);
-
-    return () => clearTimeout(t);
-  }, [fontSize, studioMode]);
-
-  // Autofit when layout dimensions change (Fullscreen, Zen Mode, Sidebar toggle)
-  useEffect(() => {
-    if (studioMode === 'read' || studioMode === 'interactive') {
+    if (!isManualRef.current && (studioMode === 'read' || studioMode === 'interactive')) {
       const t = setTimeout(() => autofitFontSize(), 150);
       return () => clearTimeout(t);
     }
   }, [isFullscreen, settings?.zenMode, settings?.showSidebar]);
 
-  // Autofit when window resizes
+  // Autofit when window resizes, only if not manually adjusted
   useEffect(() => {
     const handleResize = () => {
-      if (studioMode === 'read' || studioMode === 'interactive') {
+      if (!isManualRef.current && (studioMode === 'read' || studioMode === 'interactive')) {
         autofitFontSize();
       }
     };
@@ -2065,6 +2068,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  setIsManual(true);
                   const step = fontSize > 48 ? 8 : fontSize > 24 ? 4 : fontSize > 8 ? 2 : 1;
                   setFontSize(Math.max(2, fontSize - step));
                 }}
@@ -2078,7 +2082,10 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               <select
                 aria-label="Select Notation Font Size"
                 value={fontSize}
-                onChange={(e) => setFontSize(Math.max(2, Math.min(96, parseInt(e.target.value, 10))))}
+                onChange={(e) => {
+                  setIsManual(true);
+                  setFontSize(Math.max(2, Math.min(96, parseInt(e.target.value, 10))));
+                }}
                 className="bg-transparent text-[11px] font-mono font-bold text-[#6366F1] hover:text-[#818CF8] text-center focus:outline-none cursor-pointer appearance-none px-1"
                 title="Click to choose font size preset (2px to 96px)"
               >
@@ -2098,6 +2105,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  setIsManual(true);
                   const step = fontSize >= 48 ? 8 : fontSize >= 24 ? 4 : fontSize >= 8 ? 2 : 1;
                   setFontSize(Math.min(96, fontSize + step));
                 }}
@@ -2107,11 +2115,22 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 <Type size={13} />
               </button>
             </Tooltip>
-            <Tooltip content="Autofit to Width" description="Fit font size (2–96px) to page width without horizontal scrolling" side="bottom">
+            <Tooltip
+              content={isManual ? "Fit to Page Width (Auto-fit is currently paused)" : "Fit to Page Width"}
+              description="Fit font size (2–96px) to page width without horizontal scrolling"
+              side="bottom"
+            >
               <button
                 type="button"
-                onClick={() => autofitFontSize()}
-                className="ml-0.5 px-1.5 py-0.5 hover:bg-white/10 rounded-md text-indigo-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-sans font-bold border border-indigo-500/20"
+                onClick={() => {
+                  setIsManual(false);
+                  autofitFontSize(true);
+                }}
+                className={`ml-0.5 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-sans font-bold border ${
+                  isManual
+                    ? 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-200 border-indigo-400/40'
+                    : 'hover:bg-white/10 text-indigo-300 hover:text-white border-indigo-500/20'
+                }`}
                 aria-label="Autofit Font Size to Page Width"
               >
                 <Maximize2 size={10} className="rotate-45 text-indigo-400" />

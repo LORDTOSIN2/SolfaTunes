@@ -86,6 +86,7 @@ export default function App() {
 
   // Sheet display states
   const [fontSize, setFontSize] = useState<number>(18);
+  const [isManualFontSize, setIsManualFontSize] = useState<boolean>(false);
   const [scale, setScale] = useState<number>(1.0);
 
   // Selected note state for visual editing & workspace modes
@@ -355,6 +356,7 @@ export default function App() {
     musicXmlProvenanceRef.current = null;
     setMusicXmlStatus(null);
     setSelectedBundledScoreId(song.id);
+    setIsManualFontSize(false);
     setAbcText(song.abcText);
     setAbcLoadVersion(version => version + 1);
     setSelectedNote(null);
@@ -368,6 +370,7 @@ export default function App() {
     musicXmlProvenanceRef.current = null;
     setMusicXmlStatus(null);
     setSelectedBundledScoreId(undefined);
+    setIsManualFontSize(false);
     setAbcText(text);
     setAbcLoadVersion(version => version + 1);
   };
@@ -439,6 +442,7 @@ export default function App() {
 
       musicXmlProvenanceRef.current = imported;
       setSelectedBundledScoreId(bundledScoreId);
+      setIsManualFontSize(false);
       const importedBpm = imported.score.tempoBpm ?? bpm;
       setBpm(importedBpm);
       const importedAbc = serializeScoreToAbc(imported.score);
@@ -873,6 +877,8 @@ export default function App() {
               currentEighth={currentTick}
               fontSize={fontSize}
               setFontSize={setFontSize}
+              isManualFontSize={isManualFontSize}
+              setIsManualFontSize={setIsManualFontSize}
               scale={scale}
               setScale={setScale}
               mutedVoices={mutedVoices}
@@ -936,6 +942,8 @@ export default function App() {
               currentEighth={currentTick}
               fontSize={fontSize}
               setFontSize={setFontSize}
+              isManualFontSize={isManualFontSize}
+              setIsManualFontSize={setIsManualFontSize}
               scale={scale}
               setScale={setScale}
               mutedVoices={mutedVoices}
