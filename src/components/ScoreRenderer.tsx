@@ -692,21 +692,21 @@ const BarlineGraphic: React.FC<{ type: string; height: number }> = ({ type, heig
   switch (type) {
     case '||': // Section boundary
       return (
-        <div className="flex items-center justify-center gap-1 px-1.5 h-full">
+        <div className="flex items-center justify-center gap-1 px-1.5 h-full shrink-0">
           <div className="w-[2px] bg-black" style={lineStyle} />
           <div className="w-[2px] bg-black" style={lineStyle} />
         </div>
       );
     case '|]': // Final bar
       return (
-        <div className="flex items-center justify-center gap-1.5 px-2 h-full">
+        <div className="flex items-center justify-center gap-1.5 px-2 h-full shrink-0">
           <div className="w-[1.5px] bg-black" style={lineStyle} />
           <div className="w-[5px] bg-black rounded-sm" style={lineStyle} />
         </div>
       );
     case ':|': // Repeat end
       return (
-        <div className="flex items-center justify-center gap-1 px-1.5 h-full relative">
+        <div className="flex items-center justify-center gap-1 px-1.5 h-full relative shrink-0">
           <div className="flex flex-col gap-1.5 justify-center mr-1">
             <div className="w-1.5 h-1.5 rounded-full bg-black" />
             <div className="w-1.5 h-1.5 rounded-full bg-black" />
@@ -717,7 +717,7 @@ const BarlineGraphic: React.FC<{ type: string; height: number }> = ({ type, heig
       );
     case '|:': // Repeat start
       return (
-        <div className="flex items-center justify-center gap-1 px-1.5 h-full relative">
+        <div className="flex items-center justify-center gap-1 px-1.5 h-full relative shrink-0">
           <div className="w-[4px] bg-black" style={lineStyle} />
           <div className="w-[1.5px] bg-black" style={lineStyle} />
           <div className="flex flex-col gap-1.5 justify-center ml-1">
@@ -728,7 +728,7 @@ const BarlineGraphic: React.FC<{ type: string; height: number }> = ({ type, heig
       );
     case '::': // Dual repeat
       return (
-        <div className="flex items-center justify-center gap-1 px-2 h-full">
+        <div className="flex items-center justify-center gap-1 px-2 h-full shrink-0">
           <div className="flex flex-col gap-1.5 justify-center">
             <div className="w-1.5 h-1.5 rounded-full bg-black" />
             <div className="w-1.5 h-1.5 rounded-full bg-black" />
@@ -744,7 +744,7 @@ const BarlineGraphic: React.FC<{ type: string; height: number }> = ({ type, heig
     case '|': // Standard barline
     default:
       return (
-        <div className="flex items-center justify-center px-1.5 h-full">
+        <div className="flex items-center justify-center px-1.5 h-full shrink-0">
           <div className="w-[1.5px] bg-black/20" style={lineStyle} />
         </div>
       );
@@ -812,7 +812,7 @@ const ScrollableSystemRow: React.FC<ScrollableSystemRowProps> = ({ systemHeight,
         style={{ WebkitOverflowScrolling: 'touch', minHeight: `${systemHeight}px` }}
       >
         <div
-          className="flex flex-row flex-nowrap items-start w-max min-w-full relative"
+          className="flex flex-row flex-nowrap items-stretch w-max min-w-full relative"
           style={{ height: `${systemHeight}px` }}
         >
           {children}
@@ -1116,6 +1116,27 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     }
     
     return rows;
+  }, [score]);
+
+  // Precompute the proportional beat weight for every measure across systems
+  // (ensures measures stretch proportionally to their pulse count and fully justify across the system width)
+  const systemMeasuresBeats = useMemo(() => {
+    if (!score) return [];
+    return score.systems.map((system) => {
+      const count = Math.max(
+        0,
+        ...score.voices.map((voice) => system.voices[voice.id]?.measures.length || 0)
+      );
+      return Array.from({ length: count }, (_, mIndex) => {
+        return Math.max(
+          1,
+          ...score.voices.map((voice) => {
+            const m = system.voices[voice.id]?.measures[mIndex];
+            return m ? analyzeMeasureCells(m, score.meter).length : 0;
+          })
+        );
+      });
+    });
   }, [score]);
 
   // Source Editor Tab: 'solfa' or 'abc'
@@ -1752,82 +1773,89 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                         </div>
                       </div>
 
-                      {/* Measures Block */}
-                      {Array.from({ length: systemMeasuresCount }).map((_, mIndex) => {
-                        const isPlayingThisMeasure =
-                          activeMeasure &&
-                          activeMeasure.systemIndex === system.systemIndex &&
-                          activeMeasure.measureIndex === mIndex;
+                      {/* Measures Block - Fully justified across system width */}
+                      <div className="flex-1 flex flex-row flex-nowrap items-stretch min-w-max">
+                        {Array.from({ length: systemMeasuresCount }).map((_, mIndex) => {
+                          const isPlayingThisMeasure =
+                            activeMeasure &&
+                            activeMeasure.systemIndex === system.systemIndex &&
+                            activeMeasure.measureIndex === mIndex;
 
-                        const barType = system.voices[refVoice]?.barTypes[mIndex] || '|';
+                          const barType = system.voices[refVoice]?.barTypes[mIndex] || '|';
+                          const flexWeight = systemMeasuresBeats[system.systemIndex]?.[mIndex] ?? 1;
 
-                        return (
-                          <div
-                            key={`measure-${system.systemIndex}-${mIndex}`}
-                            ref={isPlayingThisMeasure ? activeMeasureRef : undefined}
-                            className={`flex items-stretch rounded-lg border transition-colors duration-150 shrink-0 ${
-                              isPlayingThisMeasure
-                                ? 'bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-500/20 shadow-sm'
-                                : 'border-transparent'
-                            }`}
-                          >
-                            <div className={`flex flex-col justify-start ${measurePaddingCol}`} style={{ height: `${systemHeight}px` }}>
-                              {layoutRows.map((row, rIdx) => {
-                                if (row.type === 'divider') {
+                          return (
+                            <div
+                              key={`measure-${system.systemIndex}-${mIndex}`}
+                              ref={isPlayingThisMeasure ? activeMeasureRef : undefined}
+                              style={{
+                                flex: `${flexWeight} 1 0%`,
+                                minWidth: 'max-content',
+                              }}
+                              className={`flex items-stretch rounded-lg border transition-colors duration-150 ${
+                                isPlayingThisMeasure
+                                  ? 'bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-500/20 shadow-sm'
+                                  : 'border-transparent'
+                              }`}
+                            >
+                              <div className={`flex-1 flex flex-col justify-start w-full ${measurePaddingCol}`} style={{ height: `${systemHeight}px` }}>
+                                {layoutRows.map((row, rIdx) => {
+                                  if (row.type === 'divider') {
+                                    return (
+                                      <div 
+                                        key={`notes-div-${system.systemIndex}-${mIndex}-${rIdx}`}
+                                        className="flex items-center w-full px-4" 
+                                        style={{ height: `${dividerHeight}px` }}
+                                      >
+                                        <div className="w-full border-t border-black/15" />
+                                      </div>
+                                    );
+                                  }
+                                  const voice = row.voice;
+                                  const voiceLine = system.voices[voice.id];
+                                  const measure = voiceLine?.measures[mIndex];
+                                  const isMuted = !!mutedVoices[voice.id];
+
                                   return (
-                                    <div 
-                                      key={`notes-div-${system.systemIndex}-${mIndex}-${rIdx}`}
-                                      className="flex items-center w-full px-4" 
-                                      style={{ height: `${dividerHeight}px` }}
+                                    <div
+                                      key={`notes-${system.systemIndex}-${mIndex}-${voice.id}`}
+                                      className={`font-serif font-black text-center whitespace-nowrap w-full flex items-center justify-center ${notesPaddingClass}`}
+                                      style={{
+                                        fontSize: `${fontSize}px`,
+                                        height: `${rowHeight}px`,
+                                        lineHeight: `${rowHeight}px`,
+                                        opacity: isMuted ? 0.15 : 1.0
+                                      }}
                                     >
-                                      <div className="w-full border-t border-black/15" />
+                                      {measure ? (
+                                        <InteractiveRhythmLine
+                                          measure={measure}
+                                          meter={score.meter}
+                                          meterDenominator={meterDen}
+                                          systemIndex={system.systemIndex}
+                                          voiceId={voice.id}
+                                          measureIndex={mIndex}
+                                          selectedNote={selectedNote}
+                                          onSelectNote={onSelectNote}
+                                          isPlaying={isPlayingThisMeasure}
+                                          isMuted={isMuted}
+                                          isEditorMode={isInteractive}
+                                          currentTick={currentTick}
+                                          fontSize={fontSize}
+                                        />
+                                      ) : (
+                                        '\u00A0'
+                                      )}
                                     </div>
                                   );
-                                }
-                                const voice = row.voice;
-                                const voiceLine = system.voices[voice.id];
-                                const measure = voiceLine?.measures[mIndex];
-                                const isMuted = !!mutedVoices[voice.id];
+                                })}
+                              </div>
 
-                                return (
-                                  <div
-                                    key={`notes-${system.systemIndex}-${mIndex}-${voice.id}`}
-                                    className={`font-serif font-black text-center whitespace-nowrap ${notesPaddingClass}`}
-                                    style={{
-                                      fontSize: `${fontSize}px`,
-                                      height: `${rowHeight}px`,
-                                      lineHeight: `${rowHeight}px`,
-                                      opacity: isMuted ? 0.15 : 1.0
-                                    }}
-                                  >
-                                    {measure ? (
-                                      <InteractiveRhythmLine
-                                        measure={measure}
-                                        meter={score.meter}
-                                        meterDenominator={meterDen}
-                                        systemIndex={system.systemIndex}
-                                        voiceId={voice.id}
-                                        measureIndex={mIndex}
-                                        selectedNote={selectedNote}
-                                        onSelectNote={onSelectNote}
-                                        isPlaying={isPlayingThisMeasure}
-                                        isMuted={isMuted}
-                                        isEditorMode={isInteractive}
-                                        currentTick={currentTick}
-                                        fontSize={fontSize}
-                                      />
-                                    ) : (
-                                      '\u00A0'
-                                    )}
-                                  </div>
-                                );
-                              })}
+                              <BarlineGraphic type={barType} height={systemHeight} />
                             </div>
-
-                            <BarlineGraphic type={barType} height={systemHeight} />
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </ScrollableSystemRow>
                   </div>
                 </div>
