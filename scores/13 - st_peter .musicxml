@@ -2,33 +2,32 @@
 <!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
 <score-partwise version="4.0">
   <work>
-    <work-title>Franconia</work-title>
+    <work-title>St. Peter</work-title>
   </work>
-  <movement-title>Franconia</movement-title>
+  <movement-title>St. Peter</movement-title>
   <identification>
-    <creator type="composer">Harmonischer Liederschatz, 1738</creator>
+    <creator type="composer">A. R. Reinagle, 1799–1877</creator>
     <encoding>
       <software>SolfaTunes</software>
-      <encoding-date>2026-10-24</encoding-date>
+      <encoding-date>2026-10-27</encoding-date>
     </encoding>
         <miscellaneous>
       <miscellaneous-field name="solfatunes:version">1.0</miscellaneous-field>
       <miscellaneous-field name="solfatunes:songId">score-1</miscellaneous-field>
       <miscellaneous-field name="solfatunes:solfaSystem">movable-do</miscellaneous-field>
-      <miscellaneous-field name="solfatunes:tonic">Eb</miscellaneous-field>
+      <miscellaneous-field name="solfatunes:tonic">D</miscellaneous-field>
       <miscellaneous-field name="solfatunes:mode">major</miscellaneous-field>
       <miscellaneous-field name="solfatunes:chromaticConvention">sharps-i-flats-a</miscellaneous-field>
-      <miscellaneous-field name="solfatunes:hymn">{&quot;hymnMeter&quot;:&quot;8.6.8.6&quot;,&quot;tuneName&quot;:&quot;Franconia&quot;,&quot;hymnName&quot;:&quot;The advent of our King&quot;,&quot;hasDescant&quot;:false,&quot;voicePairingGroups&quot;:[[&quot;1&quot;,&quot;2&quot;],[&quot;3&quot;,&quot;4&quot;]],&quot;systemVoiceMeasureCounts&quot;:{&quot;1&quot;:[10,10],&quot;2&quot;:[10,10],&quot;3&quot;:[10,10],&quot;4&quot;:[10,10]}}</miscellaneous-field>
-      <miscellaneous-field name="solfatunes:unmeteredLyrics">[&quot;1. The advent of our King&quot;,&quot;Our prayers must now employ,&quot;,&quot;And we must hymns of welcome sing&quot;,&quot;In strains of holy joy.&quot;]</miscellaneous-field>
+      <miscellaneous-field name="solfatunes:hymn">{&quot;tuneName&quot;:&quot;St. Peter&quot;,&quot;hymnName&quot;:&quot;Behold us, Lord, a little space&quot;,&quot;hasDescant&quot;:false,&quot;voicePairingGroups&quot;:[[&quot;1&quot;,&quot;2&quot;],[&quot;3&quot;,&quot;4&quot;]],&quot;systemVoiceMeasureCounts&quot;:{&quot;1&quot;:[10,10],&quot;2&quot;:[10,10],&quot;3&quot;:[10,10],&quot;4&quot;:[10,10]}}</miscellaneous-field>
+      <miscellaneous-field name="solfatunes:unmeteredLyrics">[&quot;1 Behold us, Lord a little space&quot;,&quot;From daily tasks set free,&quot;,&quot;And met within Thy holy place&quot;,&quot;To rest awhile with Thee.&quot;,&quot;&quot;,&quot;2 Around us rolls the ceaseless tide&quot;,&quot;Of business, toil, and care,&quot;,&quot;And scarcely can we turn aside&quot;,&quot;For one brief hour of prayer.&quot;,&quot;&quot;,&quot;3 Yet these are not the only walls&quot;,&quot;Wherein Thou mayst be sought;&quot;,&quot;On homeliest work thy blessing falls&quot;,&quot;In truth and patience wrought.&quot;,&quot;&quot;,&quot;4 Thine is the loom, the forge, the mart,&quot;,&quot;The wealth of land and sea;&quot;,&quot;The worlds of science and of art,&quot;,&quot;Revealed and ruled by Thee.&quot;,&quot;&quot;,&quot;5 Then let us prove our heavenly birth&quot;,&quot;In all we do and know,&quot;,&quot;And claim the kingdom of the earth&quot;,&quot;For Thee, and not thy foe.&quot;,&quot;&quot;,&quot;6 Work shall be prayer, if all be wrought&quot;,&quot;As thou wouldst have it done;&quot;,&quot;And prayer, by thee inspired and taught,&quot;,&quot;Itself with work be one.&quot;,&quot;&quot;]</miscellaneous-field>
       <miscellaneous-field name="solfatunes:originalAbcSource">X:1
-T:Franconia
-C:Harmonischer Liederschatz, 1738
+T:St. Peter
+C:A. R. Reinagle, 1799–1877
 M:2/4
 L:1/4
-K:Eb
-% tune_name=Franconia
-% hymn_name=The advent of our King
-% hymn_meter=8.6.8.6
+K:D
+% tune_name=St. Peter
+% hymn_name=Behold us, Lord, a little space
 % has_descant=false
 %%staves [(1 2) (3 4)]
 V:1 name=&quot;Soprano&quot; clef=treble
@@ -37,23 +36,47 @@ V:3 name=&quot;Tenor&quot; clef=treble
 V:4 name=&quot;Bass&quot; clef=bass
 
 % --- System 1 ---
-[V:1] E | F G | A B | G2 | -2 || B | c e | A G | F2 | -2 ||
-[V:2] B, | D E | E D | E2 | -2 || E | E E | D E | D2 | -2 ||
-[V:3] G, | B, B, | A, F, | G,2 | -2 || G, | A, B, | A, B, | B,2 | -2 ||
-[V:4] E, | B,, E, | C, B,, | E,2 | -2 || E, | A, G, | F, E, | B,,2 | -2 ||
-
+[V:1] | z A | d c | B A | A G | F || F | E D | G F | E2 | z ||
+[V:2] | z D | F F | D D | E C | D || D | B, A, | C D | C2 | z ||
+[V:3] | z F, | A, A, | G, A, | A, A, | A, || A, | G, A, | A, A, | A,2 | z ||
+[V:4] | z D, | D, F, | G, F, | C, A,, | D, || D, | G, F, | E, D, | A,,2 | z ||
 % --- System 2 ---
-[V:1] B | e d | c B | c c | B || B | E G | F F | E2 | -2 ||
-[V:2] F | E F | G D | F F | D || D | E E | E D | E2 | -2 ||
-[V:3] D | B, B, | e B, | B, =A, | B, || B, | G, B, | C, B, | G,2 | -2 ||
-[V:4] B,, | G, B,, | E, G, | F, F, | B,, || B,, | C, G,, | A,, B,, | E,2 | -2 ||
+[V:1] | z F | G F | B A | A G | F || D | F E | D C | D2 | z |]
+[V:2] | z D | D D | D D | B, C | D || B, | D B, | A, A,/2 G,/2 | F,2 | z |]
+[V:3] | z A, | G, A, | D, D, | E, E, | D, || F, | A, G, | F, E, | D,2 | z |]
+[V:4] | z D,/2 =C/2 | B, A, | G, F, | E, A, | B, || B, | F,, G,, | A,, A,, | D,2 | z |]
 
-W: 1. The advent of our King
-W:    Our prayers must now employ,
-W:    And we must hymns of welcome sing
-W:    In strains of holy joy.
-</miscellaneous-field>
-      <miscellaneous-field name="solfatunes:noteOverrides">{&quot;1-m1-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;1-m2-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;1-m2-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;1-m3-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;1-m3-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;1-m4-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;1-m6-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;1-m7-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;1-m7-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;1-m8-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;1-m8-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;1-m9-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;1-m11-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;1-m12-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;1-m12-n1&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;1-m13-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;1-m13-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;1-m14-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;1-m14-n1&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;1-m15-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;1-m16-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;1-m17-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;1-m17-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;1-m18-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;1-m18-n1&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;1-m19-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m1-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;2-m2-n0&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m2-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m3-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m3-n1&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m4-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m6-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m7-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m7-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m8-n0&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m8-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m9-n0&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m11-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;2-m12-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m12-n1&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;2-m13-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;2-m13-n1&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m14-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;2-m14-n1&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;2-m15-n0&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m16-n0&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m17-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m17-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m18-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m18-n1&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m19-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;3-m1-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;3-m2-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m2-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m3-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;3-m3-n1&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;3-m4-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;3-m6-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;3-m7-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;3-m7-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m8-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;3-m8-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m9-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m11-n0&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;3-m12-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m12-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m13-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;3-m13-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m14-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m14-n1&quot;:{&quot;syllable&quot;:&quot;fi&quot;,&quot;scaleDegree&quot;:6,&quot;isExplicit&quot;:true},&quot;3-m15-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m16-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m17-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;3-m17-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m18-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;3-m18-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m19-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;4-m1-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m2-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m2-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m3-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;4-m3-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m4-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m6-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m7-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;4-m7-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;4-m8-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;4-m8-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m9-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m11-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m12-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;4-m12-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m13-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m13-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;4-m14-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;4-m14-n1&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;4-m15-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m16-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m17-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;4-m17-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;4-m18-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;4-m18-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m19-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true}}</miscellaneous-field>
+W: 1 Behold us, Lord a little space
+W: From daily tasks set free,
+W: And met within Thy holy place
+W: To rest awhile with Thee.
+W:
+W: 2 Around us rolls the ceaseless tide
+W: Of business, toil, and care,
+W: And scarcely can we turn aside
+W: For one brief hour of prayer.
+W:
+W: 3 Yet these are not the only walls
+W: Wherein Thou mayst be sought;
+W: On homeliest work thy blessing falls
+W: In truth and patience wrought.
+W:
+W: 4 Thine is the loom, the forge, the mart,
+W: The wealth of land and sea;
+W: The worlds of science and of art,
+W: Revealed and ruled by Thee.
+W:
+W: 5 Then let us prove our heavenly birth
+W: In all we do and know,
+W: And claim the kingdom of the earth
+W: For Thee, and not thy foe.
+W:
+W: 6 Work shall be prayer, if all be wrought
+W: As thou wouldst have it done;
+W: And prayer, by thee inspired and taught,
+W: Itself with work be one.
+W:</miscellaneous-field>
+      <miscellaneous-field name="solfatunes:noteOverrides">{&quot;1-m1-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;1-m2-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;1-m2-n1&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;1-m3-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;1-m3-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;1-m4-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;1-m4-n1&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;1-m5-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;1-m6-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;1-m7-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;1-m7-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;1-m8-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;1-m8-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;1-m9-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;1-m11-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;1-m12-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;1-m12-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;1-m13-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;1-m13-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;1-m14-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;1-m14-n1&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;1-m15-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;1-m16-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;1-m17-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;1-m17-n1&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;1-m18-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;1-m18-n1&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;1-m19-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m1-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m2-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;2-m2-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;2-m3-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m3-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m4-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;2-m4-n1&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m5-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m6-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m7-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;2-m7-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;2-m8-n0&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m8-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m9-n0&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m11-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m12-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m12-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m13-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m13-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m14-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;2-m14-n1&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;2-m15-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m16-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;2-m17-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;2-m17-n1&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;2-m18-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;2-m18-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;2-m18-n2&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;2-m19-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;3-m1-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;3-m2-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m2-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m3-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;3-m3-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m4-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m4-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m5-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m6-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m7-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;3-m7-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m8-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m8-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m9-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m11-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m12-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;3-m12-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m13-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;3-m13-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;3-m14-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;3-m14-n1&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;3-m15-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;3-m16-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;3-m17-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;3-m17-n1&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;3-m18-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;3-m18-n1&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;3-m19-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m1-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m2-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m2-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;4-m3-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;4-m3-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;4-m4-n0&quot;:{&quot;syllable&quot;:&quot;t&quot;,&quot;scaleDegree&quot;:11,&quot;isExplicit&quot;:true},&quot;4-m4-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m5-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m6-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m7-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;4-m7-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;4-m8-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;4-m8-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m9-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m11-n1&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true},&quot;4-m11-n2&quot;:{&quot;syllable&quot;:&quot;li&quot;,&quot;scaleDegree&quot;:10,&quot;isExplicit&quot;:true},&quot;4-m12-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;4-m12-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m13-n0&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;4-m13-n1&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;4-m14-n0&quot;:{&quot;syllable&quot;:&quot;r&quot;,&quot;scaleDegree&quot;:2,&quot;isExplicit&quot;:true},&quot;4-m14-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m15-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;4-m16-n0&quot;:{&quot;syllable&quot;:&quot;l&quot;,&quot;scaleDegree&quot;:9,&quot;isExplicit&quot;:true},&quot;4-m17-n0&quot;:{&quot;syllable&quot;:&quot;m&quot;,&quot;scaleDegree&quot;:4,&quot;isExplicit&quot;:true},&quot;4-m17-n1&quot;:{&quot;syllable&quot;:&quot;f&quot;,&quot;scaleDegree&quot;:5,&quot;isExplicit&quot;:true},&quot;4-m18-n0&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m18-n1&quot;:{&quot;syllable&quot;:&quot;s&quot;,&quot;scaleDegree&quot;:7,&quot;isExplicit&quot;:true},&quot;4-m19-n0&quot;:{&quot;syllable&quot;:&quot;d&quot;,&quot;scaleDegree&quot;:0,&quot;isExplicit&quot;:true}}</miscellaneous-field>
       <miscellaneous-field name="solfatunes:voiceIds">{&quot;P1&quot;:&quot;1&quot;,&quot;P2&quot;:&quot;2&quot;,&quot;P3&quot;:&quot;3&quot;,&quot;P4&quot;:&quot;4&quot;}</miscellaneous-field>
     </miscellaneous>
   </identification>
@@ -76,7 +99,7 @@ W:    In strains of holy joy.
       <attributes>
         <divisions>4</divisions>
         <key>
-          <fifths>-3</fifths>
+          <fifths>2</fifths>
           <mode>major</mode>
         </key>
         <time>
@@ -98,9 +121,14 @@ W:    In strains of holy joy.
         <sound tempo="100"/>
       </direction>
       <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>A</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -111,8 +139,8 @@ W:    In strains of holy joy.
     <measure number="2">
       <note>
         <pitch>
-          <step>F</step>
-          <octave>4</octave>
+          <step>D</step>
+          <octave>5</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -120,8 +148,9 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>G</step>
-          <octave>4</octave>
+          <step>C</step>
+          <alter>1</alter>
+          <octave>5</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -131,8 +160,7 @@ W:    In strains of holy joy.
     <measure number="3">
       <note>
         <pitch>
-          <step>A</step>
-          <alter>-1</alter>
+          <step>B</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -141,8 +169,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>A</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -153,15 +180,34 @@ W:    In strains of holy joy.
     <measure number="4">
       <note>
         <pitch>
+          <step>A</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch>
           <step>G</step>
           <octave>4</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>4</duration>
         <voice>1</voice>
-        <type>half</type>
+        <type>quarter</type>
       </note>
     </measure>
     <measure number="5">
+      <note>
+        <pitch>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
       <barline location="right">
         <bar-style>light-light</bar-style>
       </barline>
@@ -169,8 +215,8 @@ W:    In strains of holy joy.
     <measure number="6">
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>F</step>
+          <alter>1</alter>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -181,8 +227,8 @@ W:    In strains of holy joy.
     <measure number="7">
       <note>
         <pitch>
-          <step>C</step>
-          <octave>5</octave>
+          <step>E</step>
+          <octave>4</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -190,9 +236,8 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
-          <octave>5</octave>
+          <step>D</step>
+          <octave>4</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -202,8 +247,110 @@ W:    In strains of holy joy.
     <measure number="8">
       <note>
         <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+    </measure>
+    <measure number="9">
+      <note>
+        <pitch>
+          <step>E</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>8</duration>
+        <voice>1</voice>
+        <type>half</type>
+      </note>
+    </measure>
+    <measure number="10">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <barline location="right">
+        <bar-style>light-light</bar-style>
+      </barline>
+    </measure>
+    <measure number="11">
+      <print new-system="yes"/>
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+    </measure>
+    <measure number="12">
+      <note>
+        <pitch>
+          <step>G</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+    </measure>
+    <measure number="13">
+      <note>
+        <pitch>
+          <step>B</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch>
           <step>A</step>
-          <alter>-1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+    </measure>
+    <measure number="14">
+      <note>
+        <pitch>
+          <step>A</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -220,102 +367,11 @@ W:    In strains of holy joy.
         <type>quarter</type>
       </note>
     </measure>
-    <measure number="9">
-      <note>
-        <pitch>
-          <step>F</step>
-          <octave>4</octave>
-        </pitch>
-        <duration>8</duration>
-        <voice>1</voice>
-        <type>half</type>
-      </note>
-    </measure>
-    <measure number="10">
-      <barline location="right">
-        <bar-style>light-light</bar-style>
-      </barline>
-    </measure>
-    <measure number="11">
-      <print new-system="yes"/>
-      <note>
-        <pitch>
-          <step>B</step>
-          <alter>-1</alter>
-          <octave>4</octave>
-        </pitch>
-        <duration>4</duration>
-        <voice>1</voice>
-        <type>quarter</type>
-      </note>
-    </measure>
-    <measure number="12">
-      <note>
-        <pitch>
-          <step>E</step>
-          <alter>-1</alter>
-          <octave>5</octave>
-        </pitch>
-        <duration>4</duration>
-        <voice>1</voice>
-        <type>quarter</type>
-      </note>
-      <note>
-        <pitch>
-          <step>D</step>
-          <octave>5</octave>
-        </pitch>
-        <duration>4</duration>
-        <voice>1</voice>
-        <type>quarter</type>
-      </note>
-    </measure>
-    <measure number="13">
-      <note>
-        <pitch>
-          <step>C</step>
-          <octave>5</octave>
-        </pitch>
-        <duration>4</duration>
-        <voice>1</voice>
-        <type>quarter</type>
-      </note>
-      <note>
-        <pitch>
-          <step>B</step>
-          <alter>-1</alter>
-          <octave>4</octave>
-        </pitch>
-        <duration>4</duration>
-        <voice>1</voice>
-        <type>quarter</type>
-      </note>
-    </measure>
-    <measure number="14">
-      <note>
-        <pitch>
-          <step>C</step>
-          <octave>5</octave>
-        </pitch>
-        <duration>4</duration>
-        <voice>1</voice>
-        <type>quarter</type>
-      </note>
-      <note>
-        <pitch>
-          <step>C</step>
-          <octave>5</octave>
-        </pitch>
-        <duration>4</duration>
-        <voice>1</voice>
-        <type>quarter</type>
-      </note>
-    </measure>
     <measure number="15">
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>F</step>
+          <alter>1</alter>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -329,8 +385,7 @@ W:    In strains of holy joy.
     <measure number="16">
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -341,8 +396,8 @@ W:    In strains of holy joy.
     <measure number="17">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>F</step>
+          <alter>1</alter>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -351,7 +406,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>G</step>
+          <step>E</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -362,7 +417,7 @@ W:    In strains of holy joy.
     <measure number="18">
       <note>
         <pitch>
-          <step>F</step>
+          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -371,7 +426,8 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>F</step>
+          <step>C</step>
+          <alter>1</alter>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -382,8 +438,7 @@ W:    In strains of holy joy.
     <measure number="19">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>8</duration>
@@ -392,8 +447,14 @@ W:    In strains of holy joy.
       </note>
     </measure>
     <measure number="20">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
       <barline location="right">
-        <bar-style>light-light</bar-style>
+        <bar-style>light-heavy</bar-style>
       </barline>
     </measure>
   </part>
@@ -402,7 +463,7 @@ W:    In strains of holy joy.
       <attributes>
         <divisions>4</divisions>
         <key>
-          <fifths>-3</fifths>
+          <fifths>2</fifths>
           <mode>major</mode>
         </key>
         <time>
@@ -415,17 +476,11 @@ W:    In strains of holy joy.
         </clef>
       </attributes>
       <note>
-        <pitch>
-          <step>B</step>
-          <alter>-1</alter>
-          <octave>3</octave>
-        </pitch>
+        <rest/>
         <duration>4</duration>
         <voice>1</voice>
         <type>quarter</type>
       </note>
-    </measure>
-    <measure number="2">
       <note>
         <pitch>
           <step>D</step>
@@ -435,10 +490,22 @@ W:    In strains of holy joy.
         <voice>1</voice>
         <type>quarter</type>
       </note>
+    </measure>
+    <measure number="2">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch>
+          <step>F</step>
+          <alter>1</alter>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -449,8 +516,7 @@ W:    In strains of holy joy.
     <measure number="3">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -471,15 +537,33 @@ W:    In strains of holy joy.
       <note>
         <pitch>
           <step>E</step>
-          <alter>-1</alter>
           <octave>4</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>4</duration>
         <voice>1</voice>
-        <type>half</type>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch>
+          <step>C</step>
+          <alter>1</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
       </note>
     </measure>
     <measure number="5">
+      <note>
+        <pitch>
+          <step>D</step>
+          <octave>4</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
       <barline location="right">
         <bar-style>light-light</bar-style>
       </barline>
@@ -487,8 +571,7 @@ W:    In strains of holy joy.
     <measure number="6">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -499,9 +582,8 @@ W:    In strains of holy joy.
     <measure number="7">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
-          <octave>4</octave>
+          <step>B</step>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -509,9 +591,8 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
-          <octave>4</octave>
+          <step>A</step>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -521,7 +602,8 @@ W:    In strains of holy joy.
     <measure number="8">
       <note>
         <pitch>
-          <step>D</step>
+          <step>C</step>
+          <alter>1</alter>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -530,8 +612,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -542,7 +623,8 @@ W:    In strains of holy joy.
     <measure number="9">
       <note>
         <pitch>
-          <step>D</step>
+          <step>C</step>
+          <alter>1</alter>
           <octave>4</octave>
         </pitch>
         <duration>8</duration>
@@ -551,6 +633,12 @@ W:    In strains of holy joy.
       </note>
     </measure>
     <measure number="10">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
       <barline location="right">
         <bar-style>light-light</bar-style>
       </barline>
@@ -558,8 +646,14 @@ W:    In strains of holy joy.
     <measure number="11">
       <print new-system="yes"/>
       <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
         <pitch>
-          <step>F</step>
+          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -570,8 +664,7 @@ W:    In strains of holy joy.
     <measure number="12">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -580,7 +673,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>F</step>
+          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -591,7 +684,7 @@ W:    In strains of holy joy.
     <measure number="13">
       <note>
         <pitch>
-          <step>G</step>
+          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -611,8 +704,8 @@ W:    In strains of holy joy.
     <measure number="14">
       <note>
         <pitch>
-          <step>F</step>
-          <octave>4</octave>
+          <step>B</step>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -620,7 +713,8 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>F</step>
+          <step>C</step>
+          <alter>1</alter>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -645,8 +739,8 @@ W:    In strains of holy joy.
     <measure number="16">
       <note>
         <pitch>
-          <step>D</step>
-          <octave>4</octave>
+          <step>B</step>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -656,8 +750,7 @@ W:    In strains of holy joy.
     <measure number="17">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>4</octave>
         </pitch>
         <duration>4</duration>
@@ -666,9 +759,8 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
-          <octave>4</octave>
+          <step>B</step>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -678,9 +770,8 @@ W:    In strains of holy joy.
     <measure number="18">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
-          <octave>4</octave>
+          <step>A</step>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -688,20 +779,29 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>D</step>
-          <octave>4</octave>
+          <step>A</step>
+          <octave>3</octave>
         </pitch>
-        <duration>4</duration>
+        <duration>2</duration>
         <voice>1</voice>
-        <type>quarter</type>
+        <type>eighth</type>
+      </note>
+      <note>
+        <pitch>
+          <step>G</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <type>eighth</type>
       </note>
     </measure>
     <measure number="19">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
-          <octave>4</octave>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>3</octave>
         </pitch>
         <duration>8</duration>
         <voice>1</voice>
@@ -709,8 +809,14 @@ W:    In strains of holy joy.
       </note>
     </measure>
     <measure number="20">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
       <barline location="right">
-        <bar-style>light-light</bar-style>
+        <bar-style>light-heavy</bar-style>
       </barline>
     </measure>
   </part>
@@ -719,7 +825,7 @@ W:    In strains of holy joy.
       <attributes>
         <divisions>4</divisions>
         <key>
-          <fifths>-3</fifths>
+          <fifths>2</fifths>
           <mode>major</mode>
         </key>
         <time>
@@ -732,8 +838,15 @@ W:    In strains of holy joy.
         </clef>
       </attributes>
       <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
         <pitch>
-          <step>G</step>
+          <step>F</step>
+          <alter>1</alter>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -744,8 +857,7 @@ W:    In strains of holy joy.
     <measure number="2">
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>A</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -754,8 +866,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>A</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -766,8 +877,7 @@ W:    In strains of holy joy.
     <measure number="3">
       <note>
         <pitch>
-          <step>A</step>
-          <alter>-1</alter>
+          <step>G</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -776,7 +886,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>F</step>
+          <step>A</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -787,15 +897,33 @@ W:    In strains of holy joy.
     <measure number="4">
       <note>
         <pitch>
-          <step>G</step>
+          <step>A</step>
           <octave>3</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>4</duration>
         <voice>1</voice>
-        <type>half</type>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch>
+          <step>A</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
       </note>
     </measure>
     <measure number="5">
+      <note>
+        <pitch>
+          <step>A</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
       <barline location="right">
         <bar-style>light-light</bar-style>
       </barline>
@@ -803,7 +931,7 @@ W:    In strains of holy joy.
     <measure number="6">
       <note>
         <pitch>
-          <step>G</step>
+          <step>A</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -814,8 +942,7 @@ W:    In strains of holy joy.
     <measure number="7">
       <note>
         <pitch>
-          <step>A</step>
-          <alter>-1</alter>
+          <step>G</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -824,8 +951,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>A</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -837,7 +963,6 @@ W:    In strains of holy joy.
       <note>
         <pitch>
           <step>A</step>
-          <alter>-1</alter>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -846,8 +971,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>A</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -858,8 +982,7 @@ W:    In strains of holy joy.
     <measure number="9">
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>A</step>
           <octave>3</octave>
         </pitch>
         <duration>8</duration>
@@ -868,6 +991,12 @@ W:    In strains of holy joy.
       </note>
     </measure>
     <measure number="10">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
       <barline location="right">
         <bar-style>light-light</bar-style>
       </barline>
@@ -875,9 +1004,15 @@ W:    In strains of holy joy.
     <measure number="11">
       <print new-system="yes"/>
       <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
         <pitch>
-          <step>D</step>
-          <octave>4</octave>
+          <step>A</step>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -887,8 +1022,7 @@ W:    In strains of holy joy.
     <measure number="12">
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>G</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -897,8 +1031,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>A</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -909,9 +1042,8 @@ W:    In strains of holy joy.
     <measure number="13">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
-          <octave>5</octave>
+          <step>D</step>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -919,8 +1051,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -931,8 +1062,7 @@ W:    In strains of holy joy.
     <measure number="14">
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>E</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -941,21 +1071,18 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>A</step>
-          <alter>0</alter>
+          <step>E</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
         <type>quarter</type>
-        <accidental>natural</accidental>
       </note>
     </measure>
     <measure number="15">
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -969,8 +1096,8 @@ W:    In strains of holy joy.
     <measure number="16">
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>F</step>
+          <alter>1</alter>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -981,7 +1108,7 @@ W:    In strains of holy joy.
     <measure number="17">
       <note>
         <pitch>
-          <step>G</step>
+          <step>A</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -990,8 +1117,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>G</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1002,7 +1128,8 @@ W:    In strains of holy joy.
     <measure number="18">
       <note>
         <pitch>
-          <step>C</step>
+          <step>F</step>
+          <alter>1</alter>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1011,8 +1138,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>E</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1023,7 +1149,7 @@ W:    In strains of holy joy.
     <measure number="19">
       <note>
         <pitch>
-          <step>G</step>
+          <step>D</step>
           <octave>3</octave>
         </pitch>
         <duration>8</duration>
@@ -1032,8 +1158,14 @@ W:    In strains of holy joy.
       </note>
     </measure>
     <measure number="20">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
       <barline location="right">
-        <bar-style>light-light</bar-style>
+        <bar-style>light-heavy</bar-style>
       </barline>
     </measure>
   </part>
@@ -1042,7 +1174,7 @@ W:    In strains of holy joy.
       <attributes>
         <divisions>4</divisions>
         <key>
-          <fifths>-3</fifths>
+          <fifths>2</fifths>
           <mode>major</mode>
         </key>
         <time>
@@ -1055,9 +1187,14 @@ W:    In strains of holy joy.
         </clef>
       </attributes>
       <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
+      <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1068,9 +1205,8 @@ W:    In strains of holy joy.
     <measure number="2">
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
-          <octave>2</octave>
+          <step>D</step>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -1078,8 +1214,8 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>F</step>
+          <alter>1</alter>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1090,7 +1226,7 @@ W:    In strains of holy joy.
     <measure number="3">
       <note>
         <pitch>
-          <step>C</step>
+          <step>G</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1099,9 +1235,9 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
-          <octave>2</octave>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -1111,16 +1247,34 @@ W:    In strains of holy joy.
     <measure number="4">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>C</step>
+          <alter>1</alter>
           <octave>3</octave>
         </pitch>
-        <duration>8</duration>
+        <duration>4</duration>
         <voice>1</voice>
-        <type>half</type>
+        <type>quarter</type>
+      </note>
+      <note>
+        <pitch>
+          <step>A</step>
+          <octave>2</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
       </note>
     </measure>
     <measure number="5">
+      <note>
+        <pitch>
+          <step>D</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
       <barline location="right">
         <bar-style>light-light</bar-style>
       </barline>
@@ -1128,8 +1282,7 @@ W:    In strains of holy joy.
     <measure number="6">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1140,8 +1293,7 @@ W:    In strains of holy joy.
     <measure number="7">
       <note>
         <pitch>
-          <step>A</step>
-          <alter>-1</alter>
+          <step>G</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1150,7 +1302,8 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>G</step>
+          <step>F</step>
+          <alter>1</alter>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1161,7 +1314,7 @@ W:    In strains of holy joy.
     <measure number="8">
       <note>
         <pitch>
-          <step>F</step>
+          <step>E</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1170,8 +1323,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1182,8 +1334,7 @@ W:    In strains of holy joy.
     <measure number="9">
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>A</step>
           <octave>2</octave>
         </pitch>
         <duration>8</duration>
@@ -1192,6 +1343,12 @@ W:    In strains of holy joy.
       </note>
     </measure>
     <measure number="10">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
       <barline location="right">
         <bar-style>light-light</bar-style>
       </barline>
@@ -1199,20 +1356,36 @@ W:    In strains of holy joy.
     <measure number="11">
       <print new-system="yes"/>
       <note>
-        <pitch>
-          <step>B</step>
-          <alter>-1</alter>
-          <octave>2</octave>
-        </pitch>
+        <rest/>
         <duration>4</duration>
         <voice>1</voice>
         <type>quarter</type>
+      </note>
+      <note>
+        <pitch>
+          <step>D</step>
+          <octave>3</octave>
+        </pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <type>eighth</type>
+      </note>
+      <note>
+        <pitch>
+          <step>C</step>
+          <alter>0</alter>
+          <octave>4</octave>
+        </pitch>
+        <duration>2</duration>
+        <voice>1</voice>
+        <type>eighth</type>
+        <accidental>natural</accidental>
       </note>
     </measure>
     <measure number="12">
       <note>
         <pitch>
-          <step>G</step>
+          <step>B</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1221,9 +1394,8 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
-          <octave>2</octave>
+          <step>A</step>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -1233,8 +1405,7 @@ W:    In strains of holy joy.
     <measure number="13">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>G</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1243,7 +1414,8 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>G</step>
+          <step>F</step>
+          <alter>1</alter>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1254,7 +1426,7 @@ W:    In strains of holy joy.
     <measure number="14">
       <note>
         <pitch>
-          <step>F</step>
+          <step>E</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1263,7 +1435,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>F</step>
+          <step>A</step>
           <octave>3</octave>
         </pitch>
         <duration>4</duration>
@@ -1275,8 +1447,7 @@ W:    In strains of holy joy.
       <note>
         <pitch>
           <step>B</step>
-          <alter>-1</alter>
-          <octave>2</octave>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -1290,8 +1461,7 @@ W:    In strains of holy joy.
       <note>
         <pitch>
           <step>B</step>
-          <alter>-1</alter>
-          <octave>2</octave>
+          <octave>3</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -1301,8 +1471,9 @@ W:    In strains of holy joy.
     <measure number="17">
       <note>
         <pitch>
-          <step>C</step>
-          <octave>3</octave>
+          <step>F</step>
+          <alter>1</alter>
+          <octave>2</octave>
         </pitch>
         <duration>4</duration>
         <voice>1</voice>
@@ -1322,7 +1493,6 @@ W:    In strains of holy joy.
       <note>
         <pitch>
           <step>A</step>
-          <alter>-1</alter>
           <octave>2</octave>
         </pitch>
         <duration>4</duration>
@@ -1331,8 +1501,7 @@ W:    In strains of holy joy.
       </note>
       <note>
         <pitch>
-          <step>B</step>
-          <alter>-1</alter>
+          <step>A</step>
           <octave>2</octave>
         </pitch>
         <duration>4</duration>
@@ -1343,8 +1512,7 @@ W:    In strains of holy joy.
     <measure number="19">
       <note>
         <pitch>
-          <step>E</step>
-          <alter>-1</alter>
+          <step>D</step>
           <octave>3</octave>
         </pitch>
         <duration>8</duration>
@@ -1353,8 +1521,14 @@ W:    In strains of holy joy.
       </note>
     </measure>
     <measure number="20">
+      <note>
+        <rest/>
+        <duration>4</duration>
+        <voice>1</voice>
+        <type>quarter</type>
+      </note>
       <barline location="right">
-        <bar-style>light-light</bar-style>
+        <bar-style>light-heavy</bar-style>
       </barline>
     </measure>
   </part>
