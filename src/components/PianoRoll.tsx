@@ -40,6 +40,10 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  Columns3,
   Sliders,
   X,
   HelpCircle,
@@ -99,7 +103,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   // 1. Grid & Display Settings
   const [pixelsPerTick, setPixelsPerTick] = useState<number>(4.0); // 16 ticks = 64px
   const [rowHeight, setRowHeight] = useState<number>(20); // 20px default row height
-  const [snapTicks, setSnapTicks] = useState<number>(8); // default 8 ticks = 1/8 note
+  const [snapTicks, setSnapTicks] = useState<number>(4); // default 4 ticks = 1/16 note
   const [localAutoFormatOnBlur, setLocalAutoFormatOnBlur] = useState<boolean>(true);
   const autoFormatOnBlur = autoFormatOnBlurProp !== undefined ? autoFormatOnBlurProp : localAutoFormatOnBlur;
   const setAutoFormatOnBlur = (val: boolean) => {
@@ -107,6 +111,12 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     onToggleAutoFormatOnBlur?.(val);
   };
   const [hasUncommittedChanges, setHasUncommittedChanges] = useState<boolean>(false);
+
+  // Time-based multi-selection state (bar/time range selection across vocal lines)
+  const [selectedBar, setSelectedBar] = useState<number>(1);
+  const [timeSelectScope, setTimeSelectScope] = useState<'all' | 'active'>('all');
+  const [isTimeRulerSelecting, setIsTimeRulerSelecting] = useState<boolean>(false);
+  const [timeRulerDragRange, setTimeRulerDragRange] = useState<{ startTick: number; currentTick: number } | null>(null);
 
   // 2. Collapsible UI Panels (Clean scanability, collapse away by default)
   const [showToolsDrawer, setShowToolsDrawer] = useState<boolean>(false);
@@ -214,6 +224,118 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   const totalGridWidth = totalTicks * pixelsPerTick;
   const totalGridHeight = keyCount * rowHeight;
   const totalCanvasHeight = totalGridHeight + 28; // 28px timeline header
+
+  // Generate Measure Barlines for the Timeline Header
+  const measureColumns = useMemo(() => {
+    const cols = flattenedScore.measures.map((measure) => ({
+      measureNumber: measure.measureNumber,
+      startTick: measure.startTick,
+      durationTicks: measure.durationTicks,
+      width: measure.durationTicks * pixelsPerTick,
+    }));
+    let nextStart = cols.length > 0
+      ? cols[cols.length - 1].startTick + cols[cols.length - 1].durationTicks
+      : 0;
+    let measureNumber = cols.length + 1;
+    while (nextStart < totalTicks) {
+      cols.push({
+        measureNumber,
+        startTick: nextStart,
+        durationTicks: meterTicks,
+        width: meterTicks * pixelsPerTick,
+      });
+      nextStart += meterTicks;
+      measureNumber++;
+    }
+    return cols;
+  }, [flattenedScore.measures, totalTicks, meterTicks, pixelsPerTick]);
+
+  // Audio timeline measure ranges from score
+  const audioRanges = useMemo(() => getScoreMeasureRanges(score), [score]);
+
+  // Visual piano roll measure bounds
+  const pianoMeasureBounds = useMemo(() => {
+    return measureColumns.map((col, idx) => ({
+      measureIndex: idx,
+      startTick: col.startTick,
+      durationTicks: meterTicks,
+    }));
+  }, [measureColumns, meterTicks]);
+
+  // Dynamic mapping: converts audio playback tick to visual piano roll grid tick
+  // Aligns pickup measures (anacrusis) and regular measures with 100% precision!
+  const activePianoRollTick = useMemo(() => {
+    return audioTickToPianoRollTick(currentTick, audioRanges, pianoMeasureBounds);
+  }, [currentTick, audioRanges, pianoMeasureBounds]);
+
+  // Time-based multi-selection helpers: select all notes in a time window or bar
+  const selectNotesByTimeRange = useCallback(
+    (
+      startTick: number,
+      endTick: number,
+      scope: 'all' | 'active' = timeSelectScope,
+      append: boolean = false
+    ) => {
+      const minT = Math.min(startTick, endTick);
+      const maxT = Math.max(startTick, endTick);
+      const matchingIds = new Set<string>(append ? selectedNoteIds : []);
+
+      notes.forEach((n) => {
+        if (n.isRest) return;
+        if (scope === 'active' && n.voiceId !== activeVoiceId) return;
+        const nEnd = n.startTick + n.durationTicks;
+        if (n.startTick < maxT && nEnd > minT) {
+          matchingIds.add(n.id);
+        }
+      });
+
+      setSelectedNoteIds(matchingIds);
+    },
+    [notes, selectedNoteIds, activeVoiceId, timeSelectScope]
+  );
+
+  const selectMeasure = useCallback(
+    (
+      measureNumber: number,
+      scope: 'all' | 'active' = timeSelectScope,
+      append: boolean = false
+    ) => {
+      const col = measureColumns.find((c) => c.measureNumber === measureNumber);
+      if (!col) return;
+      setSelectedBar(measureNumber);
+      selectNotesByTimeRange(col.startTick, col.startTick + col.durationTicks, scope, append);
+      if (onSeekTick) {
+        const targetAudio = pianoRollTickToAudioTick(col.startTick, audioRanges, pianoMeasureBounds);
+        onSeekTick(targetAudio);
+      }
+    },
+    [measureColumns, selectNotesByTimeRange, timeSelectScope, onSeekTick, audioRanges, pianoMeasureBounds]
+  );
+
+  const selectCurrentPlayheadBar = useCallback(() => {
+    const currentCol =
+      measureColumns.find(
+        (c) => activePianoRollTick >= c.startTick && activePianoRollTick < c.startTick + c.durationTicks
+      ) || measureColumns[0];
+    if (currentCol) {
+      selectMeasure(currentCol.measureNumber, timeSelectScope, false);
+    }
+  }, [measureColumns, activePianoRollTick, selectMeasure, timeSelectScope]);
+
+  // Measure columns that contain at least one currently selected note
+  const selectedMeasureNumbers = useMemo(() => {
+    const set = new Set<number>();
+    if (selectedNoteIds.size === 0) return set;
+    const selectedNotes = notes.filter((n) => selectedNoteIds.has(n.id));
+    measureColumns.forEach((col) => {
+      const colEnd = col.startTick + col.durationTicks;
+      const hasNote = selectedNotes.some(
+        (n) => n.startTick < colEnd && n.startTick + n.durationTicks > col.startTick
+      );
+      if (hasNote) set.add(col.measureNumber);
+    });
+    return set;
+  }, [notes, selectedNoteIds, measureColumns]);
 
   // Sound preview helper
   const playPreview = useCallback(
@@ -518,6 +640,21 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   // Window / Grid Mouse Move: Note Dragging, Resizing, or Marquee
   // -------------------------------------------------------------
   const handleMouseMove = (e: React.MouseEvent) => {
+    // Ruler Time-Range Drag Selection
+    if (isTimeRulerSelecting && timeRulerDragRange && gridContainerRef.current) {
+      const rect = gridContainerRef.current.getBoundingClientRect();
+      const x = Math.max(0, e.clientX - rect.left);
+      const curTick = Math.max(0, Math.round(x / pixelsPerTick));
+      setTimeRulerDragRange((prev) => (prev ? { ...prev, currentTick: curTick } : null));
+      selectNotesByTimeRange(
+        timeRulerDragRange.startTick,
+        curTick,
+        timeSelectScope,
+        e.shiftKey || e.ctrlKey || e.metaKey
+      );
+      return;
+    }
+
     // Ruler Scrubbing
     if (isRulerDragging) {
       handleRulerSeekAtClientX(e.clientX);
@@ -654,6 +791,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
     if (isRulerDragging) {
       setIsRulerDragging(false);
     }
+
+    if (isTimeRulerSelecting) {
+      setIsTimeRulerSelecting(false);
+      setTimeRulerDragRange(null);
+    }
   };
 
   // -------------------------------------------------------------
@@ -757,49 +899,6 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   const [followPlayhead, setFollowPlayhead] = useState<boolean>(true);
   const [isRulerDragging, setIsRulerDragging] = useState<boolean>(false);
 
-  // Generate Measure Barlines for the Timeline Header
-  const measureColumns = useMemo(() => {
-    const cols = flattenedScore.measures.map((measure) => ({
-      measureNumber: measure.measureNumber,
-      startTick: measure.startTick,
-      durationTicks: measure.durationTicks,
-      width: measure.durationTicks * pixelsPerTick,
-    }));
-    let nextStart = cols.length > 0
-      ? cols[cols.length - 1].startTick + cols[cols.length - 1].durationTicks
-      : 0;
-    let measureNumber = cols.length + 1;
-    while (nextStart < totalTicks) {
-      cols.push({
-        measureNumber,
-        startTick: nextStart,
-        durationTicks: meterTicks,
-        width: meterTicks * pixelsPerTick,
-      });
-      nextStart += meterTicks;
-      measureNumber++;
-    }
-    return cols;
-  }, [flattenedScore.measures, totalTicks, meterTicks, pixelsPerTick]);
-
-  // Audio timeline measure ranges from score
-  const audioRanges = useMemo(() => getScoreMeasureRanges(score), [score]);
-
-  // Visual piano roll measure bounds
-  const pianoMeasureBounds = useMemo(() => {
-    return measureColumns.map((col, idx) => ({
-      measureIndex: idx,
-      startTick: col.startTick,
-      durationTicks: meterTicks,
-    }));
-  }, [measureColumns, meterTicks]);
-
-  // Dynamic mapping: converts audio playback tick to visual piano roll grid tick
-  // Aligns pickup measures (anacrusis) and regular measures with 100% precision!
-  const activePianoRollTick = useMemo(() => {
-    return audioTickToPianoRollTick(currentTick, audioRanges, pianoMeasureBounds);
-  }, [currentTick, audioRanges, pianoMeasureBounds]);
-
   // Active sounding note IDs and pitches during audio playback
   const { activeSoundingNoteIds, activeSoundingPitches, activePitchVoices } = useMemo(() => {
     const soundingIds = new Set<string>();
@@ -873,6 +972,16 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   const handleRulerMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
     e.preventDefault();
+    if (e.shiftKey || e.altKey) {
+      if (!gridContainerRef.current) return;
+      const rect = gridContainerRef.current.getBoundingClientRect();
+      const x = Math.max(0, e.clientX - rect.left);
+      const startTick = Math.max(0, Math.round(x / pixelsPerTick));
+      setIsTimeRulerSelecting(true);
+      setTimeRulerDragRange({ startTick, currentTick: startTick });
+      selectNotesByTimeRange(startTick, startTick + snapTicks, timeSelectScope, e.ctrlKey || e.metaKey);
+      return;
+    }
     setIsRulerDragging(true);
     handleRulerSeekAtClientX(e.clientX);
   };
@@ -880,10 +989,14 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
   useEffect(() => {
     const handleGlobalMouseUp = () => {
       if (isRulerDragging) setIsRulerDragging(false);
+      if (isTimeRulerSelecting) {
+        setIsTimeRulerSelecting(false);
+        setTimeRulerDragRange(null);
+      }
     };
     window.addEventListener('mouseup', handleGlobalMouseUp);
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-  }, [isRulerDragging]);
+  }, [isRulerDragging, isTimeRulerSelecting]);
   const beatLines = useMemo(() => {
     const lines: number[] = [];
     measureColumns.forEach((measure) => {
@@ -1043,6 +1156,72 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
 
         {/* Right: Quick Controls & Collapsible Drawer Toggles */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Time-Based Bar Multiselector */}
+          <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-lg border border-white/10 text-[11px]">
+            <span className="text-stone-400 font-medium hidden md:flex items-center gap-1">
+              <Clock size={11} className="text-indigo-400" />
+              Bar:
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const prev = Math.max(1, selectedBar - 1);
+                selectMeasure(prev, timeSelectScope, false);
+              }}
+              disabled={selectedBar <= 1}
+              className="p-1 hover:bg-white/10 text-stone-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded cursor-pointer transition-colors"
+              title="Select Previous Bar"
+              aria-label="Previous bar"
+            >
+              <ChevronLeft size={12} />
+            </button>
+            <select
+              value={selectedBar}
+              onChange={(e) => {
+                const b = Number(e.target.value);
+                selectMeasure(b, timeSelectScope, false);
+              }}
+              className="bg-transparent text-indigo-300 font-mono font-bold focus:outline-none cursor-pointer text-xs"
+              title="Select notes by bar/measure"
+            >
+              {measureColumns.map((col) => (
+                <option key={col.measureNumber} value={col.measureNumber} className="bg-stone-900 text-white">
+                  Bar {col.measureNumber}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                const next = Math.min(measureColumns.length, selectedBar + 1);
+                selectMeasure(next, timeSelectScope, false);
+              }}
+              disabled={selectedBar >= measureColumns.length}
+              className="p-1 hover:bg-white/10 text-stone-300 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed rounded cursor-pointer transition-colors"
+              title="Select Next Bar"
+              aria-label="Next bar"
+            >
+              <ChevronRight size={12} />
+            </button>
+            <Tooltip
+              content="Selection Scope"
+              description={timeSelectScope === 'all' ? 'Selecting notes in All Voices (SATB). Click to toggle.' : `Selecting notes in ${activeVoiceTheme.name} only. Click to toggle.`}
+              side="bottom"
+            >
+              <button
+                type="button"
+                onClick={() => setTimeSelectScope((s) => (s === 'all' ? 'active' : 'all'))}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase transition-colors cursor-pointer border ml-0.5 ${
+                  timeSelectScope === 'all'
+                    ? 'bg-indigo-600/30 text-indigo-200 border-indigo-400/40'
+                    : 'bg-white/5 text-stone-400 border-white/10 hover:text-white'
+                }`}
+              >
+                {timeSelectScope === 'all' ? 'All' : activeVoiceId}
+              </button>
+            </Tooltip>
+          </div>
+
           {/* Snap / Grid Size */}
           <Tooltip
             content="Grid Snap"
@@ -1056,6 +1235,7 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 onChange={(e) => setSnapTicks(Number(e.target.value))}
                 className="bg-transparent text-indigo-300 font-mono font-bold focus:outline-none cursor-pointer text-xs"
               >
+                <option value={2} className="bg-stone-900 text-white">1/32</option>
                 <option value={4} className="bg-stone-900 text-white">1/16</option>
                 <option value={8} className="bg-stone-900 text-white">1/8</option>
                 <option value={16} className="bg-stone-900 text-white">1/4</option>
@@ -1292,7 +1472,44 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
             </div>
 
             {/* Group C: Selection Tools */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] uppercase font-black text-indigo-400 tracking-wider">
+                Select:
+              </span>
+
+              {/* Select Current Bar at Playhead */}
+              <button
+                type="button"
+                onClick={selectCurrentPlayheadBar}
+                className="flex items-center gap-1 px-2 py-1 bg-black/40 hover:bg-white/10 text-stone-300 hover:text-white text-[10px] font-bold rounded border border-white/10 cursor-pointer transition-colors"
+                title="Select all notes in the bar where the playback cursor is currently positioned"
+              >
+                <Clock size={11} className="text-rose-400" />
+                <span>Bar at Cursor</span>
+              </button>
+
+              {/* Quick Bar Number Chips */}
+              <div className="flex items-center gap-0.5 bg-black/40 p-0.5 rounded-md border border-white/10 text-[10px] overflow-x-auto max-w-[240px] sm:max-w-none">
+                {measureColumns.slice(0, 10).map((col) => {
+                  const isSel = selectedMeasureNumbers.has(col.measureNumber);
+                  return (
+                    <button
+                      key={`drawer-bar-chip-${col.measureNumber}`}
+                      type="button"
+                      onClick={() => selectMeasure(col.measureNumber, timeSelectScope, false)}
+                      className={`px-1.5 py-0.5 rounded cursor-pointer transition-colors font-mono font-bold ${
+                        isSel
+                          ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-white/30'
+                          : 'text-stone-400 hover:text-white hover:bg-white/10'
+                      }`}
+                      title={`Select Bar ${col.measureNumber}`}
+                    >
+                      M{col.measureNumber}
+                    </button>
+                  );
+                })}
+              </div>
+
               <button
                 onClick={() => setSelectedNoteIds(new Set(notes.map((n) => n.id)))}
                 className="px-2 py-1 bg-black/40 hover:bg-white/10 text-stone-300 hover:text-white text-[10px] font-bold rounded border border-white/10 cursor-pointer"
@@ -1418,26 +1635,42 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                 minWidth: `${totalGridWidth}px`,
                 height: '28px',
               }}
-              title="Click or drag anywhere on ruler to scrub/seek playback position"
+              title="Click or drag to scrub playback • Shift+drag to select time window • Click measure badge to select bar"
             >
               {measureColumns.map((col) => {
                 const isCurrentMeasure =
                   activePianoRollTick >= col.startTick &&
                   activePianoRollTick < col.startTick + meterTicks;
+                const isMeasureSelected = selectedMeasureNumbers.has(col.measureNumber);
                 return (
                   <div
                     key={col.measureNumber}
-                    className={`flex items-center px-2 text-[10px] font-mono font-bold border-r border-white/20 select-none transition-colors shrink-0 ${
+                    className={`flex items-center justify-between px-1.5 text-[10px] font-mono font-bold border-r border-white/20 select-none transition-colors shrink-0 group ${
                       isCurrentMeasure
-                        ? 'bg-indigo-600/20 text-indigo-200 border-indigo-400/40'
+                        ? 'bg-indigo-600/25 text-indigo-200 border-indigo-400/40'
+                        : isMeasureSelected
+                        ? 'bg-indigo-500/20 text-indigo-300'
                         : 'text-stone-400 hover:bg-white/5'
                     }`}
                     style={{ width: `${col.width}px` }}
                   >
-                    <span className={isCurrentMeasure ? 'text-indigo-300 font-extrabold' : 'text-indigo-400'}>
-                      M{col.measureNumber}
-                    </span>
-                    <span className="text-stone-500 text-[9px] ml-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        selectMeasure(col.measureNumber, timeSelectScope, e.shiftKey || e.ctrlKey || e.metaKey);
+                      }}
+                      className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                        isMeasureSelected
+                          ? 'bg-indigo-600 text-white shadow-sm ring-1 ring-white/30'
+                          : 'hover:bg-white/15 text-stone-300 hover:text-white'
+                      }`}
+                      title={`Click to select all notes in Bar ${col.measureNumber} (${timeSelectScope === 'all' ? 'All voices' : activeVoiceTheme.name}) • Shift+click to select multiple bars`}
+                    >
+                      <Columns3 size={10} className={isMeasureSelected ? 'text-white' : 'text-indigo-400'} />
+                      <span>M{col.measureNumber}</span>
+                    </button>
+                    <span className="text-stone-500 text-[9px] hidden sm:inline mr-1">
                       {col.startTick}t
                     </span>
                   </div>
@@ -1535,6 +1768,34 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
                   }}
                 />
               ))}
+
+              {/* Selected measure time-column visual highlight */}
+              {measureColumns.map((col) => {
+                if (!selectedMeasureNumbers.has(col.measureNumber)) return null;
+                return (
+                  <div
+                    key={`time-col-highlight-${col.measureNumber}`}
+                    className="absolute top-0 bottom-0 pointer-events-none z-[2] bg-indigo-500/10 border-x border-indigo-400/30"
+                    style={{
+                      left: `${col.startTick * pixelsPerTick}px`,
+                      width: `${col.width}px`,
+                      height: `${totalGridHeight}px`,
+                    }}
+                  />
+                );
+              })}
+
+              {/* Time Ruler drag selection highlight band */}
+              {isTimeRulerSelecting && timeRulerDragRange && (
+                <div
+                  className="absolute top-0 bottom-0 pointer-events-none z-[25] bg-indigo-500/20 border-x-2 border-indigo-400"
+                  style={{
+                    left: `${Math.min(timeRulerDragRange.startTick, timeRulerDragRange.currentTick) * pixelsPerTick}px`,
+                    width: `${Math.max(1, Math.abs(timeRulerDragRange.currentTick - timeRulerDragRange.startTick)) * pixelsPerTick}px`,
+                    height: `${totalGridHeight}px`,
+                  }}
+                />
+              )}
 
               {/* Playhead Marker */}
               {activePianoRollTick !== undefined && (
@@ -1756,6 +2017,11 @@ export const PianoRoll: React.FC<PianoRollProps> = ({
             <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
             <span className="font-bold text-white whitespace-nowrap">
               {selectedNoteIds.size} note{selectedNoteIds.size > 1 ? 's' : ''}
+              {selectedMeasureNumbers.size === 1
+                ? ` (Bar ${Array.from(selectedMeasureNumbers)[0]})`
+                : selectedMeasureNumbers.size > 1
+                ? ` (${selectedMeasureNumbers.size} bars)`
+                : ''}
             </span>
           </div>
 

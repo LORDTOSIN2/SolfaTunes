@@ -312,5 +312,42 @@ describe('Piano Roll Adapter & Monophony Engine', () => {
     expect(getMeterBeatTicks('6/8')).toBe(24);
     expect(48 / getMeterBeatTicks('6/8')).toBe(2);
   });
+
+  it('does not create unnecessary rests in pickup / anacrusis measures upon formatting', () => {
+    // 2/4 meter with 1-beat pickup (16 ticks) in measure 0
+    const abc = 'X:1\nT:Pickup Test\nM:2/4\nL:1/4\nK:C\nV:S\n[V:S] G | c G |';
+    const initialScore = new SolfaTransformer().transform(new AbcParser().parse(abc).score);
+    const { notes } = flattenScoreToPianoRoll(initialScore);
+
+    // Format with 1/16 snap (4 ticks)
+    const formatted4 = formatAndReconstructScore(initialScore, notes, 4);
+    const m0Notes4 = formatted4.systems[0].voices['S'].measures[0].notes;
+    expect(m0Notes4.length).toBe(1);
+    expect(m0Notes4[0].isRest).toBe(false);
+    expect(m0Notes4[0].durationTicks).toBe(16);
+
+    // Format with 1/32 snap (2 ticks)
+    const formatted2 = formatAndReconstructScore(initialScore, notes, 2);
+    const m0Notes2 = formatted2.systems[0].voices['S'].measures[0].notes;
+    expect(m0Notes2.length).toBe(1);
+    expect(m0Notes2[0].isRest).toBe(false);
+    expect(m0Notes2[0].durationTicks).toBe(16);
+  });
+
+  it('absorbs sub-snap micro-gaps without generating spurious 1-tick or 2-tick rests', () => {
+    const abc = 'X:1\nT:Gap Test\nM:4/4\nL:1/4\nK:C\nV:S\n[V:S] C D E F |';
+    const initialScore = new SolfaTransformer().transform(new AbcParser().parse(abc).score);
+    const { notes } = flattenScoreToPianoRoll(initialScore);
+
+    // Simulate note 0 ending at tick 14 (leaving a 2-tick gap before note 1 at tick 16)
+    notes[0].durationTicks = 14;
+
+    const formatted = formatAndReconstructScore(initialScore, notes, 4); // snapTicks = 4
+    const sNotes = formatted.systems[0].voices['S'].measures[0].notes;
+    // The micro-gap is absorbed so no rest is generated between notes
+    const rests = sNotes.filter((n) => n.isRest);
+    expect(rests.length).toBe(0);
+    expect(sNotes.length).toBe(4);
+  });
 });
 

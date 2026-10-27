@@ -466,6 +466,44 @@ export function formatAndReconstructScore(
   const keyInfo = getKeyInfo(baseScore.key);
   const meterTicks = getMeterTicksPerMeasure(baseScore.meter);
 
+  // Collect metadata for original measures to preserve pickup measures, caesuras, and intentionally empty bars
+  const origMeasureMeta: Array<{
+    duration: number;
+    isEmptyInAllVoices: boolean;
+    barType?: string;
+  }> = [];
+
+  baseScore.systems.forEach((sys) => {
+    const sysMeasureCount = Math.max(
+      0,
+      ...baseScore.voices.map((v) => sys.voices[v.id]?.measures.length || 0)
+    );
+    for (let mIdx = 0; mIdx < sysMeasureCount; mIdx++) {
+      let maxDur = 0;
+      let totalNotesAcrossVoices = 0;
+      let barType: string | undefined;
+
+      baseScore.voices.forEach((v) => {
+        const vl = sys.voices[v.id];
+        const meas = vl?.measures[mIdx];
+        if (meas) {
+          totalNotesAcrossVoices += meas.notes.length;
+          const vDur = meas.notes.reduce((sum, n) => sum + (n.durationTicks || 0), 0);
+          if (vDur > maxDur) maxDur = vDur;
+        }
+        if (vl?.barTypes && vl.barTypes[mIdx]) {
+          barType = vl.barTypes[mIdx];
+        }
+      });
+
+      origMeasureMeta.push({
+        duration: maxDur,
+        isEmptyInAllVoices: totalNotesAcrossVoices === 0,
+        barType,
+      });
+    }
+  });
+
   // 1. Filter sounding notes and quantize startTick and durationTicks
   const soundingNotes = flatNotes.filter((n) => !n.isRest && n.durationTicks > 0);
   const quantizedNotes = soundingNotes.map((n) => {
@@ -489,16 +527,7 @@ export function formatAndReconstructScore(
   });
 
   // Keep original total measure count if larger so empty/end measures aren't truncated
-  let origTotalMeasures = 0;
-  baseScore.systems.forEach((s) => {
-    let sysM = 0;
-    baseScore.voices.forEach((v) => {
-      const vl = s.voices[v.id];
-      if (vl && vl.measures.length > sysM) sysM = vl.measures.length;
-    });
-    origTotalMeasures += sysM;
-  });
-
+  const origTotalMeasures = origMeasureMeta.length;
   const totalMeasures = Math.max(origTotalMeasures || 1, Math.max(1, Math.ceil(maxTick / meterTicks)));
 
   // 4. Group measures into systems (preserve original measures per system if available, default to 4)
@@ -529,11 +558,9 @@ export function formatAndReconstructScore(
       const barTypes: string[] = [];
 
       for (let m = mStartIdx; m < mEndIdx; m++) {
+        const meta = origMeasureMeta[m];
         const measureStartTick = m * meterTicks;
         const measureEndTick = measureStartTick + meterTicks;
-
-        const measureNotes: SolfaNote[] = [];
-        let curTick = measureStartTick;
 
         // Find notes that overlap with [measureStartTick, measureEndTick)
         const inMeasure = voiceNotes.filter((n) => {
@@ -541,28 +568,60 @@ export function formatAndReconstructScore(
           return n.startTick < measureEndTick && nEnd > measureStartTick;
         });
 
-        inMeasure.forEach((n) => {
-          const nEnd = n.startTick + n.durationTicks;
-          const sliceStart = Math.max(measureStartTick, n.startTick);
-          const sliceEnd = Math.min(measureEndTick, nEnd);
-          const sliceDur = sliceEnd - sliceStart;
-          if (sliceDur <= 0) return;
+        // Determine target measure duration:
+        // If the original measure was an anacrusis pickup or caesura (duration < meterTicks),
+        // preserve that shorter measure length unless notes intentionally overflow it.
+        const notesMaxEnd = inMeasure.reduce(
+          (max, n) => Math.max(max, Math.min(measureEndTick, n.startTick + n.durationTicks)),
+          measureStartTick
+        );
 
-          // Fill rest gap before this note if needed
-          if (sliceStart > curTick) {
-            const restDur = sliceStart - curTick;
-            measureNotes.push({
-              syllable: '·',
-              scaleDegree: 0,
-              midiPitch: 0,
-              octaveRelativeToVoice: 0,
-              durationTicks: restDur,
-              isRest: true,
-              timestamp: curTick,
-              rawLetter: 'z',
-            });
-            curTick = sliceStart;
+        let targetMeasureDuration = meterTicks;
+        if (meta && meta.duration > 0 && meta.duration < meterTicks) {
+          targetMeasureDuration = Math.max(meta.duration, notesMaxEnd - measureStartTick);
+        } else if (meta && meta.duration === 0 && inMeasure.length === 0) {
+          targetMeasureDuration = 0;
+        }
+
+        const targetMeasureEnd = measureStartTick + targetMeasureDuration;
+        const measureNotes: SolfaNote[] = [];
+        let curTick = measureStartTick;
+
+        inMeasure.forEach((n, idx) => {
+          let sliceStart = Math.max(measureStartTick, n.startTick);
+          const sliceEnd = Math.min(targetMeasureEnd, n.startTick + n.durationTicks);
+          if (sliceEnd <= sliceStart) return;
+
+          // If first note starts within sub-snap micro-gap of measure start, snap to measureStartTick
+          if (idx === 0 && sliceStart > measureStartTick && sliceStart - measureStartTick < snapTicks) {
+            sliceStart = measureStartTick;
           }
+
+          // Handle gaps between notes
+          if (sliceStart > curTick) {
+            const gap = sliceStart - curTick;
+            if (gap < snapTicks && measureNotes.length > 0) {
+              // Micro-gap smaller than grid snap: absorb into previous note to prevent spurious micro-rests
+              measureNotes[measureNotes.length - 1].durationTicks += gap;
+              curTick = sliceStart;
+            } else if (gap >= snapTicks) {
+              // Genuine musical rest
+              measureNotes.push({
+                syllable: '·',
+                scaleDegree: 0,
+                midiPitch: 0,
+                octaveRelativeToVoice: 0,
+                durationTicks: gap,
+                isRest: true,
+                timestamp: curTick,
+                rawLetter: 'z',
+              });
+              curTick = sliceStart;
+            }
+          }
+
+          const sliceDur = sliceEnd - curTick;
+          if (sliceDur <= 0) return;
 
           // Generate note properties from pitch
           const props = midiToNoteProperties(n.midiPitch, baseScore.key);
@@ -577,7 +636,7 @@ export function formatAndReconstructScore(
             octaveRelativeToVoice: 0,
             durationTicks: sliceDur,
             isRest: false,
-            timestamp: sliceStart,
+            timestamp: curTick,
             rawLetter: props.rawLetter,
             rawAccidental: props.rawAccidental,
             octaveNum: props.octaveNum,
@@ -586,33 +645,41 @@ export function formatAndReconstructScore(
           curTick = sliceEnd;
         });
 
-        // Fill trailing rest to complete the measure if needed
-        if (curTick < measureEndTick) {
-          const restDur = measureEndTick - curTick;
-          measureNotes.push({
-            syllable: '·',
-            scaleDegree: 0,
-            midiPitch: 0,
-            octaveRelativeToVoice: 0,
-            durationTicks: restDur,
-            isRest: true,
-            timestamp: curTick,
-            rawLetter: 'z',
-          });
+        // Fill trailing space to complete the measure if needed
+        if (curTick < targetMeasureEnd) {
+          const trailingGap = targetMeasureEnd - curTick;
+          if (trailingGap < snapTicks && measureNotes.length > 0) {
+            // Micro-gap at barline: extend the last note to the barline
+            measureNotes[measureNotes.length - 1].durationTicks += trailingGap;
+            curTick = targetMeasureEnd;
+          } else if (trailingGap >= snapTicks) {
+            measureNotes.push({
+              syllable: '·',
+              scaleDegree: 0,
+              midiPitch: 0,
+              octaveRelativeToVoice: 0,
+              durationTicks: trailingGap,
+              isRest: true,
+              timestamp: curTick,
+              rawLetter: 'z',
+            });
+          }
         }
 
-        // Fallback for totally empty measure
+        // Handle empty measures: preserve intentional tie continuation bars if empty across all voices
         if (measureNotes.length === 0) {
-          measureNotes.push({
-            syllable: '·',
-            scaleDegree: 0,
-            midiPitch: 0,
-            octaveRelativeToVoice: 0,
-            durationTicks: meterTicks,
-            isRest: true,
-            timestamp: measureStartTick,
-            rawLetter: 'z',
-          });
+          if (!meta?.isEmptyInAllVoices) {
+            measureNotes.push({
+              syllable: '·',
+              scaleDegree: 0,
+              midiPitch: 0,
+              octaveRelativeToVoice: 0,
+              durationTicks: targetMeasureDuration || meterTicks,
+              isRest: true,
+              timestamp: measureStartTick,
+              rawLetter: 'z',
+            });
+          }
         }
 
         measures.push({
@@ -620,7 +687,7 @@ export function formatAndReconstructScore(
           rawText: '',
         });
 
-        barTypes.push(m === totalMeasures - 1 ? '|]' : '|');
+        barTypes.push(meta?.barType || (m === totalMeasures - 1 ? '|]' : '|'));
       }
 
       systemVoices[voice.id] = {
