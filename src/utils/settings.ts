@@ -15,6 +15,7 @@ export interface AppSettings {
 
   // Editor & Display Preferences
   autoFormatOnBlur: boolean;         // Default: true
+  autoFormatPastedLyrics: boolean;   // Default: true (appends "W: " to pasted verses)
   soundPreviewOnClick: boolean;      // Default: true
   colorCodedVoices: boolean;         // Default: true
   showCompilationWarnings: boolean;  // Default: true
@@ -29,6 +30,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   zenMode: false,
   pianoRollGridOpacity: 0.08,
   autoFormatOnBlur: true,
+  autoFormatPastedLyrics: true,
   soundPreviewOnClick: true,
   colorCodedVoices: true,
   showCompilationWarnings: true,
@@ -45,6 +47,7 @@ export function loadAppSettings(): AppSettings {
     return {
       ...DEFAULT_APP_SETTINGS,
       ...parsed,
+      autoFormatPastedLyrics: parsed.autoFormatPastedLyrics ?? true,
       // Ensure live preview stays off by default if unconfigured or requested
       showLivePreview: parsed.showLivePreview ?? false,
       pianoRollGridOpacity:

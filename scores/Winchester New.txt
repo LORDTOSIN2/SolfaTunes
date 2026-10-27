@@ -1,0 +1,32 @@
+X:1
+T:Winchester New
+C:Musikalisch Handbuch (Hamburg, 1690)
+M:2/4
+L:1/4
+K:C
+% tune_name=Winchester New
+% hymn_name=On Jordan's bank the Baptist's cry
+% hymn_meter=8.8.8.8
+% has_descant=false
+%%staves [(1 2) (3 4)]
+V:1 name="Soprano" clef=treble
+V:2 name="Alto" clef=treble
+V:3 name="Tenor" clef=treble
+V:4 name="Bass" clef=bass
+
+% --- System 1 ---
+[V:1] G | c G | A A | G F | E || E | F E | D G | G ^F | G2 ||
+[V:2] E | G E | F C | C 3/2 B,/2 C || C | C C | B, B, | E D | D2 ||
+[V:3] c | c c | c F | G G | G || G | F G | G G | c A | B2 ||
+[V:4] C | E C | F F | E G | C || C | A, C | G, E | C D | G,2 ||
+
+% --- System 2 ---
+[V:1] G | c d | e c | f e | d || e | c A | G c | c B | c2 ||
+[V:2] G | G F | E G | F G | G || G | S F | S E | A G | E2 ||
+[V:3] G | G B/2 c/2 | c c | B/2 c/2 c | B || c | c c | c c | d d | c2 ||
+[V:4] G,/4 A,/4 | E D | C E | D E/2 F/2 | G || C | E F | E A | F G | C2 ||
+
+W: 1. ON Jordan's bank the Baptist's cry
+W:    Announces that the Lord is nigh;
+W:    Awake, and hearken, for he brings
+W:    Glad tidings of the King of Kings.

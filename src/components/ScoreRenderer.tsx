@@ -37,6 +37,11 @@ import { MidiPlayer } from '../audio/midi_player';
 import { AppSettings } from '../utils/settings';
 import { Tooltip } from './Tooltip';
 import { TICKS_PER_WHOLE_NOTE } from '../engine/timing';
+import {
+  isLikelyLyricsOrVerse,
+  formatAsWLyrics,
+  toggleWLyricsOnLines,
+} from '../utils/lyrics_formatter';
 
 export type StudioWorkspaceMode = 'read' | 'lyrics' | 'interactive' | 'source' | 'pianoroll' | 'split';
 
@@ -49,6 +54,8 @@ interface ScoreRendererProps {
   currentEighth?: number;
   fontSize: number;
   setFontSize: (size: number) => void;
+  isManualFontSize?: boolean;
+  setIsManualFontSize?: (manual: boolean) => void;
   scale: number;
   setScale: (scale: number) => void;
   mutedVoices: { [voiceId: string]: boolean };
@@ -94,10 +101,11 @@ const highlightAbc = (text: string): React.ReactNode => {
     const headerMatch = line.match(/^([A-Za-z]):(.*)$/);
     if (headerMatch) {
       const [_, field, content] = headerMatch;
+      const isLyric = field.toUpperCase() === 'W';
       return (
         <span key={lineIdx}>
-          <span className="text-[#818CF8] font-bold">{field}:</span>
-          <span className="text-stone-300">{content}</span>
+          <span className={isLyric ? "text-emerald-400 font-bold" : "text-[#818CF8] font-bold"}>{field}:</span>
+          <span className={isLyric ? "text-emerald-300 font-serif" : "text-stone-300"}>{content}</span>
           {lineIdx < lines.length - 1 && '\n'}
         </span>
       );
@@ -518,6 +526,7 @@ interface InteractiveRhythmLineProps {
   isMuted: boolean;
   isEditorMode: boolean;
   currentTick?: number;
+  fontSize?: number;
 }
 
 const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
@@ -533,12 +542,16 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
   isMuted,
   isEditorMode,
   currentTick,
+  fontSize,
 }) => {
   const meterStr = meter || (meterDenominator ? `4/${meterDenominator}` : '4/4');
   const cellsData = useMemo(() => analyzeMeasureCells(measure, meterStr), [measure, meterStr]);
   if (cellsData.length === 0) return <>{"\u00A0"}</>;
 
   const renderedElements: React.ReactNode[] = [];
+  const notePadClass = fontSize && fontSize <= 6 ? 'px-0' : fontSize && fontSize <= 10 ? 'px-0.5' : 'px-1';
+  const sepMarginClass = fontSize && fontSize <= 6 ? 'mx-0.5' : fontSize && fontSize <= 10 ? 'mx-1' : 'mx-2';
+  const minRestWidth = fontSize && fontSize <= 6 ? '0.6em' : '0.9em';
 
   cellsData.forEach((cell, cellIdx) => {
     const partElements: React.ReactNode[] = [];
@@ -579,7 +592,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
                 });
               } : undefined}
               disabled={!isEditorMode}
-              className={`inline-block px-1 rounded font-serif font-black text-center ${
+              className={`inline-block ${notePadClass} rounded font-serif font-black text-center ${
                 isMuted ? 'pointer-events-none' : ''
               } ${
                 isEditorMode && !isMuted ? 'cursor-pointer hover:bg-indigo-100' : ''
@@ -592,7 +605,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
                   ? 'text-indigo-900 font-black'
                   : 'text-black'
               }`}
-              style={{ minWidth: item.type === 'note' ? undefined : '0.9em' }}
+              style={{ minWidth: item.type === 'note' ? undefined : minRestWidth }}
               title={
                 isEditorMode
                   ? `${item.type === 'note' ? `Note: ${item.text}` : item.type === 'rest' ? 'Rest' : 'Sustained note'}. Click to edit.`
@@ -610,7 +623,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
           itemElements.push(
             <span
               key={`item-${cellIdx}-${partIdx}-${itemIdx}`}
-              className="text-black/20 font-light select-none px-1"
+              className={`text-black/20 font-light select-none ${notePadClass}`}
             >
               {item.text}
             </span>
@@ -658,7 +671,7 @@ const InteractiveRhythmLineComponent: React.FC<InteractiveRhythmLineProps> = ({
     // Pulse separator: colon ':'
     if (cellIdx < cellsData.length - 1) {
       renderedElements.push(
-        <span key={`sep-${cellIdx}`} className="mx-2 text-black/30 font-light select-none">
+        <span key={`sep-${cellIdx}`} className={`${sepMarginClass} text-black/30 font-light select-none`}>
           :
         </span>
       );
@@ -679,21 +692,21 @@ const BarlineGraphic: React.FC<{ type: string; height: number }> = ({ type, heig
   switch (type) {
     case '||': // Section boundary
       return (
-        <div className="flex items-center justify-center gap-1 px-1.5 h-full">
+        <div className="flex items-center justify-center gap-1 px-1.5 h-full shrink-0">
           <div className="w-[2px] bg-black" style={lineStyle} />
           <div className="w-[2px] bg-black" style={lineStyle} />
         </div>
       );
     case '|]': // Final bar
       return (
-        <div className="flex items-center justify-center gap-1.5 px-2 h-full">
+        <div className="flex items-center justify-center gap-1.5 px-2 h-full shrink-0">
           <div className="w-[1.5px] bg-black" style={lineStyle} />
           <div className="w-[5px] bg-black rounded-sm" style={lineStyle} />
         </div>
       );
     case ':|': // Repeat end
       return (
-        <div className="flex items-center justify-center gap-1 px-1.5 h-full relative">
+        <div className="flex items-center justify-center gap-1 px-1.5 h-full relative shrink-0">
           <div className="flex flex-col gap-1.5 justify-center mr-1">
             <div className="w-1.5 h-1.5 rounded-full bg-black" />
             <div className="w-1.5 h-1.5 rounded-full bg-black" />
@@ -704,7 +717,7 @@ const BarlineGraphic: React.FC<{ type: string; height: number }> = ({ type, heig
       );
     case '|:': // Repeat start
       return (
-        <div className="flex items-center justify-center gap-1 px-1.5 h-full relative">
+        <div className="flex items-center justify-center gap-1 px-1.5 h-full relative shrink-0">
           <div className="w-[4px] bg-black" style={lineStyle} />
           <div className="w-[1.5px] bg-black" style={lineStyle} />
           <div className="flex flex-col gap-1.5 justify-center ml-1">
@@ -715,7 +728,7 @@ const BarlineGraphic: React.FC<{ type: string; height: number }> = ({ type, heig
       );
     case '::': // Dual repeat
       return (
-        <div className="flex items-center justify-center gap-1 px-2 h-full">
+        <div className="flex items-center justify-center gap-1 px-2 h-full shrink-0">
           <div className="flex flex-col gap-1.5 justify-center">
             <div className="w-1.5 h-1.5 rounded-full bg-black" />
             <div className="w-1.5 h-1.5 rounded-full bg-black" />
@@ -731,7 +744,7 @@ const BarlineGraphic: React.FC<{ type: string; height: number }> = ({ type, heig
     case '|': // Standard barline
     default:
       return (
-        <div className="flex items-center justify-center px-1.5 h-full">
+        <div className="flex items-center justify-center px-1.5 h-full shrink-0">
           <div className="w-[1.5px] bg-black/20" style={lineStyle} />
         </div>
       );
@@ -794,11 +807,12 @@ const ScrollableSystemRow: React.FC<ScrollableSystemRowProps> = ({ systemHeight,
       {/* Main horizontal scrolling container */}
       <div
         ref={containerRef}
+        data-system-scroll="true"
         className="w-full overflow-x-auto touch-pan-x scroll-smooth overscroll-x-contain pb-1 [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.15)_transparent]"
         style={{ WebkitOverflowScrolling: 'touch', minHeight: `${systemHeight}px` }}
       >
         <div
-          className="flex flex-row flex-nowrap items-start w-max min-w-full relative"
+          className="flex flex-row flex-nowrap items-stretch w-max min-w-full relative"
           style={{ height: `${systemHeight}px` }}
         >
           {children}
@@ -828,6 +842,8 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   currentEighth,
   fontSize,
   setFontSize,
+  isManualFontSize,
+  setIsManualFontSize,
   scale,
   setScale,
   mutedVoices,
@@ -852,6 +868,163 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
   onStop,
 }) => {
   const [showHelp, setShowHelp] = useState<boolean>(false);
+  const paperSheetContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Manual font size adjustment state: when true, auto-fit is disabled
+  const [localIsManualFontSize, setLocalIsManualFontSize] = useState<boolean>(false);
+  const isManual = isManualFontSize !== undefined ? isManualFontSize : localIsManualFontSize;
+  const isManualRef = useRef<boolean>(isManual);
+  useEffect(() => {
+    isManualRef.current = isManual;
+  }, [isManual]);
+
+  const setIsManual = (val: boolean) => {
+    isManualRef.current = val;
+    if (setIsManualFontSize) {
+      setIsManualFontSize(val);
+    } else {
+      setLocalIsManualFontSize(val);
+    }
+  };
+
+  const fontSizeRef = useRef<number>(fontSize);
+  useEffect(() => {
+    fontSizeRef.current = fontSize;
+  }, [fontSize]);
+
+  const autofitFontSize = (force = false, targetMaxFont?: number) => {
+    if (!score || !score.systems || score.systems.length === 0) return;
+    if (studioMode !== 'read' && studioMode !== 'interactive') return;
+    // Retain user's manual font size: do not auto-fit unless explicitly forced (e.g. score load or Fit button)
+    if (!force && isManualRef.current) return;
+
+    const sheetEl = paperSheetContainerRef.current;
+    const currentSize = fontSizeRef.current;
+
+    // 1. Precise DOM-based measurement if the sheet is rendered
+    if (sheetEl) {
+      const scrollContainers = sheetEl.querySelectorAll<HTMLDivElement>('[data-system-scroll="true"]');
+      if (scrollContainers.length > 0) {
+        let maxScrollWidth = 0;
+        let minClientWidth = sheetEl.clientWidth;
+
+        scrollContainers.forEach((el) => {
+          if (el.clientWidth > 0) {
+            minClientWidth = Math.min(minClientWidth, el.clientWidth);
+          }
+          maxScrollWidth = Math.max(maxScrollWidth, el.scrollWidth);
+        });
+
+        if (maxScrollWidth > 0 && minClientWidth > 0) {
+          // Provide an 8px safety breathing room so scrollbars never appear
+          const availWidth = minClientWidth - 8;
+          const ratio = availWidth / maxScrollWidth;
+
+          let idealSize: number;
+          if (ratio < 1) {
+            // Content overflows: scale font down so horizontal scrolling is unnecessary
+            idealSize = Math.floor(currentSize * ratio);
+          } else {
+            // Content already fits: scale up moderately if room, up to targetMaxFont (default 24px)
+            const maxCap = targetMaxFont || 24;
+            idealSize = Math.min(maxCap, Math.floor(currentSize * ratio));
+          }
+
+          // Strictly clamp within requested 2–96px range
+          idealSize = Math.max(2, Math.min(96, idealSize));
+
+          if (idealSize !== currentSize) {
+            setFontSize(idealSize);
+          }
+          return idealSize;
+        }
+      }
+    }
+
+    // 2. Fallback analytical estimation before DOM is measured
+    let maxMeasures = 1;
+    score.systems.forEach((sys) => {
+      score.voices.forEach((v) => {
+        const line = sys.voices[v.id];
+        if (line) {
+          maxMeasures = Math.max(maxMeasures, line.measures.length);
+        }
+      });
+    });
+
+    const windowW = typeof window !== 'undefined' ? window.innerWidth : 1024;
+    const isSidebarOpen = settings?.showSidebar && !settings?.zenMode && !isFullscreen;
+    const estContainerWidth = isSidebarOpen ? Math.max(320, windowW - 360) : Math.max(320, windowW - 64);
+    const estSheetWidth = Math.min(1024, estContainerWidth) - 48;
+
+    const beats = score.meter === '3/4' ? 3 : score.meter === '2/4' ? 2 : score.meter === '6/8' ? 6 : 4;
+    const estUnitsPerMeasure = beats * 1.8;
+    const totalUnits = maxMeasures * estUnitsPerMeasure;
+    const fixedWidth = maxMeasures * 16 + 56;
+    const netWidth = Math.max(80, estSheetWidth - fixedWidth);
+
+    let estSize = Math.floor(netWidth / Math.max(1, totalUnits));
+    estSize = Math.max(2, Math.min(96, estSize));
+
+    setFontSize(estSize);
+    return estSize;
+  };
+
+  // Autofit on loading a new score (resets manual mode so the new score fits comfortably)
+  const prevScoreIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!score) return;
+    const currentScoreId = `${score.id || ''}_${score.title}_${score.systems.length}`;
+    if (currentScoreId !== prevScoreIdRef.current) {
+      prevScoreIdRef.current = currentScoreId;
+      setIsManual(false);
+      if (studioMode === 'read' || studioMode === 'interactive') {
+        autofitFontSize(true);
+        const raf = requestAnimationFrame(() => autofitFontSize(true));
+        const t = setTimeout(() => autofitFontSize(true), 180);
+        return () => {
+          cancelAnimationFrame(raf);
+          clearTimeout(t);
+        };
+      }
+    }
+  }, [score, studioMode]);
+
+  // Autofit when switching mode to score view ('read') or visual edit view ('interactive') if not manual
+  const prevModeRef = useRef<string>(studioMode);
+  useEffect(() => {
+    if (studioMode !== prevModeRef.current) {
+      prevModeRef.current = studioMode;
+      if (!isManualRef.current && (studioMode === 'read' || studioMode === 'interactive')) {
+        autofitFontSize();
+        const raf = requestAnimationFrame(() => autofitFontSize());
+        const t = setTimeout(() => autofitFontSize(), 180);
+        return () => {
+          cancelAnimationFrame(raf);
+          clearTimeout(t);
+        };
+      }
+    }
+  }, [studioMode]);
+
+  // Autofit when layout dimensions change (Fullscreen, Zen Mode, Sidebar toggle), only if not manually adjusted
+  useEffect(() => {
+    if (!isManualRef.current && (studioMode === 'read' || studioMode === 'interactive')) {
+      const t = setTimeout(() => autofitFontSize(), 150);
+      return () => clearTimeout(t);
+    }
+  }, [isFullscreen, settings?.zenMode, settings?.showSidebar]);
+
+  // Autofit when window resizes, only if not manually adjusted
+  useEffect(() => {
+    const handleResize = () => {
+      if (!isManualRef.current && (studioMode === 'read' || studioMode === 'interactive')) {
+        autofitFontSize();
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [studioMode, score]);
 
   // Split View Resizer state (clamped between 20% and 80%, default 50%)
   const [splitRatio, setSplitRatio] = useState<number>(50);
@@ -943,6 +1116,27 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     }
     
     return rows;
+  }, [score]);
+
+  // Precompute the proportional beat weight for every measure across systems
+  // (ensures measures stretch proportionally to their pulse count and fully justify across the system width)
+  const systemMeasuresBeats = useMemo(() => {
+    if (!score) return [];
+    return score.systems.map((system) => {
+      const count = Math.max(
+        0,
+        ...score.voices.map((voice) => system.voices[voice.id]?.measures.length || 0)
+      );
+      return Array.from({ length: count }, (_, mIndex) => {
+        return Math.max(
+          1,
+          ...score.voices.map((voice) => {
+            const m = system.voices[voice.id]?.measures[mIndex];
+            return m ? analyzeMeasureCells(m, score.meter).length : 0;
+          })
+        );
+      });
+    });
   }, [score]);
 
   // Source Editor Tab: 'solfa' or 'abc'
@@ -1072,6 +1266,124 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     if (autoFormatOnBlur) {
       handleAlignSolfa();
     }
+  };
+
+  // Lyrics Paste Notification & Auto-Formatting State
+  const [lyricsPasteToast, setLyricsPasteToast] = useState<{
+    visible: boolean;
+    lineCount: number;
+    timer?: ReturnType<typeof setTimeout>;
+  }>({ visible: false, lineCount: 0 });
+
+  const showLyricsToast = (lineCount: number) => {
+    setLyricsPasteToast((prev) => {
+      if (prev.timer) clearTimeout(prev.timer);
+      const timer = setTimeout(() => {
+        setLyricsPasteToast({ visible: false, lineCount: 0 });
+      }, 4500);
+      return { visible: true, lineCount, timer };
+    });
+  };
+
+  const handleEditorPaste = (
+    e: React.ClipboardEvent<HTMLTextAreaElement>,
+    editorType: 'solfa' | 'abc'
+  ) => {
+    const isAutoLyricsEnabled = settings ? settings.autoFormatPastedLyrics : true;
+    if (!isAutoLyricsEnabled) return;
+
+    const pastedText = e.clipboardData.getData('text');
+    if (!pastedText) return;
+
+    if (isLikelyLyricsOrVerse(pastedText)) {
+      e.preventDefault();
+      const { formatted, lineCount } = formatAsWLyrics(pastedText);
+
+      const textarea = e.currentTarget;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+
+      let insertedViaExecCommand = false;
+      try {
+        insertedViaExecCommand = document.execCommand('insertText', false, formatted);
+      } catch {
+        insertedViaExecCommand = false;
+      }
+
+      if (!insertedViaExecCommand) {
+        const currentVal = textarea.value;
+        const nextVal = currentVal.substring(0, start) + formatted + currentVal.substring(end);
+        if (editorType === 'solfa') {
+          handleSolfaChange(nextVal);
+        } else {
+          setAbcText(nextVal);
+        }
+        requestAnimationFrame(() => {
+          textarea.selectionStart = textarea.selectionEnd = start + formatted.length;
+        });
+      } else {
+        if (editorType === 'solfa') {
+          handleSolfaChange(textarea.value);
+        } else {
+          setAbcText(textarea.value);
+        }
+      }
+
+      showLyricsToast(lineCount);
+    }
+  };
+
+  const handleToggleLyricsSelection = (editorType: 'solfa' | 'abc') => {
+    const textarea = editorType === 'solfa' ? solfaTextareaRef.current : editorTextareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentVal = textarea.value;
+
+    if (start === end) {
+      // Append a sample lyrics stanza template with W: lines
+      const template = '\n\nW: First line of verse\nW: Second line of verse\nW: Third line of verse\nW: Fourth line of verse\n';
+      const nextVal = currentVal + template;
+      if (editorType === 'solfa') {
+        handleSolfaChange(nextVal);
+      } else {
+        setAbcText(nextVal);
+      }
+      showLyricsToast(4);
+      return;
+    }
+
+    const selectedText = currentVal.substring(start, end);
+    const { result, action } = toggleWLyricsOnLines(selectedText);
+
+    let insertedViaExecCommand = false;
+    try {
+      insertedViaExecCommand = document.execCommand('insertText', false, result);
+    } catch {
+      insertedViaExecCommand = false;
+    }
+
+    if (!insertedViaExecCommand) {
+      const nextVal = currentVal.substring(0, start) + result + currentVal.substring(end);
+      if (editorType === 'solfa') {
+        handleSolfaChange(nextVal);
+      } else {
+        setAbcText(nextVal);
+      }
+      requestAnimationFrame(() => {
+        textarea.selectionStart = start;
+        textarea.selectionEnd = start + result.length;
+      });
+    } else {
+      if (editorType === 'solfa') {
+        handleSolfaChange(textarea.value);
+      } else {
+        setAbcText(textarea.value);
+      }
+    }
+
+    showLyricsToast(action === 'added' ? result.split('\n').length : 0);
   };
 
   // 1. Calculate measure tick ranges to highlight active measures
@@ -1347,6 +1659,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     if (!score) return null;
     return (
       <div
+        ref={paperSheetContainerRef}
         className="mx-auto w-full max-w-5xl bg-[#FDFCF8] text-black border border-black/5 shadow-2xl rounded-2xl p-3 sm:p-6 md:p-10 font-sans relative transition-all"
         style={{
           transform: `scale(${scale})`,
@@ -1387,14 +1700,16 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 ...score.voices.map(voice => system.voices[voice.id]?.measures.length || 0)
               );
 
-              const rowHeight = Math.max(28, fontSize * 2.2);
-              const dividerHeight = 12;
+              const rowHeight = fontSize <= 6 ? Math.max(8, Math.round(fontSize * 2.2)) : fontSize <= 12 ? Math.max(14, Math.round(fontSize * 2.0)) : Math.max(28, Math.round(fontSize * 2.2));
+              const dividerHeight = fontSize <= 6 ? 4 : fontSize <= 12 ? 8 : 12;
               const voiceCount = layoutRows.filter(r => r.type === 'voice').length;
               const dividerCount = layoutRows.filter(r => r.type === 'divider').length;
               const systemHeight = (voiceCount * rowHeight) + (dividerCount * dividerHeight);
 
               // Dynamic width for sticky voice label column pinned on left
-              const labelWidthPx = fontSize >= 48 ? Math.max(48, Math.round(fontSize * 0.9)) : fontSize >= 28 ? 64 : 56;
+              const labelWidthPx = fontSize >= 48 ? Math.max(48, Math.round(fontSize * 0.9)) : fontSize >= 28 ? 64 : fontSize <= 6 ? 18 : fontSize <= 12 ? 32 : 56;
+              const notesPaddingClass = fontSize <= 6 ? 'px-0.5' : fontSize <= 10 ? 'px-1' : fontSize <= 14 ? 'px-1.5 sm:px-2' : 'px-3 sm:px-4';
+              const measurePaddingCol = fontSize <= 6 ? 'px-0.5' : fontSize <= 10 ? 'px-1' : 'px-2';
 
               return (
                 <div
@@ -1436,8 +1751,8 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                             }
                             const voice = row.voice;
                             const isMuted = !!mutedVoices[voice.id];
-                            // Abbreviate to S, A, T, B when font size is large or width is narrow
-                            const voiceLabel = fontSize >= 28 ? (voice.name ? voice.name.charAt(0) : voice.id) : voice.name;
+                            // Abbreviate to S, A, T, B when font size is small or very large
+                            const voiceLabel = fontSize <= 12 || fontSize >= 28 ? (voice.name ? voice.name.charAt(0) : voice.id) : voice.name;
 
                             return (
                               <div
@@ -1445,7 +1760,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                                 title={voice.name}
                                 className="font-serif italic font-bold transition-opacity duration-200 text-black/80 truncate"
                                 style={{
-                                  fontSize: `${Math.min(fontSize * 0.85, 48)}px`,
+                                  fontSize: `${Math.max(2, Math.min(fontSize * 0.85, 48))}px`,
                                   height: `${rowHeight}px`,
                                   lineHeight: `${rowHeight}px`,
                                   opacity: isMuted ? 0.25 : 1.0
@@ -1458,81 +1773,89 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                         </div>
                       </div>
 
-                      {/* Measures Block */}
-                      {Array.from({ length: systemMeasuresCount }).map((_, mIndex) => {
-                        const isPlayingThisMeasure =
-                          activeMeasure &&
-                          activeMeasure.systemIndex === system.systemIndex &&
-                          activeMeasure.measureIndex === mIndex;
+                      {/* Measures Block - Fully justified across system width */}
+                      <div className="flex-1 flex flex-row flex-nowrap items-stretch min-w-max">
+                        {Array.from({ length: systemMeasuresCount }).map((_, mIndex) => {
+                          const isPlayingThisMeasure =
+                            activeMeasure &&
+                            activeMeasure.systemIndex === system.systemIndex &&
+                            activeMeasure.measureIndex === mIndex;
 
-                        const barType = system.voices[refVoice]?.barTypes[mIndex] || '|';
+                          const barType = system.voices[refVoice]?.barTypes[mIndex] || '|';
+                          const flexWeight = systemMeasuresBeats[system.systemIndex]?.[mIndex] ?? 1;
 
-                        return (
-                          <div
-                            key={`measure-${system.systemIndex}-${mIndex}`}
-                            ref={isPlayingThisMeasure ? activeMeasureRef : undefined}
-                            className={`flex items-stretch rounded-lg border transition-colors duration-150 shrink-0 ${
-                              isPlayingThisMeasure
-                                ? 'bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-500/20 shadow-sm'
-                                : 'border-transparent'
-                            }`}
-                          >
-                            <div className="flex flex-col justify-start px-2" style={{ height: `${systemHeight}px` }}>
-                              {layoutRows.map((row, rIdx) => {
-                                if (row.type === 'divider') {
+                          return (
+                            <div
+                              key={`measure-${system.systemIndex}-${mIndex}`}
+                              ref={isPlayingThisMeasure ? activeMeasureRef : undefined}
+                              style={{
+                                flex: `${flexWeight} 1 0%`,
+                                minWidth: 'max-content',
+                              }}
+                              className={`flex items-stretch rounded-lg border transition-colors duration-150 ${
+                                isPlayingThisMeasure
+                                  ? 'bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-500/20 shadow-sm'
+                                  : 'border-transparent'
+                              }`}
+                            >
+                              <div className={`flex-1 flex flex-col justify-start w-full ${measurePaddingCol}`} style={{ height: `${systemHeight}px` }}>
+                                {layoutRows.map((row, rIdx) => {
+                                  if (row.type === 'divider') {
+                                    return (
+                                      <div 
+                                        key={`notes-div-${system.systemIndex}-${mIndex}-${rIdx}`}
+                                        className="flex items-center w-full px-4" 
+                                        style={{ height: `${dividerHeight}px` }}
+                                      >
+                                        <div className="w-full border-t border-black/15" />
+                                      </div>
+                                    );
+                                  }
+                                  const voice = row.voice;
+                                  const voiceLine = system.voices[voice.id];
+                                  const measure = voiceLine?.measures[mIndex];
+                                  const isMuted = !!mutedVoices[voice.id];
+
                                   return (
-                                    <div 
-                                      key={`notes-div-${system.systemIndex}-${mIndex}-${rIdx}`}
-                                      className="flex items-center w-full px-4" 
-                                      style={{ height: `${dividerHeight}px` }}
+                                    <div
+                                      key={`notes-${system.systemIndex}-${mIndex}-${voice.id}`}
+                                      className={`font-serif font-black text-center whitespace-nowrap w-full flex items-center justify-center ${notesPaddingClass}`}
+                                      style={{
+                                        fontSize: `${fontSize}px`,
+                                        height: `${rowHeight}px`,
+                                        lineHeight: `${rowHeight}px`,
+                                        opacity: isMuted ? 0.15 : 1.0
+                                      }}
                                     >
-                                      <div className="w-full border-t border-black/15" />
+                                      {measure ? (
+                                        <InteractiveRhythmLine
+                                          measure={measure}
+                                          meter={score.meter}
+                                          meterDenominator={meterDen}
+                                          systemIndex={system.systemIndex}
+                                          voiceId={voice.id}
+                                          measureIndex={mIndex}
+                                          selectedNote={selectedNote}
+                                          onSelectNote={onSelectNote}
+                                          isPlaying={isPlayingThisMeasure}
+                                          isMuted={isMuted}
+                                          isEditorMode={isInteractive}
+                                          currentTick={currentTick}
+                                          fontSize={fontSize}
+                                        />
+                                      ) : (
+                                        '\u00A0'
+                                      )}
                                     </div>
                                   );
-                                }
-                                const voice = row.voice;
-                                const voiceLine = system.voices[voice.id];
-                                const measure = voiceLine?.measures[mIndex];
-                                const isMuted = !!mutedVoices[voice.id];
+                                })}
+                              </div>
 
-                                return (
-                                  <div
-                                    key={`notes-${system.systemIndex}-${mIndex}-${voice.id}`}
-                                    className="font-serif font-black text-center whitespace-nowrap px-3 sm:px-4"
-                                    style={{
-                                      fontSize: `${fontSize}px`,
-                                      height: `${rowHeight}px`,
-                                      lineHeight: `${rowHeight}px`,
-                                      opacity: isMuted ? 0.15 : 1.0
-                                    }}
-                                  >
-                                    {measure ? (
-                                      <InteractiveRhythmLine
-                                        measure={measure}
-                                        meter={score.meter}
-                                        meterDenominator={meterDen}
-                                        systemIndex={system.systemIndex}
-                                        voiceId={voice.id}
-                                        measureIndex={mIndex}
-                                        selectedNote={selectedNote}
-                                        onSelectNote={onSelectNote}
-                                        isPlaying={isPlayingThisMeasure}
-                                        isMuted={isMuted}
-                                        isEditorMode={isInteractive}
-                                        currentTick={currentTick}
-                                      />
-                                    ) : (
-                                      '\u00A0'
-                                    )}
-                                  </div>
-                                );
-                              })}
+                              <BarlineGraphic type={barType} height={systemHeight} />
                             </div>
-
-                            <BarlineGraphic type={barType} height={systemHeight} />
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </ScrollableSystemRow>
                   </div>
                 </div>
@@ -1767,13 +2090,15 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             </Tooltip>
           </div>
 
-          {/* Font Size Controls (Supports up to 96px with stepper & direct preset selector) */}
+          {/* Font Size Controls (Updated range: 2–96px with stepper, direct preset selector & Autofit button) */}
           <div className="flex items-center gap-1 bg-black/40 px-2 py-1 rounded-xl border border-white/10 shadow-inner">
-            <Tooltip content="Decrease Font" description="Reduce notation font size (down to 12px)" side="bottom">
+            <Tooltip content="Decrease Font" description="Reduce notation font size (down to 2px)" side="bottom">
               <button
+                type="button"
                 onClick={() => {
-                  const step = fontSize > 48 ? 8 : fontSize > 24 ? 4 : 2;
-                  setFontSize(Math.max(12, fontSize - step));
+                  setIsManual(true);
+                  const step = fontSize > 48 ? 8 : fontSize > 24 ? 4 : fontSize > 8 ? 2 : 1;
+                  setFontSize(Math.max(2, fontSize - step));
                 }}
                 className="p-1 hover:bg-white/10 rounded-lg text-stone-300 hover:text-white transition-colors cursor-pointer"
                 aria-label="Decrease Font Size"
@@ -1785,16 +2110,19 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               <select
                 aria-label="Select Notation Font Size"
                 value={fontSize}
-                onChange={(e) => setFontSize(parseInt(e.target.value, 10))}
+                onChange={(e) => {
+                  setIsManual(true);
+                  setFontSize(Math.max(2, Math.min(96, parseInt(e.target.value, 10))));
+                }}
                 className="bg-transparent text-[11px] font-mono font-bold text-[#6366F1] hover:text-[#818CF8] text-center focus:outline-none cursor-pointer appearance-none px-1"
-                title="Click to choose font size preset (up to 96px)"
+                title="Click to choose font size preset (2px to 96px)"
               >
-                {[12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 60, 72, 84, 96].map((sz) => (
+                {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48, 60, 72, 84, 96].map((sz) => (
                   <option key={sz} value={sz} className="bg-[#161822] text-stone-200">
                     {sz}px
                   </option>
                 ))}
-                {!([12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 60, 72, 84, 96].includes(fontSize)) && (
+                {!([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48, 60, 72, 84, 96].includes(fontSize)) && (
                   <option value={fontSize} className="bg-[#161822] text-stone-200">
                     {fontSize}px
                   </option>
@@ -1803,14 +2131,38 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
             </div>
             <Tooltip content="Increase Font" description="Enlarge notation font size up to 96px" side="bottom">
               <button
+                type="button"
                 onClick={() => {
-                  const step = fontSize >= 48 ? 8 : fontSize >= 24 ? 4 : 2;
+                  setIsManual(true);
+                  const step = fontSize >= 48 ? 8 : fontSize >= 24 ? 4 : fontSize >= 8 ? 2 : 1;
                   setFontSize(Math.min(96, fontSize + step));
                 }}
                 className="p-1 hover:bg-white/10 rounded-lg text-stone-300 hover:text-white transition-colors cursor-pointer"
                 aria-label="Increase Font Size"
               >
                 <Type size={13} />
+              </button>
+            </Tooltip>
+            <Tooltip
+              content={isManual ? "Fit to Page Width (Auto-fit is currently paused)" : "Fit to Page Width"}
+              description="Fit font size (2–96px) to page width without horizontal scrolling"
+              side="bottom"
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setIsManual(false);
+                  autofitFontSize(true);
+                }}
+                className={`ml-0.5 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-sans font-bold border ${
+                  isManual
+                    ? 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-200 border-indigo-400/40'
+                    : 'hover:bg-white/10 text-indigo-300 hover:text-white border-indigo-500/20'
+                }`}
+                aria-label="Autofit Font Size to Page Width"
+              >
+                <Maximize2 size={10} className="rotate-45 text-indigo-400" />
+                <span className="hidden sm:inline">Fit</span>
               </button>
             </Tooltip>
           </div>
@@ -2015,6 +2367,37 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 </button>
               )}
 
+              {/* Auto W: Lyrics Toggle */}
+              <label
+                className="flex items-center gap-1.5 text-[10px] text-stone-300 font-sans font-bold cursor-pointer select-none px-2.5 py-1.5 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
+                title="Automatically prepend 'W: ' to pasted lyrics, hymn stanzas, and verses"
+              >
+                <input
+                  type="checkbox"
+                  checked={settings ? settings.autoFormatPastedLyrics : true}
+                  onChange={(e) => {
+                    if (onUpdateSettings && settings) {
+                      onUpdateSettings({ ...settings, autoFormatPastedLyrics: e.target.checked });
+                    }
+                  }}
+                  className="w-3.5 h-3.5 text-emerald-500 rounded focus:ring-0 cursor-pointer accent-emerald-500"
+                />
+                <span className="flex items-center gap-1 text-emerald-300/90">
+                  <span>Auto W: Lyrics</span>
+                </span>
+              </label>
+
+              {/* Format / Wrap Selection as W: Lyrics Button */}
+              <button
+                type="button"
+                onClick={() => handleToggleLyricsSelection(sourceTab)}
+                className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-200 rounded-lg active:scale-95 transition-all font-sans font-bold text-[10px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-sm"
+                title="Format selected lines as 'W: ' hymn lyrics lines (or insert lyrics template if nothing selected)"
+              >
+                <FileText size={12} className="text-emerald-400" />
+                <span>Format W:</span>
+              </button>
+
               {/* Split Preview Active Indicator (if enabled in settings) */}
               {showLivePreview && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 rounded-lg text-[10px] font-sans font-bold">
@@ -2125,7 +2508,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                     Auto-Align Grid & Tips
                   </p>
                   <p className="text-indigo-100/80 font-medium font-sans">
-                    Click <span className="font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded">Format & Align Grid</span> to normalize octaves to unicode subscripts (<span className="font-mono text-white">s₁</span>, <span className="font-mono text-white">d₂</span>) and perfectly align vertical choir bars and colons. Enable <span className="font-bold text-white">Format on Blur</span> to align automatically as you edit!
+                    Click <span className="font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded">Format & Align Grid</span> to normalize octaves and align bars and colons. Paste raw hymn verses anytime—they are auto-formatted with <span className="font-mono text-emerald-300 font-bold">W:</span> to become instant score lyrics!
                   </p>
                 </div>
               </div>
@@ -2139,7 +2522,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                     <li><span className="font-bold font-mono text-white">T: Title</span>, <span className="font-bold font-mono text-white">C: Composer</span>.</li>
                     <li><span className="font-bold font-mono text-white">K: Key</span> (e.g., <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">K:G</span>, <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">K:C</span>).</li>
                     <li><span className="font-bold font-mono text-white">M: Meter</span> (e.g., <span className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">M:4/4</span>).</li>
-                    <li><span className="font-bold font-mono text-white">V:S name="Soprano"</span> Voice declaration header.</li>
+                    <li><span className="font-bold font-mono text-white">W: Lyrics</span> Whole stanza/verse line.</li>
                   </ul>
                 </div>
                 <div className="flex-1">
@@ -2155,10 +2538,10 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                 </div>
                 <div className="flex-1">
                   <p className="font-black text-white uppercase tracking-wider text-[10px] text-indigo-400 mb-2 font-sans">
-                    Grid Aligner Hint
+                    Grid Aligner & Lyrics
                   </p>
                   <p className="text-indigo-100/80 font-medium font-sans">
-                    Write notes for different voices (e.g., <span className="font-mono text-white bg-black/30 px-1">V:S</span>, <span className="font-mono text-white bg-black/30 px-1">V:A</span>, etc.) in consecutive lines. Use <span className="font-mono text-white">|</span> for measure lines. Click <span className="font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded">Align Bar Lines</span> to instantly make them line up vertically for a beautiful choir grid layout!
+                    Click <span className="font-bold text-white bg-indigo-600 px-1.5 py-0.5 rounded">Align Bar Lines</span> to align bars across voices. When you paste verses or stanzas, <span className="font-mono text-emerald-300 font-bold">Auto W: Lyrics</span> automatically prepends <span className="font-mono text-emerald-300">W: </span> to each line!
                   </p>
                 </div>
               </div>
@@ -2168,7 +2551,28 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
           {/* Editor Main Area (Lines & Scrollable Panel) */}
           <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
             {/* Left: Code Editor Pane */}
-            <div className={`flex flex-col overflow-hidden ${showLivePreview ? 'w-full lg:w-1/2 border-b lg:border-b-0 lg:border-r border-white/10' : 'w-full flex-1'}`}>
+            <div className={`flex flex-col overflow-hidden relative ${showLivePreview ? 'w-full lg:w-1/2 border-b lg:border-b-0 lg:border-r border-white/10' : 'w-full flex-1'}`}>
+              {/* Floating Lyrics Paste Toast Notification */}
+              {lyricsPasteToast.visible && (
+                <div className="absolute top-3 right-6 z-40 bg-emerald-950/95 border border-emerald-500/40 text-emerald-100 px-3.5 py-2 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs animate-in fade-in slide-in-from-top-2 duration-200 backdrop-blur-md">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span>
+                    Auto-formatted pasted text into <strong>{lyricsPasteToast.lineCount}</strong> lyric lines with <code className="bg-emerald-900/80 px-1 py-0.5 rounded font-mono font-bold text-white">W:</code>
+                  </span>
+                  <span className="text-[10px] text-emerald-300/80 font-mono hidden sm:inline">
+                    (⌘Z / Ctrl+Z to undo)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setLyricsPasteToast({ visible: false, lineCount: 0 })}
+                    className="text-emerald-400 hover:text-white p-0.5 ml-1 rounded cursor-pointer"
+                    title="Dismiss notification"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+
               <div className="flex-1 flex overflow-hidden relative">
                 {sourceTab === 'solfa' ? (
                   <>
@@ -2201,6 +2605,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                         ref={solfaTextareaRef}
                         value={solfaText}
                         onChange={(e) => handleSolfaChange(e.target.value)}
+                        onPaste={(e) => handleEditorPaste(e, 'solfa')}
                         onBlur={handleSolfaBlur}
                         onScroll={handleSolfaScroll}
                         className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
@@ -2241,6 +2646,7 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
                         ref={editorTextareaRef}
                         value={abcText}
                         onChange={(e) => setAbcText(e.target.value)}
+                        onPaste={(e) => handleEditorPaste(e, 'abc')}
                         onScroll={handleEditorScroll}
                         className="absolute inset-0 w-full h-full p-4 pb-36 font-mono text-[11px] leading-relaxed bg-transparent text-transparent caret-white focus:outline-none resize-none whitespace-pre break-all overflow-auto border border-transparent"
                         placeholder="Type or paste ABC notation here..."

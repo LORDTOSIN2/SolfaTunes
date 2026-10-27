@@ -305,6 +305,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </button>
               </div>
 
+              {/* Auto-Format Pasted Lyrics (W:) */}
+              <div className="flex items-center justify-between p-3.5 hover:bg-white/[0.02] transition-colors">
+                <div className="pr-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-xs text-white">Auto-Format Pasted Lyrics (W:)</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded uppercase tracking-wider">
+                      Auto W:
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-400 mt-0.5">
+                    Automatically prepend &ldquo;W:&rdquo; to pasted hymn verses and stanzas so they immediately become legit score lyrics.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={settings.autoFormatPastedLyrics}
+                  onClick={() => handleToggle('autoFormatPastedLyrics')}
+                  className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
+                    settings.autoFormatPastedLyrics ? 'bg-indigo-600' : 'bg-stone-700'
+                  }`}
+                >
+                  <div
+                    className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${
+                      settings.autoFormatPastedLyrics ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
               {/* Sound preview on click */}
               <div className="flex items-center justify-between p-3.5 hover:bg-white/[0.02] transition-colors">
                 <div className="pr-4">
