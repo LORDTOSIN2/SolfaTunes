@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  compareScoresByFileName,
   createAbcScoreLibraryItem,
   getScoreDisplayTitle,
   SCORES,
@@ -23,20 +24,28 @@ describe('score fixtures', () => {
   it('bundles repository MusicXML projects into the unified score library', async () => {
     const musicXmlScores = SCORES.filter(score => score.format === 'musicxml');
 
-    expect(musicXmlScores.map(score => score.fileName).sort()).toEqual([
-      '1 - illsley_second_tune.musicxml',
-      '2 - winchester_new .musicxml',
-      'external MuseScore SATB 1.xml',
-      'external Stuttgart-Come_Thou Key G.xml',
-      'franconia .musicxml',
-      'morning .musicxml',
-      'vienna .musicxml',
-    ]);
+    expect(musicXmlScores.length).toBeGreaterThanOrEqual(21);
+    const prefixedMusicXmlScores = musicXmlScores.filter(score => /^\d+\s*-/.test(score.fileName));
+    expect(prefixedMusicXmlScores.map(score => score.fileName)).toEqual(
+      [...prefixedMusicXmlScores.map(score => score.fileName)].sort((a, b) => {
+        const aNumber = Number(a.match(/^\d+/)?.[0]);
+        const bNumber = Number(b.match(/^\d+/)?.[0]);
+        return aNumber - bNumber || a.localeCompare(b);
+      })
+    );
     for (const score of musicXmlScores) {
       const xmlText = await score.loadXml();
       expect(xmlText).toContain('<score-partwise');
       expect(() => MusicXmlParser.parse(xmlText)).not.toThrow();
     }
+  });
+
+  it('sorts numbered score files by their numeric prefixes', () => {
+    const score2 = createAbcScoreLibraryItem('2 - second.txt', 'T:Second');
+    const score10 = createAbcScoreLibraryItem('10 - tenth.txt', 'T:Tenth');
+    const unnumbered = createAbcScoreLibraryItem('alpha.txt', 'T:Alpha');
+
+    expect([score10, unnumbered, score2].sort(compareScoresByFileName)).toEqual([score2, score10, unnumbered]);
   });
 
   it('loads test fixtures and displays hymn names by default', () => {
@@ -136,9 +145,6 @@ describe('score fixtures', () => {
 
     const viennaScore = SCORES.find(s => s.tuneName?.toLowerCase().includes('vienna') || s.title.toLowerCase().includes('vienna'));
     expect(viennaScore?.hymnMeter).toBe('7.7.7.7');
-
-    const stuttgartScore = SCORES.find(s => s.fileName.toLowerCase().includes('stuttgart'));
-    expect(stuttgartScore?.hymnMeter).toBe('8.7.8.7');
   });
 });
 

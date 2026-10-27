@@ -159,9 +159,26 @@ export function createMusicXmlScoreLibraryItem(
   };
 }
 
+export function compareScoresByFileName(a: ScoreLibraryItem, b: ScoreLibraryItem): number {
+  const aMatch = a.fileName.match(/^\s*(\d+)/);
+  const bMatch = b.fileName.match(/^\s*(\d+)/);
+
+  if (aMatch && bMatch) {
+    const aNumber = Number(aMatch[1]);
+    const bNumber = Number(bMatch[1]);
+    if (aNumber !== bNumber) return aNumber - bNumber;
+  } else if (aMatch) {
+    return -1;
+  } else if (bMatch) {
+    return 1;
+  }
+
+  return a.fileName.localeCompare(b.fileName, undefined, { numeric: true });
+}
+
 export const ABC_SCORES: AbcScoreLibraryItem[] = Object.entries(abcScoreFiles)
   .map(([path, abcText]) => createAbcScoreLibraryItem(path, abcText))
-  .sort((a, b) => getScoreDisplayTitle(a, 'hymn').localeCompare(getScoreDisplayTitle(b, 'hymn')));
+  .sort(compareScoresByFileName);
 
 export const SCORES: ScoreLibraryItem[] = [
   ...ABC_SCORES,
@@ -169,7 +186,7 @@ export const SCORES: ScoreLibraryItem[] = [
     createMusicXmlScoreLibraryItem(path, rawXml)
   ),
 ]
-  .sort((a, b) => getScoreDisplayTitle(a, 'hymn').localeCompare(getScoreDisplayTitle(b, 'hymn')));
+  .sort(compareScoresByFileName);
 
 export function getScoreDisplayTitle(
   score: ScoreLibraryItem,
