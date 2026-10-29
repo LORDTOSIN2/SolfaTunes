@@ -320,11 +320,25 @@ export function flattenScoreToPianoRoll(score: ParsedScore): {
 
     for (let mIdx = 0; mIdx < systemMeasures; mIdx++) {
       // Find duration of this measure across voices
+      let measureMaxVoiceTicks = 0;
+      score.voices.forEach((v) => {
+        const vl = system.voices[v.id];
+        if (vl && vl.measures[mIdx]) {
+          const vDur = vl.measures[mIdx].notes.reduce(
+            (acc, n) => acc + Math.max(1, n.durationTicks || 16),
+            0
+          );
+          if (vDur > measureMaxVoiceTicks) measureMaxVoiceTicks = vDur;
+        }
+      });
+      // Ensure measure duration is at least meterTicks, but expands if notes exceed meterTicks
+      const effectiveMeasureDuration = Math.max(meterTicks, measureMaxVoiceTicks);
+
       measureInfos.push({
         measureIndex: globalMeasureIdx,
         measureNumber: globalMeasureIdx + 1,
         startTick: currentMeasureStart,
-        durationTicks: meterTicks,
+        durationTicks: effectiveMeasureDuration,
       });
 
       // Extract notes for each voice
@@ -362,7 +376,7 @@ export function flattenScoreToPianoRoll(score: ParsedScore): {
         }
       });
 
-      currentMeasureStart += meterTicks;
+      currentMeasureStart += effectiveMeasureDuration;
       globalMeasureIdx++;
     }
   });
@@ -371,8 +385,10 @@ export function flattenScoreToPianoRoll(score: ParsedScore): {
     maxTick = currentMeasureStart;
   }
 
+  const monophonicNotes = enforceMonophony(flatNotes);
+
   return {
-    notes: flatNotes,
+    notes: monophonicNotes,
     measures: measureInfos,
     totalTicks: Math.max(maxTick, meterTicks * 4),
   };

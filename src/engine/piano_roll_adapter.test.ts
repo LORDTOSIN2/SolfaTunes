@@ -349,5 +349,75 @@ describe('Piano Roll Adapter & Monophony Engine', () => {
     expect(rests.length).toBe(0);
     expect(sNotes.length).toBe(4);
   });
+
+  it('correctly adapts Bishopthorpe MusicXML score into Piano Roll with 4 SATB channels and correct note mappings', async () => {
+    const { SCORES } = await import('../utils/scores');
+    const { MusicXmlParser } = await import('./musicxml/musicxml_parser');
+    const bishopthorpe = SCORES.find((s) => s.fileName.includes('bishopthorpe'));
+    expect(bishopthorpe).toBeDefined();
+    if (!bishopthorpe || bishopthorpe.format !== 'musicxml') return;
+
+    const xml = await bishopthorpe.loadXml();
+    const { score } = MusicXmlParser.parse(xml);
+    expect(score.title).toBe('Bishopthorpe');
+    expect(score.key).toBe('G');
+    expect(score.meter).toBe('3/4');
+
+    const { notes, measures } = flattenScoreToPianoRoll(score);
+    expect(measures.length).toBe(18);
+    const channels = score.voices.map((v) => getVoiceCategory(v.name || v.id));
+    expect(channels).toEqual(['S', 'A', 'T', 'B']);
+    expect(notes.length).toBe(137);
+
+    // Verify soprano voice notes
+    const sopranoNotes = notes.filter((n) => n.voiceId === '1' && !n.isRest);
+    expect(sopranoNotes.length).toBe(41);
+    expect(sopranoNotes[0].syllable).toBe('s'); // D in Key G is sol
+    expect(sopranoNotes[0].midiPitch).toBe(62); // D4
+
+    // Ensure strict monophony (no overlapping notes) across every voice
+    ['1', '2', '3', '4'].forEach((voiceId) => {
+      const vNotes = notes.filter((n) => n.voiceId === voiceId && !n.isRest).sort((a, b) => a.startTick - b.startTick);
+      for (let i = 0; i < vNotes.length - 1; i++) {
+        const curEnd = vNotes[i].startTick + vNotes[i].durationTicks;
+        const nextStart = vNotes[i + 1].startTick;
+        expect(curEnd).toBeLessThanOrEqual(nextStart);
+      }
+    });
+
+    // Specifically verify Soprano measures 2, 3, 4, 5 do not collide at measure boundaries
+    // Measure 1 pickup (D4, C5): ticks 0..16, measure grid ends at 48
+    // Measure 2 (B4, A4, G4): ticks 48..96
+    const m2Notes = sopranoNotes.filter((n) => n.startTick >= 48 && n.startTick < 96);
+    expect(m2Notes.map((n) => ({ pitch: n.midiPitch, start: n.startTick, dur: n.durationTicks }))).toEqual([
+      { pitch: 71, start: 48, dur: 24 }, // B4 (dotted quarter)
+      { pitch: 69, start: 72, dur: 8 },  // A4 (eighth)
+      { pitch: 67, start: 80, dur: 16 }, // G4 (quarter)
+    ]);
+
+    // Measure 3 (F#4, E4, C5): ticks 96..144
+    const m3Notes = sopranoNotes.filter((n) => n.startTick >= 96 && n.startTick < 144);
+    expect(m3Notes.map((n) => ({ pitch: n.midiPitch, start: n.startTick, dur: n.durationTicks }))).toEqual([
+      { pitch: 66, start: 96, dur: 16 },  // F#4 (quarter, t₁)
+      { pitch: 64, start: 112, dur: 16 }, // E4 (quarter, l₁)
+      { pitch: 72, start: 128, dur: 16 }, // C5 (quarter, f)
+    ]);
+
+    // Measure 4 (B4, G4, F#4): ticks 144..192
+    const m4Notes = sopranoNotes.filter((n) => n.startTick >= 144 && n.startTick < 192);
+    expect(m4Notes.map((n) => ({ pitch: n.midiPitch, start: n.startTick, dur: n.durationTicks }))).toEqual([
+      { pitch: 71, start: 144, dur: 16 }, // B4 (quarter, m)
+      { pitch: 67, start: 160, dur: 16 }, // G4 (quarter, d)
+      { pitch: 66, start: 176, dur: 16 }, // F#4 (quarter, t₁)
+    ]);
+
+    // Measure 5 (G4): ticks 192..224
+    const m5Notes = sopranoNotes.filter((n) => n.startTick >= 192 && n.startTick < 240);
+    expect(m5Notes.map((n) => ({ pitch: n.midiPitch, start: n.startTick, dur: n.durationTicks }))).toEqual([
+      { pitch: 67, start: 192, dur: 32 }, // G4 (half note, d)
+    ]);
+  });
 });
+
+
 
