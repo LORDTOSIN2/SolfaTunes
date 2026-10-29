@@ -972,7 +972,8 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     return estSize;
   };
 
-  // Autofit on loading a new score (resets manual mode so the new score fits comfortably)
+  // Set the default size for every score to 14px on load.
+  // Autofit runs ONLY when the user clicks the 'Fit' button.
   const prevScoreIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!score) return;
@@ -980,53 +981,9 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
     if (currentScoreId !== prevScoreIdRef.current) {
       prevScoreIdRef.current = currentScoreId;
       setIsManual(false);
-      if (studioMode === 'read' || studioMode === 'interactive') {
-        autofitFontSize(true);
-        const raf = requestAnimationFrame(() => autofitFontSize(true));
-        const t = setTimeout(() => autofitFontSize(true), 180);
-        return () => {
-          cancelAnimationFrame(raf);
-          clearTimeout(t);
-        };
-      }
+      setFontSize(14);
     }
-  }, [score, studioMode]);
-
-  // Autofit when switching mode to score view ('read') or visual edit view ('interactive') if not manual
-  const prevModeRef = useRef<string>(studioMode);
-  useEffect(() => {
-    if (studioMode !== prevModeRef.current) {
-      prevModeRef.current = studioMode;
-      if (!isManualRef.current && (studioMode === 'read' || studioMode === 'interactive')) {
-        autofitFontSize();
-        const raf = requestAnimationFrame(() => autofitFontSize());
-        const t = setTimeout(() => autofitFontSize(), 180);
-        return () => {
-          cancelAnimationFrame(raf);
-          clearTimeout(t);
-        };
-      }
-    }
-  }, [studioMode]);
-
-  // Autofit when layout dimensions change (Fullscreen, Zen Mode, Sidebar toggle), only if not manually adjusted
-  useEffect(() => {
-    if (!isManualRef.current && (studioMode === 'read' || studioMode === 'interactive')) {
-      const t = setTimeout(() => autofitFontSize(), 150);
-      return () => clearTimeout(t);
-    }
-  }, [isFullscreen, settings?.zenMode, settings?.showSidebar]);
-
-  // Autofit when window resizes, only if not manually adjusted
-  useEffect(() => {
-    const handleResize = () => {
-      if (!isManualRef.current && (studioMode === 'read' || studioMode === 'interactive')) {
-        autofitFontSize();
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [studioMode, score]);
+  }, [score, setFontSize]);
 
   // Split View Resizer state (clamped between 20% and 80%, default 50%)
   const [splitRatio, setSplitRatio] = useState<number>(50);
@@ -2377,21 +2334,16 @@ export const ScoreRenderer: React.FC<ScoreRendererProps> = ({
               </button>
             </Tooltip>
             <Tooltip
-              content={isManual ? "Fit to Page Width (Auto-fit is currently paused)" : "Fit to Page Width"}
+              content="Fit to Page Width"
               description="Fit font size (2–96px) to page width without horizontal scrolling"
               side="bottom"
             >
               <button
                 type="button"
                 onClick={() => {
-                  setIsManual(false);
                   autofitFontSize(true);
                 }}
-                className={`ml-0.5 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-sans font-bold border ${
-                  isManual
-                    ? 'bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-200 border-indigo-400/40'
-                    : 'hover:bg-white/10 text-indigo-300 hover:text-white border-indigo-500/20'
-                }`}
+                className="ml-0.5 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-sans font-bold border hover:bg-white/10 text-indigo-300 hover:text-white border-indigo-500/20 active:scale-95"
                 aria-label="Autofit Font Size to Page Width"
               >
                 <Maximize2 size={10} className="rotate-45 text-indigo-400" />

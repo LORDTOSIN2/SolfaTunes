@@ -85,8 +85,8 @@ export default function App() {
   const [masterVolume, setMasterVolume] = useState<number>(0.8);
   const [isLooping, setIsLooping] = useState<boolean>(false);
 
-  // Sheet display states
-  const [fontSize, setFontSize] = useState<number>(18);
+  // Sheet display states (default 14px for every score)
+  const [fontSize, setFontSize] = useState<number>(14);
   const [isManualFontSize, setIsManualFontSize] = useState<boolean>(false);
   const [scale, setScale] = useState<number>(1.0);
 
@@ -362,6 +362,7 @@ export default function App() {
     setMusicXmlStatus(null);
     setSelectedBundledScoreId(song.id);
     setIsManualFontSize(false);
+    setFontSize(14);
     setAbcText(song.abcText);
     setAbcLoadVersion(version => version + 1);
     setSelectedNote(null);
@@ -377,6 +378,7 @@ export default function App() {
     setMusicXmlStatus(null);
     setSelectedBundledScoreId(undefined);
     setIsManualFontSize(false);
+    setFontSize(14);
     setAbcText(text);
     setAbcLoadVersion(version => version + 1);
   };
@@ -449,6 +451,7 @@ export default function App() {
       musicXmlProvenanceRef.current = imported;
       setSelectedBundledScoreId(bundledScoreId);
       setIsManualFontSize(false);
+      setFontSize(14);
       const importedBpm = imported.score.tempoBpm ?? bpm;
       setBpm(importedBpm);
       const importedAbc = serializeScoreToAbc(imported.score);
